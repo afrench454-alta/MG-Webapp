@@ -1,0 +1,21 @@
+.page { min-height: 100vh; padding: 48px 20px; background: #f3f1e9; color: #173f35; }
+.card { width: min(760px, 100%); margin: 0 auto; overflow: hidden; border: 1px solid #d6d5ca; border-radius: 22px; background: #fff; box-shadow: 0 18px 48px rgb(23 63 53 / 10%); }
+.card header { padding: 32px; color: #fff; background: #173f35; }
+.card header p { margin: 0 0 8px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #d9f36a; }
+.card header h1 { margin: 0 0 10px; font-size: clamp(26px, 5vw, 40px); }
+.card header span { display: block; max-width: 620px; line-height: 1.55; color: #e7eee9; }
+.form { display: grid; gap: 24px; padding: 32px; }
+.identity { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.identity label { display: grid; gap: 7px; font-weight: 700; }
+.identity input, .field input[type="text"], .field textarea { width: 100%; border: 1px solid #cfd4ce; border-radius: 10px; padding: 11px 12px; font: inherit; }
+.field { display: grid; gap: 12px; margin: 0; padding: 0; border: 0; }
+.field legend { margin-bottom: 10px; font-weight: 800; }
+.field legend span { color: #a7462c; }
+.options { display: grid; gap: 9px; }
+.options label { display: flex; gap: 9px; align-items: center; padding: 10px 12px; border: 1px solid #e0e1da; border-radius: 10px; }
+.form button { justify-self: start; border: 0; border-radius: 10px; padding: 12px 20px; background: #173f35; color: white; font: inherit; font-weight: 800; cursor: pointer; }
+.form button:disabled { opacity: .65; }
+.error { margin: 0; color: #a7462c; font-weight: 700; }
+.success { padding: 42px 32px; }
+.success h1 { margin-top: 0; }
+@media (max-width: 640px) { .page { padding: 0; } .card { border: 0; border-radius: 0; min-height: 100vh; } .identity { grid-template-columns: 1fr; } .form, .card header { padding: 24px 20px; } }

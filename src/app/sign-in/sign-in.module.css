@@ -1,0 +1,110 @@
+.shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--canvas);
+}
+
+.card {
+  width: min(100%, 440px);
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.brand {
+  margin: 0 0 4px;
+  color: var(--brand-strong);
+  font-family: "IBM Plex Mono", var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.card h1 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 36px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.intro {
+  margin: 10px 0 28px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field input {
+  min-height: 46px;
+  width: 100%;
+  padding: 0 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.field small,
+.status {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status {
+  min-height: 20px;
+  margin: -4px 0 0;
+  line-height: 1.45;
+}
+
+.form button {
+  min-height: 46px;
+  padding: 0 18px;
+  color: white;
+  background: var(--brand);
+  border: 0;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.form button:hover:not(:disabled) {
+  background: var(--brand-strong);
+}
+
+.form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+@media (max-width: 520px) {
+  .shell {
+    align-items: start;
+    padding: 20px 12px;
+  }
+
+  .card {
+    padding: 26px 22px;
+  }
+}

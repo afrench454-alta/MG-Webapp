@@ -1,0 +1,19 @@
+{
+  "archiveFormat": "zip-store",
+  "createdAt": "2026-08-06T18:47:55.229Z",
+  "project": "fieldcentral-pro-console",
+  "version": "0.1.0",
+  "restore": [
+    "npm ci",
+    "npm run check",
+    "npm run build"
+  ],
+  "excluded": [
+    "dependencies",
+    "build output",
+    "Git history",
+    "logs",
+    "QA captures",
+    "real environment files"
+  ]
+}

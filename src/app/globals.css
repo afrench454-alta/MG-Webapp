@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  --canvas: #f5f7f2;
+  --surface: #ffffff;
+  --sidebar: #fbfcf9;
+  --ink: #252c28;
+  --muted: #697772;
+  --line: #dfe5dc;
+  --brand: #60775f;
+  --brand-strong: #38543d;
+  --brand-soft: #e7ede3;
+  --warning: #b88952;
+  --danger: #b9564d;
+  --info: #6d7f83;
+}
+
+@theme inline {
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-sans: "IBM Plex Sans", sans-serif;
+  --font-display: "Work Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --radius-card: 1rem;
+  --radius-control: 0.625rem;
+  --shadow-card: 0 1px 2px rgb(37 44 40 / 0.04);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--canvas);
+}
+
+body {
+  min-height: 100svh;
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 75%, white);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
