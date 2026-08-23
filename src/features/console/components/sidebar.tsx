@@ -1,0 +1,102 @@
+"use client";
+
+import {
+  CalendarDays,
+  ClipboardList,
+  Columns3,
+  DollarSign,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  ReceiptText,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { ConsoleRoute } from "../domain";
+import { IconButton } from "./ui-elements";
+
+export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon }> = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "clients", label: "Clients", icon: Users },
+  { id: "requests", label: "Job Requests", icon: ClipboardList },
+  { id: "questionnaires", label: "Questionnaires", icon: FileText },
+  { id: "quotes", label: "Quotes", icon: ReceiptText },
+  { id: "schedule", label: "Schedule", icon: CalendarDays },
+  { id: "jobs", label: "Job Board", icon: Columns3 },
+  { id: "invoices", label: "Invoices", icon: DollarSign },
+];
+
+export function Sidebar({
+  active,
+  onNavigate,
+  onEstimate,
+  mobileOpen,
+  onClose,
+  signedInEmail,
+  onSignOut,
+}: {
+  active: ConsoleRoute;
+  onNavigate: (route: ConsoleRoute) => void;
+  onEstimate: () => void;
+  mobileOpen: boolean;
+  onClose: () => void;
+  signedInEmail: string;
+  onSignOut?: () => Promise<void>;
+}) {
+  return (
+    <aside className={`sidebar ${mobileOpen ? "sidebar--open" : ""}`}>
+      <div className="brand-lockup">
+        <p>FieldCentral</p>
+        <strong>Pro Console</strong>
+        <IconButton
+          label="Close navigation"
+          icon={X}
+          className="sidebar__close"
+          onClick={onClose}
+        />
+      </div>
+      <nav aria-label="Primary navigation" className="sidebar-nav">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              className={active === item.id ? "is-active" : ""}
+              aria-current={active === item.id ? "page" : undefined}
+              onClick={() => {
+                onNavigate(item.id);
+                onClose();
+              }}
+            >
+              <Icon aria-hidden="true" size={19} strokeWidth={1.8} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+      <div className="sidebar-footer">
+        <button className="ai-button" type="button" onClick={onEstimate}>
+          <Sparkles aria-hidden="true" size={18} />
+          <span>AI Estimator</span>
+        </button>
+        <div className="signed-in">
+          <p className="eyebrow">Signed in</p>
+          <strong>{signedInEmail}</strong>
+          {onSignOut ? (
+            <form action={onSignOut}>
+              <button type="submit">
+                <LogOut aria-hidden="true" size={16} /> Sign out
+              </button>
+            </form>
+          ) : (
+            <button type="button">
+              <LogOut aria-hidden="true" size={16} /> Sign out
+            </button>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}

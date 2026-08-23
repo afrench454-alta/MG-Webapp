@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
+    "test:unit": "tsx --test tests/unit/domain.test.ts tests/unit/contracts.test.ts",
+    "test": "npm run test:unit",
     "check:migrations": "node scripts/verify-migrations.mjs",
-    "check": "npm run lint && npm run typecheck && npm run check:migrations",
+    "check": "npm run lint && npm run typecheck && npm run test:unit && npm run check:migrations",
     "export:project": "node scripts/export-project.mjs"
   },
   "dependencies": {
@@ -20,7 +22,7 @@
     "@fontsource/roboto": "^5.3.0",
     "@fontsource/work-sans": "^5.3.0",
     "@supabase/ssr": "^0.12.4",
-    "@supabase/supabase-js": "^2.112.0",
+    "@supabase/supabase-js": "^2.112.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.28.0",
     "next": "16.3.0",
@@ -30,6 +32,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
