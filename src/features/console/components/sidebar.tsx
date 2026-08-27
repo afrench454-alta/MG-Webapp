@@ -57,7 +57,7 @@ export function Sidebar({
           onClick={onClose}
         />
       </div>
-      <nav aria-label="Primary navigation" className="sidebar-nav">
+      <nav aria-label="Main navigation" className="sidebar-nav">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (

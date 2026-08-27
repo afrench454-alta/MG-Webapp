@@ -440,7 +440,14 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onDeleteQuote(quote.id);
+      let result;
+      try {
+        result = await onDeleteQuote(quote.id);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -459,7 +466,14 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onDeleteJob(job.id);
+      let result;
+      try {
+        result = await onDeleteJob(job.id);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -478,7 +492,14 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onDeleteInvoice(record.id);
+      let result;
+      try {
+        result = await onDeleteInvoice(record.id);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -499,7 +520,9 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onUpdateJob({
+      let result;
+      try {
+        result = await onUpdateJob({
         id: updated.id,
         status: updated.status,
         notes: updated.notes,
@@ -510,6 +533,11 @@ export function ConsoleApp({
           | "Four-weekly"
           | "Monthly",
       });
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -547,12 +575,19 @@ export function ConsoleApp({
       return;
     }
     setOperationMutationPending(true);
-    const result = await onUpdateJobAssignments({
+      let result;
+      try {
+        result = await onUpdateJobAssignments({
       jobId: job.id,
       profileIds,
     });
-    setOperationMutationPending(false);
-    if (!result.ok) {
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
+      setOperationMutationPending(false);
+      if (!result.ok) {
       setOperationMutationError(result.message);
       return;
     }
@@ -589,9 +624,16 @@ export function ConsoleApp({
     formData.set("photo", file);
     formData.set("caption", "");
     setOperationMutationPending(true);
-    const result = await onUploadJobPhoto(formData);
-    setOperationMutationPending(false);
-    if (!result.ok) {
+      let result;
+      try {
+        result = await onUploadJobPhoto(formData);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
+      setOperationMutationPending(false);
+      if (!result.ok) {
       setOperationMutationError(result.message);
       return;
     }
@@ -611,7 +653,14 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onDeleteJobPhoto(job.id, photo.id);
+      let result;
+      try {
+        result = await onDeleteJobPhoto(job.id, photo.id);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -651,7 +700,14 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onUpdateQuoteStatus(quoteId, status);
+      let result;
+      try {
+        result = await onUpdateQuoteStatus(quoteId, status);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -693,7 +749,14 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onUpdateInvoicePayment(invoiceId, status);
+      let result;
+      try {
+        result = await onUpdateInvoicePayment(invoiceId, status);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -714,36 +777,46 @@ export function ConsoleApp({
       return;
     }
     setInvoiceRecords((current) =>
-      current.map((record) =>
-        record.id === invoiceId ? { ...record, paymentStatus: status } : record,
-      ),
+      current.map((record) => {
+        if (record.id === invoiceId) {
+          const autoFinalize = record.documentStatus === "Draft" && (status === "Paid" || status === "Part paid");
+          return { ...record, paymentStatus: status, documentStatus: autoFinalize ? "Finalized" : record.documentStatus };
+        }
+        return record;
+      })
     );
-    setDialog((current) =>
-      current?.type === "invoice-document" &&
-      current.record.id === invoiceId
-        ? { ...current, record: { ...current.record, paymentStatus: status } }
-        : current,
-    );
+    setDialog((current) => {
+      if (current?.type === "invoice-document" && current.record.id === invoiceId) {
+        const record = current.record as Invoice;
+        const autoFinalize = record.documentStatus === "Draft" && (status === "Paid" || status === "Part paid");
+        return { ...current, record: { ...record, paymentStatus: status, documentStatus: autoFinalize ? "Finalized" : record.documentStatus } };
+      }
+      return current;
+    });
     showToast(`Invoice payment status set to ${status.toLowerCase()}.`);
   };
 
   const persistQuote = async (draft: QuoteDraft) => {
     if (dataMode === "demo") {
-      setQuotes((current) => [
-        {
-          id: `QT-2026-${1000 + current.length + 1}`,
-          client: "Northside Studio",
-          address: "7 McCauley Drive, Booie",
-          issued: "05 Aug 2026",
-          expires: "19 Aug 2026",
-          validDays: 14,
-          status: "Draft",
-          discount: 0,
-          taxRate: 0,
-          ...draft,
-        },
-        ...current,
-      ]);
+      setQuotes((current) => {
+        const demoDocId = `QT-2026-${1000 + current.length + 1}`;
+        return [
+          {
+            id: demoDocId,
+            documentNumber: demoDocId,
+            client: "Northside Studio",
+            address: "7 McCauley Drive, Booie",
+            issued: "05 Aug 2026",
+            expires: "19 Aug 2026",
+            validDays: 14,
+            status: "Draft",
+            discount: 0,
+            taxRate: 0,
+            ...draft,
+          },
+          ...current,
+        ];
+      });
       setDialog(null);
       setActive("quotes");
       showToast("Quote saved as draft.");
@@ -817,9 +890,16 @@ export function ConsoleApp({
       return;
     }
     setOperationMutationPending(true);
-    const result = await onScheduleJob(draft);
-    setOperationMutationPending(false);
-    if (!result.ok) {
+      let result;
+      try {
+        result = await onScheduleJob(draft);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
+      setOperationMutationPending(false);
+      if (!result.ok) {
       setOperationMutationError(result.message);
       return;
     }
@@ -835,7 +915,14 @@ export function ConsoleApp({
         return;
       }
       setOperationMutationPending(true);
-      const result = await onFinalizeInvoice(record.id);
+      let result;
+      try {
+        result = await onFinalizeInvoice(record.id);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
       setOperationMutationPending(false);
       if (!result.ok) {
         setOperationMutationError(result.message);
@@ -846,7 +933,11 @@ export function ConsoleApp({
           item.id === record.id ? result.invoice : item,
         ),
       );
-      setDialog({ type: "invoice-document", record: result.invoice });
+      setDialog((current) =>
+        current?.type === "invoice-document" && current.record.id === record.id
+          ? { ...current, record: result.invoice }
+          : current,
+      );
       showToast("Invoice finalized.");
       return;
     }
@@ -854,7 +945,11 @@ export function ConsoleApp({
     setInvoiceRecords((current) =>
       current.map((item) => (item.id === finalized.id ? finalized : item)),
     );
-    setDialog({ type: "invoice-document", record: finalized });
+    setDialog((current) =>
+      current?.type === "invoice-document" && current.record.id === record.id
+        ? { ...current, record: finalized }
+        : current,
+    );
     showToast("Invoice finalized.");
   };
 
@@ -944,6 +1039,7 @@ export function ConsoleApp({
               setDialog({ type: "invoice-document", record })
             }
             onPaymentStatusChange={updateInvoicePaymentStatus}
+            onFinalize={finalizeInvoice}
             onDelete={(record) =>
               setDialog({ type: "delete-invoice", record })
             }

@@ -28,32 +28,36 @@ export function QuestionnairesView({
       </PageHeader>
       <section className="questionnaire-grid">
         {items.map((item) => (
-          <button
-            className="questionnaire-card"
-            key={item.id}
-            onClick={() => onPreview(item)}
-          >
-            <Badge tone={item.tone}>{item.category}</Badge>
-            <h2>{item.title}</h2>
+          <article className="questionnaire-card" key={item.id}>
+            <header>
+              <Badge tone={item.tone}>{item.category}</Badge>
+              <h2>{item.title}</h2>
+            </header>
             <p>{item.description}</p>
             <span className="question-count">{item.count} questions</span>
-            <span className="card-link">
-              Preview form <ArrowUpRight aria-hidden="true" size={15} />
-            </span>
-          </button>
+            <div className="questionnaire-card__actions" style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+              <Button variant="secondary" icon={ArrowUpRight} onClick={() => onPreview(item)}>
+                Preview Form
+              </Button>
+              <Button variant="primary" icon={Send} onClick={onSend}>
+                Send Link
+              </Button>
+            </div>
+          </article>
         ))}
       </section>
       <section className="submissions-section">
-        <h2>Submissions</h2>
+        <h2>Recent Submissions</h2>
         {submissions.length ? (
           <div className="submission-list">
             {submissions.map((submission) => (
-              <article key={submission.id}>
-                <div>
+              <article key={submission.id} className="submission-row">
+                <div className="submission-row__main">
                   <strong>{submission.respondent}</strong>
                   <span>{submission.email || "No email supplied"}</span>
                 </div>
-                <div>
+                <div className="submission-row__meta">
+                  <Badge tone="success">Received</Badge>
                   <strong>{submission.questionnaire}</strong>
                   <span>Submitted {submission.submitted}</span>
                 </div>

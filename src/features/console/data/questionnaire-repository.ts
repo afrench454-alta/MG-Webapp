@@ -6,9 +6,7 @@ import type { BusinessContext } from "@/lib/supabase/business";
 import { createClient } from "@/lib/supabase/server";
 
 import type { Questionnaire, QuestionnaireSubmission } from "../domain";
-
-const formFieldSchema = z.object({ id: z.string(), label: z.string(), type: z.enum(["text", "textarea", "radio", "checkbox"]), required: z.boolean().optional(), options: z.array(z.string()).optional() });
-export const publicQuestionnaireSchema = z.object({ already_submitted: z.boolean(), expires_at: z.string().optional(), business: z.object({ name: z.string(), logo_storage_path: z.string().nullable().optional() }).optional(), questionnaire: z.object({ id: z.uuid(), title: z.string(), introduction: z.string().nullable(), completion_message: z.string().nullable(), version: z.number(), form_schema: z.object({ fields: z.array(formFieldSchema) }) }).optional() });
+import { formFieldSchema, publicQuestionnaireSchema } from "./questionnaire-contract";
 const questionnaireRowSchema = z.object({ id: z.uuid(), name: z.string(), public_title: z.string(), introduction: z.string().nullable(), form_schema: z.object({ fields: z.array(formFieldSchema) }) });
 const responseRowSchema = z.object({ id: z.uuid(), questionnaire_id: z.uuid(), respondent_name: z.string().nullable(), respondent_email: z.string().nullable(), submitted_at: z.string() });
 

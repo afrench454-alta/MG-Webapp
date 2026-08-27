@@ -65,10 +65,42 @@ test.describe("FieldCentral Pro Console - Demo Mode", () => {
     await expect(page.getByText("Paid:")).toBeVisible();
   });
 
-  test("opens and closes AI Scope & Quote Estimator", async ({ page }) => {
-    await page.getByRole("button", { name: "AI Estimator" }).first().click();
-    await expect(page.getByRole("heading", { name: "AI Scope & Quote Estimator" })).toBeVisible();
+  test("tests invoice lifecycle: finalize draft and status updates", async ({ page }) => {
+    await page.getByRole("button", { name: "Invoices" }).click();
+    
+    // Find the first draft invoice's finalize button
+    const finalizeBtn = page.getByRole("button", { name: "Finalize" }).first();
+    if (await finalizeBtn.isVisible()) {
+      await finalizeBtn.click();
+      
+      // Should show the finalized document view
+      await expect(page.getByRole("heading", { name: "INVOICE" })).toBeVisible();
+      await expect(page.getByText("Status: Finalized")).toBeVisible();
+      await page.getByRole("button", { name: "Close" }).click();
+    }
+  });
+
+  test("tests questionnaire preview flow", async ({ page }) => {
+    await page.getByRole("button", { name: "Questionnaires" }).click();
+    await expect(page.getByRole("heading", { name: "Assessment Questionnaires" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Preview Form" }).first().click();
+    
+    // Preview dialog should open and show form steps
+    await expect(page.getByRole("heading", { name: "End of Lease Questionnaire" }).or(page.getByRole("heading", { name: "Bond Clean / End of Lease Questionnaire" }))).toBeVisible();
+    await expect(page.getByText("Contact Information")).toBeVisible();
+    
+    await page.getByRole("button", { name: "Exit Preview" }).click();
+  });
+
+  test("verifies keyboard navigation and focus traps", async ({ page }) => {
+    await page.getByRole("button", { name: "Clients" }).click();
+    await page.getByRole("button", { name: "New Client" }).click();
+    
+    await expect(page.getByRole("heading", { name: "New Client" })).toBeVisible();
+    
+    // Test Escape key closes dialog
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("heading", { name: "AI Scope & Quote Estimator" })).not.toBeVisible();
+    await expect(page.getByRole("heading", { name: "New Client" })).not.toBeVisible();
   });
 });

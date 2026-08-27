@@ -10,10 +10,10 @@ import {
   type Invoice,
   type Quote,
 } from "../domain";
-import { Button } from "../components/ui-elements";
+import { Badge, Button, documentStatusTone, paymentStatusTone, quoteStatusTone } from "../components/ui-elements";
 
-function documentNumber(id: string) {
-  return id.split("-").at(-1) ?? id;
+function getDisplayDocumentNumber(record: Quote | Invoice) {
+  return record.documentNumber || record.id;
 }
 
 function documentDate(value: string) {
@@ -81,17 +81,15 @@ export function DocumentViewDialog({
 
   const printDocument = () => {
     const previousTitle = document.title;
-    const filename = `${record.id} - ${record.client}`.replace(
+    const filename = `${getDisplayDocumentNumber(record)} - ${record.client}`.replace(
       /[\\/:*?"<>|]+/g,
       "-",
     );
-    const restoreTitle = () => {
-      document.title = previousTitle;
-      window.removeEventListener("afterprint", restoreTitle);
-    };
 
     document.title = filename;
-    window.addEventListener("afterprint", restoreTitle);
+    window.addEventListener("afterprint", () => {
+      document.title = previousTitle;
+    }, { once: true });
     window.print();
   };
 
@@ -100,7 +98,7 @@ export function DocumentViewDialog({
       <article
         className={`document-sheet document-sheet--${type}`}
         data-document-kind={type}
-        aria-label={`${documentLabel} ${record.id}`}
+        aria-label={`${documentLabel} ${getDisplayDocumentNumber(record)}`}
       >
         <header className="document-letterhead">
           <div className="document-business">
@@ -137,7 +135,7 @@ export function DocumentViewDialog({
           <dl className="document-facts">
             <div>
               <dt>{documentLabel} No.</dt>
-              <dd>{documentNumber(record.id)}</dd>
+              <dd>{getDisplayDocumentNumber(record)}</dd>
             </div>
             <div>
               <dt>{documentLabel} Date</dt>
@@ -151,6 +149,25 @@ export function DocumentViewDialog({
                   : record.due === "Upon completion"
                     ? record.due
                     : documentDate(record.due)}
+              </dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {isQuote ? (
+                  <Badge tone={quoteStatusTone((record as Quote).status)}>
+                    {(record as Quote).status}
+                  </Badge>
+                ) : (
+                  <>
+                    <Badge tone={documentStatusTone((record as Invoice).documentStatus)}>
+                      {(record as Invoice).documentStatus}
+                    </Badge>
+                    <Badge tone={paymentStatusTone((record as Invoice).paymentStatus)}>
+                      {(record as Invoice).paymentStatus}
+                    </Badge>
+                  </>
+                )}
               </dd>
             </div>
           </dl>
@@ -309,9 +326,15 @@ export function DocumentViewDialog({
             Save / Print PDF
           </Button>
           {!isQuote ? (
-            <Button icon={FileCheck2} onClick={onFinalize}>
-              Finalize
-            </Button>
+            (record as Invoice).documentStatus === "Draft" ? (
+              <Button icon={FileCheck2} onClick={onFinalize}>
+                Finalize
+              </Button>
+            ) : (
+              <Button icon={FileCheck2} disabled variant="secondary">
+                Finalized
+              </Button>
+            )
           ) : null}
           <Button variant="secondary" onClick={onClose}>
             Close

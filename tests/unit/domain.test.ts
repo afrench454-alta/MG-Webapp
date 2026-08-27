@@ -83,3 +83,16 @@ test("businessProfile & terms integrity", () => {
   assert.ok(quoteTerms.length > 20);
   assert.ok(invoiceTerms.length > 20);
 });
+
+import { documentStatusTone, paymentStatusTone } from "../../src/features/console/components/ui-elements";
+
+test("invoice status transitions: valid tone mappings", () => {
+  assert.equal(documentStatusTone("Finalized"), "success");
+  assert.equal(documentStatusTone("Void"), "red");
+  assert.equal(documentStatusTone("Draft"), "amber");
+  
+  assert.equal(paymentStatusTone("Paid"), "success");
+  assert.equal(paymentStatusTone("Part paid"), "amber");
+  assert.equal(paymentStatusTone("Void"), "neutral");
+  assert.equal(paymentStatusTone("Unpaid"), "unpaid");
+});

@@ -13,8 +13,11 @@ export const clientMutationSchema = z.object({
   id: z.string().trim().min(1).max(100),
   name: z.string().trim().min(1).max(200),
   status: z.enum(["Lead", "Active", "Inactive"]),
-  phone: z.string().trim().max(80),
-  email: z.email("Enter a valid client email.").trim().max(320),
+  phone: z.string().trim().min(3, "Enter a valid client phone number.").max(80),
+  email: z.union([
+    z.literal(""),
+    z.string().trim().email("Enter a valid client email.").max(320),
+  ]),
   preferred: z.enum(["Email", "Phone", "SMS"]),
   properties: z.array(propertySchema).max(50),
   notes: z.string().trim().max(20_000),

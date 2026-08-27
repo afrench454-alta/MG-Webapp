@@ -129,9 +129,11 @@ export function ClientsView({
                 <span>
                   <Phone aria-hidden="true" size={16} /> {client.phone}
                 </span>
-                <span>
-                  <Mail aria-hidden="true" size={16} /> {client.email}
-                </span>
+                {client.email ? (
+                  <span>
+                    <Mail aria-hidden="true" size={16} /> {client.email}
+                  </span>
+                ) : null}
               </div>
               <div className="property-list">
                 {client.properties.map((property) => (

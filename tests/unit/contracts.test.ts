@@ -40,7 +40,7 @@ test("contracts: clientMutationSchema validates required fields", () => {
     status: "Active" as const,
     phone: "0400123456",
     email: "john@example.com",
-    preferred: "Email" as const,
+    preferred: "Phone" as const,
     notes: "Client notes",
     properties: [
       { name: "Home", address: "123 Main St, Brisbane", cadence: "Weekly" },
@@ -50,8 +50,21 @@ test("contracts: clientMutationSchema validates required fields", () => {
   const parsed = clientMutationSchema.safeParse(validClient);
   assert.equal(parsed.success, true);
 
+  // Email is optional (empty string is allowed)
+  const validClientNoEmail = { ...validClient, email: "" };
+  assert.equal(clientMutationSchema.safeParse(validClientNoEmail).success, true);
+
+  // Invalid email format when provided
   const invalidEmail = { ...validClient, email: "invalid-email" };
   assert.equal(clientMutationSchema.safeParse(invalidEmail).success, false);
+
+  // Phone is required (empty string not allowed)
+  const invalidNoPhone = { ...validClient, phone: "" };
+  assert.equal(clientMutationSchema.safeParse(invalidNoPhone).success, false);
+
+  // Phone too short (< 3 chars)
+  const invalidShortPhone = { ...validClient, phone: "12" };
+  assert.equal(clientMutationSchema.safeParse(invalidShortPhone).success, false);
 });
 
 test("contracts: jobRequestDraftSchema validates service category and scope", () => {
@@ -119,4 +132,32 @@ test("contracts: scheduleJobSchema validates job schedule inputs", () => {
     scheduledStart: "invalid-date",
   };
   assert.equal(scheduleJobSchema.safeParse(invalidDate).success, false);
+});
+
+import { publicQuestionnaireSchema } from "../../src/features/console/data/questionnaire-contract";
+
+test("contracts: publicQuestionnaireSchema validates forms properly", () => {
+  const validPayload = {
+    already_submitted: false,
+    business: { name: "Mow & Glow" },
+    questionnaire: {
+      id: "123e4567-e89b-12d3-a456-426614174000",
+      version: 1,
+      title: "Title",
+      introduction: "Intro",
+      completion_message: "Done",
+      form_schema: {
+        fields: [
+          { id: "q1", label: "Question 1", type: "radio", required: true, options: ["A", "B"] },
+          { id: "q2", label: "Question 2", type: "text", required: false }
+        ]
+      }
+    }
+  };
+
+  const parsed = publicQuestionnaireSchema.safeParse(validPayload);
+  assert.equal(parsed.success, true);
+
+  const missingTitle = { ...validPayload, questionnaire: { ...validPayload.questionnaire, title: undefined } };
+  assert.equal(publicQuestionnaireSchema.safeParse(missingTitle).success, false);
 });

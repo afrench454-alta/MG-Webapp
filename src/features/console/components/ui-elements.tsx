@@ -42,6 +42,12 @@ export function quoteStatusTone(status: Quote["status"]): BadgeTone {
   return "neutral";
 }
 
+export function documentStatusTone(status: Invoice["documentStatus"]): BadgeTone {
+  if (status === "Finalized") return "success";
+  if (status === "Void") return "red";
+  return "amber";
+}
+
 export function paymentStatusTone(status: Invoice["paymentStatus"]): BadgeTone {
   if (status === "Paid") return "success";
   if (status === "Part paid") return "amber";

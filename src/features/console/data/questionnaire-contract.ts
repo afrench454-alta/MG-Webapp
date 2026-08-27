@@ -22,3 +22,27 @@ export type SubmitQuestionnaireResult = Readonly<{ ok: true; responseId: string 
 export type SendQuestionnaireAction = (input: z.infer<typeof sendQuestionnaireSchema>) => Promise<SendQuestionnaireResult>;
 export type QuestionnaireSubmissionList = QuestionnaireSubmission[];
 
+export const formFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: z.enum(["text", "textarea", "radio", "checkbox"]),
+  required: z.boolean().optional(),
+  options: z.array(z.string()).optional()
+});
+
+export const publicQuestionnaireSchema = z.object({
+  already_submitted: z.boolean(),
+  expires_at: z.string().optional(),
+  business: z.object({
+    name: z.string(),
+    logo_storage_path: z.string().nullable().optional()
+  }).optional(),
+  questionnaire: z.object({
+    id: z.uuid(),
+    title: z.string(),
+    introduction: z.string().nullable(),
+    completion_message: z.string().nullable(),
+    version: z.number(),
+    form_schema: z.object({ fields: z.array(formFieldSchema) })
+  }).optional()
+});

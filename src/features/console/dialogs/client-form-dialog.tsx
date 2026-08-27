@@ -23,7 +23,7 @@ export function ClientFormDialog({
   const [status, setStatus] = useState(client?.status || "Lead");
   const [phone, setPhone] = useState(client?.phone || "");
   const [email, setEmail] = useState(client?.email || "");
-  const [preferred, setPreferred] = useState(client?.preferred || "Email");
+  const [preferred, setPreferred] = useState(client?.preferred || "Phone");
   const [notes, setNotes] = useState(client?.notes || "");
   const [properties, setProperties] = useState(
     client?.properties || [{ name: "", address: "", cadence: "One-off" }],
@@ -42,7 +42,7 @@ export function ClientFormDialog({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    if (!name.trim() || !phone.trim()) return;
     void onSave({
       ...(client || {}),
       id: client?.id || `client-${Date.now()}`,
@@ -76,19 +76,19 @@ export function ClientFormDialog({
             <option>Inactive</option>
           </select>
         </Field>
-        <Field label="Phone">
+        <Field label="Phone" required>
           <input
             type="tel"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
+            required
           />
         </Field>
-        <Field label="Email" required>
+        <Field label="Email">
           <input
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            required
           />
         </Field>
         <Field label="Preferred contact" className="field--span-two">
@@ -98,8 +98,8 @@ export function ClientFormDialog({
               setPreferred(event.target.value as Client["preferred"])
             }
           >
-            <option>Email</option>
             <option>Phone</option>
+            <option>Email</option>
             <option>SMS</option>
           </select>
         </Field>
