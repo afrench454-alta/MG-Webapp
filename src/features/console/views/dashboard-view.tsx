@@ -26,6 +26,7 @@ import {
   type Quote,
 } from "../domain";
 import { invoiceDisplayStatus } from "../data/invoice-lifecycle";
+import { isLiveInvoice, isLiveQuote } from "../data/list-filters";
 import { Badge, EmptyState, PageHeader } from "../components/ui-elements";
 
 export function DashboardView({
@@ -45,19 +46,20 @@ export function DashboardView({
   signedInEmail?: string;
   onNavigate: (route: ConsoleRoute) => void;
 }) {
-  const upcoming = jobs.find((job) => job.status !== "completed");
+  const liveQuotes = quotes.filter(isLiveQuote);
+  const liveInvoices = invoices.filter(isLiveInvoice);
+  const upcoming = jobs.find((job) => job.status !== "completed" && job.status !== "cancelled");
   const upcomingDate = upcoming ? new Date(`${upcoming.date} 00:00:00`) : null;
   const openRequests = jobRequests.filter(
     (request) => !["Closed", "Rejected"].includes(request.status),
   );
-  const quotesAwaiting = quotes.filter((quote) =>
+  const quotesAwaiting = liveQuotes.filter((quote) =>
     ["Draft", "Sent"].includes(quote.status),
   );
-  const unpaidTotal = invoices
-    .filter((record) =>
-      record.documentStatus !== "Void" &&
-      record.paymentStatus !== "Paid" &&
-      record.paymentStatus !== "Refunded",
+  const unpaidTotal = liveInvoices
+    .filter(
+      (record) =>
+        record.paymentStatus !== "Paid" && record.paymentStatus !== "Refunded",
     )
     .reduce(
       (sum, record) =>
@@ -65,7 +67,7 @@ export function DashboardView({
         quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0).total,
       0,
     );
-  const paidTotal = invoices
+  const paidTotal = liveInvoices
     .filter((record) => record.paymentStatus === "Paid")
     .reduce(
       (sum, record) =>
@@ -92,7 +94,7 @@ export function DashboardView({
     {
       label: "Quotes awaiting",
       value: String(quotesAwaiting.length),
-      note: `${quotes.filter((quote) => quote.status === "Accepted").length} accepted`,
+      note: `${liveQuotes.filter((quote) => quote.status === "Accepted").length} accepted`,
       icon: ReceiptText,
       tone: "amber" as const,
     },
@@ -113,7 +115,7 @@ export function DashboardView({
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  const overdueInvoices = invoices.filter(
+  const overdueInvoices = liveInvoices.filter(
     (record) => invoiceDisplayStatus(record) === "Overdue",
   ).length;
   const siteVisitsDue = jobs.filter((job) => {
@@ -212,7 +214,7 @@ export function DashboardView({
               [
                 ReceiptText,
                 "Quotes to send",
-                quotes.filter((quote) => quote.status === "Draft").length,
+                liveQuotes.filter((quote) => quote.status === "Draft").length,
               ],
               [DollarSign, "Invoices overdue", overdueInvoices],
             ] satisfies Array<[LucideIcon, string, number]>

@@ -1,9 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, MapPin, Plus, ReceiptText, Search, Sparkles, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { MapPin, Plus, ReceiptText, Search, Sparkles, Trash2 } from "lucide-react";
 import type { JobRequest } from "../domain";
-import { Badge, Button, EmptyState, IconButton, matchesText, PageHeader } from "../components/ui-elements";
+import {
+  countMatching,
+  matchesRequestFilter,
+  requestFilterIds,
+  type RequestFilterId,
+} from "../data/list-filters";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  FilterGroup,
+  IconButton,
+  matchesText,
+  PageHeader,
+} from "../components/ui-elements";
 
 export function RequestsView({
   requests,
@@ -21,8 +35,11 @@ export function RequestsView({
   canManage: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"All" | JobRequest["status"]>("All");
-  const [category, setCategory] = useState<"All" | JobRequest["category"]>("All");
+  const [filter, setFilter] = useState<RequestFilterId>("all");
+  const counts = useMemo(
+    () => countMatching(requests, requestFilterIds, matchesRequestFilter),
+    [requests],
+  );
 
   const visible = requests.filter((request) => {
     const searchable = [
@@ -33,15 +50,9 @@ export function RequestsView({
       request.created,
     ].join(" ");
     return (
-      matchesText(searchable, query) &&
-      (status === "All" || request.status === status) &&
-      (category === "All" || request.category === category)
+      matchesText(searchable, query) && matchesRequestFilter(request, filter)
     );
   });
-
-  const categories = Array.from(
-    new Set(requests.map((request) => request.category)),
-  );
 
   return (
     <>
@@ -67,42 +78,17 @@ export function RequestsView({
           />
         </label>
         <div className="filter-controls">
-          <span className="filter-controls__label">Filter by</span>
-          <label className="compact-select">
-            <span className="sr-only">Request status</span>
-            <select
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as "All" | JobRequest["status"])
-              }
-            >
-              <option value="All">All statuses</option>
-              <option>New</option>
-              <option>Qualified</option>
-              <option>Quoting</option>
-              <option>Scheduled</option>
-              <option>Closed</option>
-              <option>Rejected</option>
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
-          <label className="compact-select compact-select--wide">
-            <span className="sr-only">Service category</span>
-            <select
-              value={category}
-              onChange={(event) =>
-                setCategory(
-                  event.target.value as "All" | JobRequest["category"],
-                )
-              }
-            >
-              <option value="All">All service categories</option>
-              {categories.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
+          <FilterGroup
+            label="Request view"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { id: "all", label: "All", count: counts.all },
+              { id: "open", label: "Open", count: counts.open },
+              { id: "scheduled", label: "Scheduled", count: counts.scheduled },
+              { id: "closed", label: "Closed", count: counts.closed },
+            ]}
+          />
         </div>
       </section>
       {visible.length ? (

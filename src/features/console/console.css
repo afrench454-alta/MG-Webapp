@@ -1061,7 +1061,76 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
+
+.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.filter-chip {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.filter-chip:hover:not(.filter-chip--active) {
+  color: var(--ink);
+  background: var(--panel-soft);
+}
+
+.filter-chip--active {
+  color: #fff;
+  background: var(--brand);
+}
+
+.filter-chip--voided:not(.filter-chip--active) {
+  color: var(--red);
+}
+
+.filter-chip--voided.filter-chip--active {
+  background: var(--red);
+}
+
+.filter-chip__count {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.filter-chip:not(.filter-chip--active) .filter-chip__count {
+  color: var(--micro);
+  background: var(--panel-soft);
+}
+
+.filter-chip--voided:not(.filter-chip--active) .filter-chip__count {
+  color: var(--red);
+  background: rgba(158, 54, 45, 0.1);
+}
+
 
 .list-filters {
   display: flex;
@@ -2541,6 +2610,8 @@ textarea {
   .list-filters { align-items: stretch; flex-direction: column; }
   .list-filters .search-field { width: 100%; }
   .list-filters .filter-controls { flex-wrap: wrap; }
+  .filter-group { width: 100%; }
+  .filter-chip { flex: 1 1 calc(50% - 6px); justify-content: center; min-height: 40px; }
   .live-label { white-space: normal; }
   .metric-grid { grid-template-columns: 1fr; gap: 12px; }
   .metric-card { min-height: 138px; padding: 22px; }

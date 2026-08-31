@@ -178,3 +178,47 @@ export function Field({
 export function matchesText(value: string, query: string): boolean {
   return value.toLowerCase().includes(query.trim().toLowerCase());
 }
+
+export type FilterChip<T extends string> = {
+  id: T;
+  label: string;
+  count?: number;
+};
+
+export function FilterGroup<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: ReadonlyArray<FilterChip<T>>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="filter-group" role="radiogroup" aria-label={label}>
+      {options.map((option) => {
+        const selected = option.id === value;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            className={`filter-chip${selected ? " filter-chip--active" : ""}${
+              option.id === "voided" ? " filter-chip--voided" : ""
+            }`}
+            onClick={() => onChange(option.id)}
+          >
+            <span>{option.label}</span>
+            {typeof option.count === "number" ? (
+              <span className="filter-chip__count">{option.count}</span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+

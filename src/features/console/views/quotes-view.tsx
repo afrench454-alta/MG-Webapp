@@ -1,9 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { money, quoteTotals, type Quote } from "../domain";
-import { Badge, Button, EmptyState, IconButton, matchesText, PageHeader, quoteStatusTone } from "../components/ui-elements";
+import {
+  countMatching,
+  matchesQuoteFilter,
+  quoteFilterIds,
+  type QuoteFilterId,
+} from "../data/list-filters";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  FilterGroup,
+  IconButton,
+  matchesText,
+  PageHeader,
+  quoteStatusTone,
+} from "../components/ui-elements";
 
 export function QuotesView({
   quotes,
@@ -19,7 +34,11 @@ export function QuotesView({
   onDelete: (quote: Quote) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"All" | Quote["status"]>("All");
+  const [filter, setFilter] = useState<QuoteFilterId>("live");
+  const counts = useMemo(
+    () => countMatching(quotes, quoteFilterIds, matchesQuoteFilter),
+    [quotes],
+  );
 
   const visible = quotes.filter((quote) => {
     const searchable = [
@@ -32,10 +51,7 @@ export function QuotesView({
       quote.scope,
       quote.clientNotes,
     ].join(" ");
-    return (
-      matchesText(searchable, query) &&
-      (status === "All" || quote.status === status)
-    );
+    return matchesText(searchable, query) && matchesQuoteFilter(quote, filter);
   });
 
   return (
@@ -63,25 +79,17 @@ export function QuotesView({
           />
         </label>
         <div className="filter-controls">
-          <span className="filter-controls__label">Filter by</span>
-          <label className="compact-select" aria-label="Quote status filter">
-            <span className="sr-only">Quote status</span>
-            <select
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as "All" | Quote["status"])
-              }
-            >
-              <option value="All">All statuses</option>
-              <option>Draft</option>
-              <option>Sent</option>
-              <option>Accepted</option>
-              <option>Declined</option>
-              <option>Expired</option>
-              <option>Void</option>
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
+          <FilterGroup
+            label="Quote view"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { id: "live", label: "All", count: counts.live },
+              { id: "open", label: "Open", count: counts.open },
+              { id: "accepted", label: "Accepted", count: counts.accepted },
+              { id: "voided", label: "Voided", count: counts.voided },
+            ]}
+          />
         </div>
       </section>
       <section className="record-list">
@@ -125,7 +133,13 @@ export function QuotesView({
           );
         })}
         {!visible.length ? (
-          <EmptyState title="No quotes match the current filters." />
+          <EmptyState
+            title={
+              filter === "voided"
+                ? "No voided quotes."
+                : "No quotes match the current filters."
+            }
+          />
         ) : null}
       </section>
     </>

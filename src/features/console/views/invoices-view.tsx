@@ -12,12 +12,18 @@ import {
   canMarkSent,
   canVoidInvoice,
   invoiceDisplayStatus,
-  type InvoiceDisplayStatus,
 } from "../data/invoice-lifecycle";
+import {
+  countMatching,
+  invoiceFilterIds,
+  matchesInvoiceFilter,
+  type InvoiceFilterId,
+} from "../data/list-filters";
 import {
   Badge,
   Button,
   EmptyState,
+  FilterGroup,
   IconButton,
   matchesText,
   PageHeader,
@@ -160,7 +166,11 @@ export function InvoicesView({
   onDelete: (record: Invoice) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"All" | InvoiceDisplayStatus>("All");
+  const [filter, setFilter] = useState<InvoiceFilterId>("live");
+  const counts = useMemo(
+    () => countMatching(records, invoiceFilterIds, matchesInvoiceFilter),
+    [records],
+  );
 
   const visible = useMemo(() => {
     return records.filter((record) => {
@@ -175,27 +185,30 @@ export function InvoicesView({
         ...(record.scope || []),
         ...record.items.map((item) => item.description),
       ].join(" ");
-      const display = invoiceDisplayStatus(record);
       return (
-        matchesText(searchable, query) && (status === "All" || display === status)
+        matchesText(searchable, query) && matchesInvoiceFilter(record, filter)
       );
     });
-  }, [records, query, status]);
+  }, [records, query, filter]);
 
   const outstanding = useMemo(() => {
     return records
-      .filter((record) =>
-        ["Draft", "Issued", "Sent", "Overdue", "Part paid"].includes(
-          invoiceDisplayStatus(record),
-        ),
-      )
-      .reduce((sum, record) => sum + quoteTotals(record.items).total, 0);
+      .filter((record) => matchesInvoiceFilter(record, "open"))
+      .reduce(
+        (sum, record) =>
+          sum + quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0).total,
+        0,
+      );
   }, [records]);
 
   const paid = useMemo(() => {
     return records
       .filter((record) => invoiceDisplayStatus(record) === "Paid")
-      .reduce((sum, record) => sum + quoteTotals(record.items).total, 0);
+      .reduce(
+        (sum, record) =>
+          sum + quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0).total,
+        0,
+      );
   }, [records]);
 
   return (
@@ -228,27 +241,17 @@ export function InvoicesView({
           />
         </label>
         <div className="filter-controls">
-          <span className="filter-controls__label">Filter by</span>
-          <label className="compact-select">
-            <span className="sr-only">Invoice status</span>
-            <select
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as "All" | InvoiceDisplayStatus)
-              }
-            >
-              <option value="All">All statuses</option>
-              <option value="Draft">Draft</option>
-              <option value="Issued">Issued</option>
-              <option value="Sent">Sent</option>
-              <option value="Overdue">Overdue</option>
-              <option value="Part paid">Part paid</option>
-              <option value="Paid">Paid</option>
-              <option value="Refunded">Refunded</option>
-              <option value="Void">Void</option>
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
+          <FilterGroup
+            label="Invoice view"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { id: "live", label: "All", count: counts.live },
+              { id: "open", label: "Open", count: counts.open },
+              { id: "paid", label: "Paid", count: counts.paid },
+              { id: "voided", label: "Voided", count: counts.voided },
+            ]}
+          />
         </div>
       </section>
       <section className="record-list">
@@ -266,7 +269,13 @@ export function InvoicesView({
           />
         ))}
         {!visible.length ? (
-          <EmptyState title="No invoices match the current filters." />
+          <EmptyState
+            title={
+              filter === "voided"
+                ? "No voided invoices."
+                : "No invoices match the current filters."
+            }
+          />
         ) : null}
       </section>
     </>

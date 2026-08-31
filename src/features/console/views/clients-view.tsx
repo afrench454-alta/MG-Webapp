@@ -1,9 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Mail, MapPin, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Mail, MapPin, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
 import type { Client } from "../domain";
-import { Badge, Button, EmptyState, IconButton, matchesText, PageHeader } from "../components/ui-elements";
+import {
+  clientFilterIds,
+  countMatching,
+  matchesClientFilter,
+  type ClientFilterId,
+} from "../data/list-filters";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  FilterGroup,
+  IconButton,
+  matchesText,
+  PageHeader,
+} from "../components/ui-elements";
 
 export function ClientsView({
   clients,
@@ -21,8 +35,11 @@ export function ClientsView({
   archiveMode: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"All" | Client["status"]>("All");
-  const [preferred, setPreferred] = useState<"All" | Client["preferred"]>("All");
+  const [filter, setFilter] = useState<ClientFilterId>("all");
+  const counts = useMemo(
+    () => countMatching(clients, clientFilterIds, matchesClientFilter),
+    [clients],
+  );
 
   const visible = clients.filter((client) => {
     const searchable = [
@@ -36,11 +53,7 @@ export function ClientsView({
         property.cadence,
       ]),
     ].join(" ");
-    return (
-      matchesText(searchable, query) &&
-      (status === "All" || client.status === status) &&
-      (preferred === "All" || client.preferred === preferred)
-    );
+    return matchesText(searchable, query) && matchesClientFilter(client, filter);
   });
 
   return (
@@ -67,37 +80,17 @@ export function ClientsView({
           />
         </label>
         <div className="filter-controls">
-          <span className="filter-controls__label">Filter by</span>
-          <label className="compact-select">
-            <span className="sr-only">Client status</span>
-            <select
-              value={status}
-              onChange={(event) =>
-                setStatus(event.target.value as "All" | Client["status"])
-              }
-            >
-              <option value="All">All statuses</option>
-              <option>Lead</option>
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
-          <label className="compact-select">
-            <span className="sr-only">Preferred contact</span>
-            <select
-              value={preferred}
-              onChange={(event) =>
-                setPreferred(event.target.value as "All" | Client["preferred"])
-              }
-            >
-              <option value="All">All contact methods</option>
-              <option>Email</option>
-              <option>Phone</option>
-              <option>SMS</option>
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
+          <FilterGroup
+            label="Client view"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { id: "all", label: "All", count: counts.all },
+              { id: "active", label: "Active", count: counts.active },
+              { id: "leads", label: "Leads", count: counts.leads },
+              { id: "inactive", label: "Inactive", count: counts.inactive },
+            ]}
+          />
         </div>
       </section>
       {visible.length ? (
