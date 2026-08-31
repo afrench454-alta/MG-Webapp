@@ -41,6 +41,7 @@ import type {
   DeleteQuoteAction,
   FinalizeInvoiceAction,
   VoidInvoiceAction,
+  MarkInvoiceSentAction,
   SaveInvoiceAction,
   SaveQuoteAction,
   ScheduleJobAction,
@@ -85,6 +86,7 @@ import {
 import {
   applyInvoicePayment,
   finalizeInvoiceRecord,
+  markInvoiceSent,
   voidInvoice,
 } from "./data/invoice-lifecycle";
 
@@ -135,6 +137,7 @@ export type ConsoleAppProps = {
   onSaveInvoice?: SaveInvoiceAction;
   onUpdateInvoicePayment?: UpdateInvoicePaymentAction;
   onFinalizeInvoice?: FinalizeInvoiceAction;
+  onMarkInvoiceSent?: MarkInvoiceSentAction;
   onVoidInvoice?: VoidInvoiceAction;
   onDeleteInvoice?: DeleteInvoiceAction;
   onSendQuestionnaire?: SendQuestionnaireAction;
@@ -170,6 +173,7 @@ export function ConsoleApp({
   onSaveInvoice,
   onUpdateInvoicePayment,
   onFinalizeInvoice,
+  onMarkInvoiceSent,
   onVoidInvoice,
   onDeleteInvoice,
   onSendQuestionnaire,
@@ -778,11 +782,13 @@ export function ConsoleApp({
     invoiceId: string,
     status: Invoice["paymentStatus"],
   ) => {
+    setOperationMutationError("");
     if (dataMode === "live") {
       if (!onUpdateInvoicePayment) {
         setOperationMutationError("Live invoice updates are not available.");
         return;
       }
+      setOperationMutationError("");
       setOperationMutationPending(true);
       let result;
       try {
@@ -886,7 +892,47 @@ export function ConsoleApp({
 
   const persistInvoice = async (draft: InvoiceDraft) => {
     if (dataMode === "demo") {
+      const client = clients.find((item) => item.id === draft.clientId);
+      const property = client?.properties.find((item) => item.id === draft.propertyId);
+      const dueDays = Number(draft.dueDays) || 0;
+      const issuedAt = new Date();
+      const dueAt = new Date(issuedAt);
+      dueAt.setDate(dueAt.getDate() + dueDays);
+      const formatDisplay = (value: Date) =>
+        new Intl.DateTimeFormat("en-AU", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          timeZone: "Australia/Brisbane",
+        }).format(value);
+      const formatIso = (value: Date) =>
+        new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Brisbane" }).format(value);
+      setInvoiceRecords((current) => {
+        const demoDocId = `INV-2026-${2000 + current.length + 1}`;
+        return [
+          {
+            id: demoDocId,
+            documentNumber: demoDocId,
+            clientId: draft.clientId,
+            serviceAddressId: draft.propertyId,
+            jobId: draft.jobId,
+            client: client?.name || "Client",
+            address: property?.address || "No billing address",
+            issued: formatDisplay(issuedAt),
+            due: formatDisplay(dueAt),
+            dueDate: formatIso(dueAt),
+            documentStatus: "Draft",
+            paymentStatus: "Unpaid",
+            notes: draft.notes,
+            discount: 0,
+            taxRate: 0,
+            items: draft.items,
+          },
+          ...current,
+        ];
+      });
       setDialog(null);
+      setActive("invoices");
       showToast("Invoice saved as draft.");
       return;
     }
@@ -995,6 +1041,58 @@ export function ConsoleApp({
         error instanceof OperationsRuleError
           ? error.message
           : "The invoice could not be finalized.",
+      );
+    }
+  };
+
+  const markInvoiceSentRecord = async (record: Invoice) => {
+    if (dataMode === "live") {
+      if (!onMarkInvoiceSent) {
+        setOperationMutationError("Live invoice updates are not available.");
+        return;
+      }
+      setOperationMutationError("");
+      setOperationMutationPending(true);
+      let result;
+      try {
+        result = await onMarkInvoiceSent(record.id);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
+      setOperationMutationPending(false);
+      if (!result.ok) {
+        setOperationMutationError(result.message);
+        return;
+      }
+      setInvoiceRecords((current) =>
+        current.map((item) => (item.id === record.id ? result.invoice : item)),
+      );
+      setDialog((current) =>
+        current?.type === "invoice-document" && current.record.id === record.id
+          ? { ...current, record: result.invoice }
+          : current,
+      );
+      showToast("Invoice marked sent.");
+      return;
+    }
+    try {
+      const sent = markInvoiceSent(record);
+      setInvoiceRecords((current) =>
+        current.map((item) => (item.id === sent.id ? sent : item)),
+      );
+      setDialog((current) =>
+        current?.type === "invoice-document" && current.record.id === record.id
+          ? { ...current, record: sent }
+          : current,
+      );
+      showToast("Invoice marked sent.");
+    } catch (error) {
+      setOperationMutationError(
+        error instanceof OperationsRuleError
+          ? error.message
+          : "The invoice could not be marked sent.",
       );
     }
   };
@@ -1131,12 +1229,14 @@ export function ConsoleApp({
         return (
           <InvoicesView
             records={invoiceRecords}
+            pending={operationMutationPending}
             onNew={() => setDialog({ type: "invoice-form" })}
             onView={(record) =>
               setDialog({ type: "invoice-document", record })
             }
             onPaymentStatusChange={updateInvoicePaymentStatus}
             onFinalize={finalizeInvoice}
+            onMarkSent={markInvoiceSentRecord}
             onVoid={voidIssuedInvoiceRecord}
             onDelete={(record) =>
               setDialog({ type: "delete-invoice", record })
@@ -1189,7 +1289,20 @@ export function ConsoleApp({
             <strong>Console</strong>
           </div>
         </header>
-        <main className="workspace">{renderView()}</main>
+        <main className="workspace">
+          {operationMutationError ? (
+            <div className="workspace-alert" role="alert">
+              <p>{operationMutationError}</p>
+              <button
+                type="button"
+                onClick={() => setOperationMutationError("")}
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+          {renderView()}
+        </main>
       </div>
 
       {dialog?.type === "estimator" ? (
@@ -1401,6 +1514,7 @@ export function ConsoleApp({
               )
             }
             onFinalize={() => void finalizeInvoice(dialog.record)}
+            onMarkSent={() => void markInvoiceSentRecord(dialog.record)}
             onVoid={() => void voidIssuedInvoiceRecord(dialog.record)}
           />
         </Dialog>

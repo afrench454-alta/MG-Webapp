@@ -21,8 +21,9 @@ import {
 import {
   applyInvoicePayment,
   finalizeInvoiceRecord,
+  markInvoiceSent,
+  planInvoicePaymentRecords,
   toDbDocumentStatus,
-  toDbPaymentStatus,
   voidInvoice,
 } from "./invoice-lifecycle";
 
@@ -37,7 +38,7 @@ const invoiceItemRowSchema = itemSchema.extend({ invoice_id: z.uuid() });
 const recurrenceRowSchema = z.object({ job_id: z.uuid(), frequency: z.enum(["daily", "weekly", "monthly", "yearly", "custom"]), interval_count: z.number() });
 const quoteRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), service_address_id: z.uuid().nullable(), job_request_id: z.uuid().nullable(), document_number: z.string().nullable(), status: z.enum(["draft", "sent", "approved", "declined", "expired", "void"]), title: z.string(), issue_date: z.string(), valid_until: z.string().nullable(), customer_message: z.string().nullable(), internal_notes: z.string().nullable() });
 const jobRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), service_address_id: z.uuid().nullable(), job_request_id: z.uuid().nullable(), status: z.enum(["unscheduled", "scheduled", "in_progress", "paused", "completed", "cancelled"]), title: z.string(), scope_of_work: z.string().nullable(), internal_instructions: z.string().nullable(), scheduled_start: z.string().nullable() });
-const invoiceRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), billing_address_id: z.uuid().nullable(), job_id: z.uuid().nullable(), document_number: z.string().nullable(), document_status: z.enum(["draft", "issued", "sent", "overdue", "void"]), payment_status: z.enum(["unpaid", "partially_paid", "paid", "refunded"]), title: z.string(), issue_date: z.string(), due_date: z.string().nullable(), payment_instructions: z.string().nullable(), internal_notes: z.string().nullable() });
+const invoiceRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), billing_address_id: z.uuid().nullable(), job_id: z.uuid().nullable(), document_number: z.string().nullable(), document_status: z.string(), payment_status: z.string(), title: z.string(), issue_date: z.string(), due_date: z.string().nullable(), payment_instructions: z.string().nullable(), internal_notes: z.string().nullable() });
 
 const QUOTE_SELECT = "id, client_id, service_address_id, job_request_id, document_number, status, title, issue_date, valid_until, customer_message, internal_notes";
 const JOB_SELECT = "id, client_id, service_address_id, job_request_id, status, title, scope_of_work, internal_instructions, scheduled_start";
@@ -152,23 +153,81 @@ export async function updateInvoicePayment(context: BusinessContext, id: string,
   const current = await getInvoice(context, id);
   const next = applyInvoicePayment(current, status);
   const supabase = await createClient();
-  const changes: Record<string, string> = {
-    payment_status: toDbPaymentStatus(next.paymentStatus),
-  };
   if (next.documentStatus !== current.documentStatus) {
-    changes.document_status = toDbDocumentStatus(next.documentStatus);
+    const { error: documentError } = await supabase
+      .from("invoices")
+      .update({ document_status: toDbDocumentStatus(next.documentStatus) })
+      .eq("business_id", context.businessId)
+      .eq("id", id);
+    if (documentError) throw new Error(documentError.message);
   }
+  await syncInvoicePaymentRecords(context, id, next);
+  return getInvoice(context, id);
+}
+
+const paymentRowSchema = z.object({
+  id: z.uuid(),
+  amount: z.coerce.number(),
+  status: z.enum(["recorded", "voided", "refunded"]),
+});
+
+async function syncInvoicePaymentRecords(
+  context: BusinessContext,
+  invoiceId: string,
+  invoice: Invoice,
+): Promise<void> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("payments")
+    .select("id, amount, status")
+    .eq("business_id", context.businessId)
+    .eq("invoice_id", invoiceId);
+  if (error) throw new Error(error.message);
+
+  const rows = z.array(paymentRowSchema).parse(data || []);
+  const recordedSum = rows
+    .filter((row) => row.status === "recorded")
+    .reduce((sum, row) => sum + row.amount, 0);
+  const plan = planInvoicePaymentRecords(invoice, invoice.paymentStatus, recordedSum);
+
+  if (plan.voidRecorded) {
+    const { error: voidError } = await supabase
+      .from("payments")
+      .update({ status: "voided" })
+      .eq("business_id", context.businessId)
+      .eq("invoice_id", invoiceId)
+      .eq("status", "recorded");
+    if (voidError) throw new Error(voidError.message);
+  }
+
+  if (plan.insert) {
+    const { error: insertError } = await supabase.from("payments").insert({
+      business_id: context.businessId,
+      invoice_id: invoiceId,
+      amount: plan.insert.amount,
+      method: plan.insert.method,
+      status: plan.insert.status,
+      notes: plan.insert.notes,
+      recorded_by: context.actorId,
+    });
+    if (insertError) throw new Error(insertError.message);
+  }
+}
+
+export async function finalizeInvoice(context: BusinessContext, id: string): Promise<Invoice> {
+  const next = finalizeInvoiceRecord(await getInvoice(context, id));
+  const supabase = await createClient();
   const { error } = await supabase
     .from("invoices")
-    .update(changes)
+    .update({ document_status: toDbDocumentStatus(next.documentStatus) })
     .eq("business_id", context.businessId)
     .eq("id", id);
   if (error) throw new Error(error.message);
   return getInvoice(context, id);
 }
 
-export async function finalizeInvoice(context: BusinessContext, id: string): Promise<Invoice> {
-  const next = finalizeInvoiceRecord(await getInvoice(context, id));
+export async function markInvoiceAsSent(context: BusinessContext, id: string): Promise<Invoice> {
+  const next = markInvoiceSent(await getInvoice(context, id));
   const supabase = await createClient();
   const { error } = await supabase
     .from("invoices")

@@ -10,6 +10,7 @@ import { LineItemEditor, Totals } from "../components/line-item-editor";
 export type InvoiceDraft = {
   clientId: string;
   propertyId: string;
+  extraPropertyIds?: string[];
   jobId?: string;
   items: LineItem[];
   dueDays: string;
@@ -34,6 +35,7 @@ export function InvoiceFormDialog({
   const [clientId, setClientId] = useState("");
   const selectedClient = clients.find((client) => client.id === clientId);
   const [propertyId, setPropertyId] = useState("");
+  const [extraPropertyIds, setExtraPropertyIds] = useState<string[]>([]);
   const [jobId, setJobId] = useState("");
   const [items, setItems] = useState<LineItem[]>([
     { description: "", quantity: 1, rate: 0 },
@@ -50,6 +52,7 @@ export function InvoiceFormDialog({
     void onSave({
       clientId,
       propertyId,
+      extraPropertyIds: extraPropertyIds.filter((id) => id !== propertyId),
       jobId: jobId || undefined,
       items,
       dueDays,
@@ -69,6 +72,7 @@ export function InvoiceFormDialog({
               );
               setClientId(event.target.value);
               setPropertyId(next?.properties[0]?.id || "");
+              setExtraPropertyIds([]);
             }}
             required
             disabled={pending}
@@ -88,13 +92,18 @@ export function InvoiceFormDialog({
               const next = jobs.find((job) => job.id === event.target.value);
               setJobId(event.target.value);
               if (next) {
-                const client = clients.find((item) => item.name === next.client);
+                const client =
+                  clients.find((item) => item.id === next.clientId) ||
+                  clients.find((item) => item.name === next.client);
                 setClientId(client?.id || "");
                 setPropertyId(
                   client?.properties.find(
-                    (property) => property.address === next.address,
+                    (property) =>
+                      property.id === next.serviceAddressId ||
+                      property.address === next.address,
                   )?.id || "",
                 );
+                setExtraPropertyIds([]);
               }
             }}
             disabled={pending}
@@ -126,6 +135,33 @@ export function InvoiceFormDialog({
           ))}
         </select>
       </Field>
+      {(selectedClient?.properties || []).filter(
+        (property) => property.id && property.id !== propertyId,
+      ).length ? (
+        <fieldset className="property-checklist">
+          <legend>Also include these properties</legend>
+          {(selectedClient?.properties || [])
+            .filter((property) => property.id && property.id !== propertyId)
+            .map((property) => (
+              <label key={property.id} className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={extraPropertyIds.includes(property.id!)}
+                  disabled={pending}
+                  onChange={() => {
+                    const id = property.id!;
+                    setExtraPropertyIds((current) =>
+                      current.includes(id)
+                        ? current.filter((value) => value !== id)
+                        : [...current, id],
+                    );
+                  }}
+                />
+                <span>{property.address}</span>
+              </label>
+            ))}
+        </fieldset>
+      ) : null}
       <LineItemEditor items={items} setItems={setItems} />
       <Totals items={items} />
       <div className="form-grid form-grid--three">

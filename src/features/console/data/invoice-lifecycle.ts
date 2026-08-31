@@ -1,4 +1,4 @@
-import type { Invoice } from "../domain";
+import { quoteTotals, type Invoice } from "../domain";
 import { OperationsRuleError } from "./operations-rules";
 
 export type InvoiceDisplayStatus =
@@ -11,11 +11,29 @@ export type InvoiceDisplayStatus =
   | "Refunded"
   | "Void";
 
+export type InvoicePaymentWrite = {
+  voidRecorded: boolean;
+  insert: {
+    amount: number;
+    status: "recorded" | "refunded";
+    method: "bank_transfer";
+    notes: string;
+  } | null;
+};
+
 const COLLECTABLE_DOCUMENTS: Invoice["documentStatus"][] = [
   "Issued",
   "Sent",
   "Overdue",
 ];
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function invoiceTotal(invoice: Pick<Invoice, "items" | "discount" | "taxRate">): number {
+  return roundMoney(quoteTotals(invoice.items, invoice.discount ?? 0, invoice.taxRate ?? 0).total);
+}
 
 function brisbaneToday(now: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -37,6 +55,10 @@ export function canDeleteInvoice(invoice: Invoice): boolean {
 
 export function canFinalizeInvoice(invoice: Invoice): boolean {
   return invoice.documentStatus === "Draft";
+}
+
+export function canMarkSent(invoice: Invoice): boolean {
+  return invoice.documentStatus === "Issued";
 }
 
 export function canVoidInvoice(invoice: Invoice): boolean {
@@ -134,6 +156,79 @@ export function finalizeInvoiceRecord(invoice: Invoice): Invoice {
     throw new OperationsRuleError("Only draft invoices can be finalized.");
   }
   return { ...invoice, documentStatus: "Issued" };
+}
+
+export function markInvoiceSent(invoice: Invoice): Invoice {
+  if (!canMarkSent(invoice)) {
+    throw new OperationsRuleError("Only issued invoices can be marked sent.");
+  }
+  return { ...invoice, documentStatus: "Sent" };
+}
+
+/**
+ * Postgres derives invoices.payment_status from payment rows.
+ * Direct status updates are rejected by invoices_guard_derived_fields.
+ */
+export function planInvoicePaymentRecords(
+  invoice: Pick<Invoice, "items" | "discount" | "taxRate">,
+  next: Invoice["paymentStatus"],
+  recordedSum = 0,
+): InvoicePaymentWrite {
+  const total = invoiceTotal(invoice);
+  const recorded = roundMoney(Math.max(0, recordedSum));
+
+  if (next === "Unpaid") {
+    return { voidRecorded: recorded > 0, insert: null };
+  }
+
+  if (next === "Paid") {
+    if (total <= 0) {
+      throw new OperationsRuleError("This invoice has no amount to collect.");
+    }
+    const remaining = roundMoney(total - recorded);
+    if (remaining <= 0) {
+      return { voidRecorded: false, insert: null };
+    }
+    return {
+      voidRecorded: false,
+      insert: {
+        amount: remaining,
+        status: "recorded",
+        method: "bank_transfer",
+        notes: "Marked paid in console",
+      },
+    };
+  }
+
+  if (next === "Part paid") {
+    if (total <= 0.01) {
+      throw new OperationsRuleError("This invoice is too small to mark as part paid.");
+    }
+    if (recorded > 0 && recorded < total) {
+      return { voidRecorded: false, insert: null };
+    }
+    const half = roundMoney(total / 2);
+    const amount = roundMoney(Math.min(Math.max(half, 0.01), total - 0.01));
+    return {
+      voidRecorded: recorded > 0,
+      insert: {
+        amount,
+        status: "recorded",
+        method: "bank_transfer",
+        notes: "Marked part paid in console",
+      },
+    };
+  }
+
+  return {
+    voidRecorded: recorded > 0,
+    insert: {
+      amount: Math.max(total, 0.01),
+      status: "refunded",
+      method: "bank_transfer",
+      notes: "Marked refunded in console",
+    },
+  };
 }
 
 export function toDbPaymentStatus(status: Invoice["paymentStatus"]): string {

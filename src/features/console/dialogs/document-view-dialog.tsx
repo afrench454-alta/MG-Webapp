@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronDown, FileCheck2, Printer } from "lucide-react";
+import { ChevronDown, FileCheck2, Printer, Send } from "lucide-react";
 import {
   businessProfile,
   invoiceTerms,
@@ -10,7 +10,7 @@ import {
   type Invoice,
   type Quote,
 } from "../domain";
-import { allowedPaymentStatuses, canFinalizeInvoice, canMarkPaid, canVoidInvoice, invoiceDisplayStatus } from "../data/invoice-lifecycle";
+import { allowedPaymentStatuses, canFinalizeInvoice, canMarkPaid, canMarkSent, canVoidInvoice, invoiceDisplayStatus } from "../data/invoice-lifecycle";
 import { Badge, Button, invoiceDisplayTone, quoteStatusTone } from "../components/ui-elements";
 
 function getDisplayDocumentNumber(record: Quote | Invoice) {
@@ -56,6 +56,7 @@ export function DocumentViewDialog({
   onClose,
   onStatusChange,
   onFinalize,
+  onMarkSent,
   onVoid,
 }: {
   type: "quote" | "invoice";
@@ -63,6 +64,7 @@ export function DocumentViewDialog({
   onClose: () => void;
   onStatusChange?: (status: string) => void;
   onFinalize?: () => void;
+  onMarkSent?: () => void;
   onVoid?: () => void;
 }) {
   const isQuote = "expires" in record;
@@ -315,7 +317,9 @@ export function DocumentViewDialog({
               ? ["Draft", "Sent", "Accepted", "Declined", "Expired", "Void"]
               : allowedPaymentStatuses(record as Invoice)
             ).map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option} value={option}>
+                {option}
+              </option>
             ))}
           </select>
           <ChevronDown aria-hidden="true" size={16} />
@@ -335,6 +339,11 @@ export function DocumentViewDialog({
           {!isQuote && canFinalizeInvoice(record as Invoice) ? (
             <Button variant="secondary" icon={FileCheck2} onClick={onFinalize}>
               Issue
+            </Button>
+          ) : null}
+          {!isQuote && canMarkSent(record as Invoice) ? (
+            <Button variant="secondary" icon={Send} onClick={onMarkSent}>
+              Mark sent
             </Button>
           ) : null}
           {!isQuote && canVoidInvoice(record as Invoice) ? (

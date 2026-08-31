@@ -8,9 +8,12 @@ import {
   canDeleteInvoice,
   canFinalizeInvoice,
   canMarkPaid,
+  canMarkSent,
   canVoidInvoice,
   invoiceDisplayStatus,
   markInvoicePaid,
+  markInvoiceSent,
+  planInvoicePaymentRecords,
   voidInvoice,
 } from "../../src/features/console/data/invoice-lifecycle";
 
@@ -128,4 +131,52 @@ test("markInvoicePaid issues a draft and sets paid", () => {
   const paid = markInvoicePaid(invoice());
   assert.equal(paid.documentStatus, "Issued");
   assert.equal(paid.paymentStatus, "Paid");
+});
+
+test("issued invoices can be marked sent", () => {
+  assert.equal(canMarkSent(invoice()), false);
+  assert.equal(canMarkSent(invoice({ documentStatus: "Issued" })), true);
+  const sent = markInvoiceSent(invoice({ documentStatus: "Issued" }));
+  assert.equal(sent.documentStatus, "Sent");
+  assert.throws(() => markInvoiceSent(invoice()), /issued invoices/i);
+});
+
+test("planInvoicePaymentRecords writes payment rows instead of payment_status", () => {
+  const record = invoice({ items: [{ description: "Mow", quantity: 1, rate: 80 }] });
+
+  assert.deepEqual(planInvoicePaymentRecords(record, "Unpaid", 0), {
+    voidRecorded: false,
+    insert: null,
+  });
+  assert.equal(planInvoicePaymentRecords(record, "Unpaid", 40).voidRecorded, true);
+
+  const paid = planInvoicePaymentRecords(record, "Paid", 0);
+  assert.equal(paid.voidRecorded, false);
+  assert.equal(paid.insert?.amount, 80);
+  assert.equal(paid.insert?.status, "recorded");
+
+  const remaining = planInvoicePaymentRecords(record, "Paid", 30);
+  assert.equal(remaining.insert?.amount, 50);
+
+  const alreadyPaid = planInvoicePaymentRecords(record, "Paid", 80);
+  assert.equal(alreadyPaid.insert, null);
+
+  const part = planInvoicePaymentRecords(record, "Part paid", 0);
+  assert.equal(part.insert?.amount, 40);
+  assert.equal(part.insert?.status, "recorded");
+
+  const alreadyPart = planInvoicePaymentRecords(record, "Part paid", 25);
+  assert.equal(alreadyPart.insert, null);
+
+  const refunded = planInvoicePaymentRecords(record, "Refunded", 80);
+  assert.equal(refunded.voidRecorded, true);
+  assert.equal(refunded.insert?.status, "refunded");
+  assert.equal(refunded.insert?.amount, 80);
+});
+
+test("planInvoicePaymentRecords rejects zero-total paid invoices", () => {
+  assert.throws(
+    () => planInvoicePaymentRecords(invoice({ items: [{ description: "Call-out", quantity: 1, rate: 0 }] }), "Paid"),
+    /no amount to collect/i,
+  );
 });

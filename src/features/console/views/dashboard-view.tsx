@@ -25,6 +25,7 @@ import {
   type JobRequest,
   type Quote,
 } from "../domain";
+import { invoiceDisplayStatus } from "../data/invoice-lifecycle";
 import { Badge, EmptyState, PageHeader } from "../components/ui-elements";
 
 export function DashboardView({
@@ -106,6 +107,20 @@ export function DashboardView({
 
   const greeting = gdayGreeting(displayNameFromIdentity(undefined, signedInEmail));
   const todayLabel = brisbaneDateLabel();
+  const todayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Brisbane",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const overdueInvoices = invoices.filter(
+    (record) => invoiceDisplayStatus(record) === "Overdue",
+  ).length;
+  const siteVisitsDue = jobs.filter((job) => {
+    if (job.status !== "scheduled" && job.status !== "in-progress") return false;
+    const day = job.dateKey?.slice(0, 10);
+    return Boolean(day) && day <= todayKey;
+  }).length;
 
   return (
     <>
@@ -193,13 +208,13 @@ export function DashboardView({
                 "Jobs in progress",
                 jobs.filter((job) => job.status === "in-progress").length,
               ],
-              [Clock3, "Site visits due", 0],
+              [Clock3, "Site visits due", siteVisitsDue],
               [
                 ReceiptText,
                 "Quotes to send",
                 quotes.filter((quote) => quote.status === "Draft").length,
               ],
-              [DollarSign, "Invoices overdue", 0],
+              [DollarSign, "Invoices overdue", overdueInvoices],
             ] satisfies Array<[LucideIcon, string, number]>
           ).map(([Icon, label, count]) => (
             <div className="ops-row" key={label}>

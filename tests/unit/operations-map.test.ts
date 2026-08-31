@@ -31,6 +31,7 @@ test("mapInvoicePaymentStatus keeps refunded instead of mapping it to Void", () 
   assert.equal(mapInvoicePaymentStatus("partially_paid"), "Part paid");
   assert.equal(mapInvoicePaymentStatus("paid"), "Paid");
   assert.equal(mapInvoicePaymentStatus("refunded"), "Refunded");
+  assert.equal(mapInvoicePaymentStatus("unexpected"), "Unpaid");
 });
 
 test("mapInvoiceDocumentStatus keeps issued, sent, and overdue instead of Finalized", () => {
@@ -39,4 +40,5 @@ test("mapInvoiceDocumentStatus keeps issued, sent, and overdue instead of Finali
   assert.equal(mapInvoiceDocumentStatus("sent"), "Sent");
   assert.equal(mapInvoiceDocumentStatus("overdue"), "Overdue");
   assert.equal(mapInvoiceDocumentStatus("void"), "Void");
+  assert.equal(mapInvoiceDocumentStatus("finalized"), "Issued");
 });

@@ -6,7 +6,7 @@ import { archiveClientAction, saveClientAction } from "@/features/console/data/c
 import { listClients } from "@/features/console/data/client-repository";
 import { deleteJobRequestAction, saveJobRequestAction } from "@/features/console/data/job-request-actions";
 import { listJobRequests } from "@/features/console/data/job-request-repository";
-import { deleteInvoiceAction, deleteJobAction, deleteJobPhotoAction, deleteQuoteAction, finalizeInvoiceAction, saveInvoiceAction, saveQuoteAction, scheduleJobAction, updateInvoicePaymentAction, updateJobAction, updateJobAssignmentsAction, updateQuoteStatusAction, uploadJobPhotoAction, voidInvoiceAction } from "@/features/console/data/operations-actions";
+import { deleteInvoiceAction, deleteJobAction, deleteJobPhotoAction, deleteQuoteAction, finalizeInvoiceAction, markInvoiceSentAction, saveInvoiceAction, saveQuoteAction, scheduleJobAction, updateInvoicePaymentAction, updateJobAction, updateJobAssignmentsAction, updateQuoteStatusAction, uploadJobPhotoAction, voidInvoiceAction } from "@/features/console/data/operations-actions";
 import { listInvoices, listJobs, listQuotes, listTeamMembers } from "@/features/console/data/operations-repository";
 import { sendQuestionnaireAction } from "@/features/console/data/questionnaire-actions";
 import { listQuestionnaires, listQuestionnaireSubmissions } from "@/features/console/data/questionnaire-repository";
@@ -64,6 +64,7 @@ export default async function Home() {
       onSaveInvoice={saveInvoiceAction}
       onUpdateInvoicePayment={updateInvoicePaymentAction}
       onFinalizeInvoice={finalizeInvoiceAction}
+      onMarkInvoiceSent={markInvoiceSentAction}
       onVoidInvoice={voidInvoiceAction}
       onDeleteInvoice={deleteInvoiceAction}
       onSendQuestionnaire={sendQuestionnaireAction}

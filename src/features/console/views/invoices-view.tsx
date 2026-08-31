@@ -2,13 +2,14 @@
 
 import { useState, useMemo, memo } from "react";
 import type { ChangeEvent } from "react";
-import { Ban, Check, ChevronDown, Eye, Plus, Search, Trash2, FileCheck2 } from "lucide-react";
+import { Ban, Check, ChevronDown, Eye, Plus, Search, Send, Trash2, FileCheck2 } from "lucide-react";
 import { money, quoteTotals, type Invoice } from "../domain";
 import {
   allowedPaymentStatuses,
   canDeleteInvoice,
   canFinalizeInvoice,
   canMarkPaid,
+  canMarkSent,
   canVoidInvoice,
   invoiceDisplayStatus,
   type InvoiceDisplayStatus,
@@ -25,16 +26,20 @@ import {
 
 const InvoiceRow = memo(function InvoiceRow({
   record,
+  pending,
   onView,
   onPaymentStatusChange,
   onFinalize,
+  onMarkSent,
   onVoid,
   onDelete,
 }: {
   record: Invoice;
+  pending: boolean;
   onView: (record: Invoice) => void;
   onPaymentStatusChange: (id: string, status: Invoice["paymentStatus"]) => void;
   onFinalize: (record: Invoice) => void;
+  onMarkSent: (record: Invoice) => void;
   onVoid: (record: Invoice) => void;
   onDelete: (record: Invoice) => void;
 }) {
@@ -75,9 +80,12 @@ const InvoiceRow = memo(function InvoiceRow({
               aria-label={`Payment status for ${record.documentNumber || record.id}`}
               value={record.paymentStatus}
               onChange={handlePaymentChange}
+              disabled={pending}
             >
               {paymentOptions.map((option) => (
-                <option key={option}>{option}</option>
+                <option key={option} value={option}>
+                  {option}
+                </option>
               ))}
             </select>
             <ChevronDown aria-hidden="true" size={16} />
@@ -85,7 +93,7 @@ const InvoiceRow = memo(function InvoiceRow({
         ) : (
           <span className="record-payment-locked">{record.paymentStatus}</span>
         )}
-        <Button variant="secondary" icon={Eye} onClick={() => onView(record)}>
+        <Button variant="secondary" icon={Eye} onClick={() => onView(record)} disabled={pending}>
           View
         </Button>
         {canMarkPaid(record) ? (
@@ -93,17 +101,23 @@ const InvoiceRow = memo(function InvoiceRow({
             variant="primary"
             icon={Check}
             onClick={() => onPaymentStatusChange(record.id, "Paid")}
+            disabled={pending}
           >
             Mark paid
           </Button>
         ) : null}
         {canFinalizeInvoice(record) ? (
-          <Button variant="secondary" icon={FileCheck2} onClick={() => onFinalize(record)}>
+          <Button variant="secondary" icon={FileCheck2} onClick={() => onFinalize(record)} disabled={pending}>
             Issue
           </Button>
         ) : null}
+        {canMarkSent(record) ? (
+          <Button variant="secondary" icon={Send} onClick={() => onMarkSent(record)} disabled={pending}>
+            Mark sent
+          </Button>
+        ) : null}
         {canVoidInvoice(record) ? (
-          <Button variant="secondary" icon={Ban} onClick={() => onVoid(record)}>
+          <Button variant="secondary" icon={Ban} onClick={() => onVoid(record)} disabled={pending}>
             Void
           </Button>
         ) : null}
@@ -113,6 +127,7 @@ const InvoiceRow = memo(function InvoiceRow({
             icon={Trash2}
             tone="danger"
             onClick={() => onDelete(record)}
+            disabled={pending}
           />
         ) : null}
       </div>
@@ -122,14 +137,17 @@ const InvoiceRow = memo(function InvoiceRow({
 
 export function InvoicesView({
   records,
+  pending = false,
   onNew,
   onView,
   onPaymentStatusChange,
   onFinalize,
+  onMarkSent,
   onVoid,
   onDelete,
 }: {
   records: Invoice[];
+  pending?: boolean;
   onNew: () => void;
   onView: (record: Invoice) => void;
   onPaymentStatusChange: (
@@ -137,6 +155,7 @@ export function InvoicesView({
     status: Invoice["paymentStatus"],
   ) => void;
   onFinalize: (record: Invoice) => void;
+  onMarkSent: (record: Invoice) => void;
   onVoid: (record: Invoice) => void;
   onDelete: (record: Invoice) => void;
 }) {
@@ -184,7 +203,7 @@ export function InvoicesView({
       <PageHeader
         eyebrow="Billing"
         title="Invoices"
-        subtitle="Mark paid issues a draft in one step. Void unpaid issued invoices. Delete drafts only."
+        subtitle="Mark paid records a payment and issues a draft in one step. Void unpaid issued invoices. Delete drafts only."
       >
         <div className="billing-summary">
           <span>
@@ -194,7 +213,7 @@ export function InvoicesView({
             Paid: <strong className="success-text">{money(paid)}</strong>
           </span>
         </div>
-        <Button icon={Plus} onClick={onNew}>
+        <Button icon={Plus} onClick={onNew} disabled={pending}>
           Create Invoice
         </Button>
       </PageHeader>
@@ -219,14 +238,14 @@ export function InvoicesView({
               }
             >
               <option value="All">All statuses</option>
-              <option>Draft</option>
-              <option>Issued</option>
-              <option>Sent</option>
-              <option>Overdue</option>
-              <option>Part paid</option>
-              <option>Paid</option>
-              <option>Refunded</option>
-              <option>Void</option>
+              <option value="Draft">Draft</option>
+              <option value="Issued">Issued</option>
+              <option value="Sent">Sent</option>
+              <option value="Overdue">Overdue</option>
+              <option value="Part paid">Part paid</option>
+              <option value="Paid">Paid</option>
+              <option value="Refunded">Refunded</option>
+              <option value="Void">Void</option>
             </select>
             <ChevronDown aria-hidden="true" size={16} />
           </label>
@@ -237,9 +256,11 @@ export function InvoicesView({
           <InvoiceRow
             key={record.id}
             record={record}
+            pending={pending}
             onView={onView}
             onPaymentStatusChange={onPaymentStatusChange}
             onFinalize={onFinalize}
+            onMarkSent={onMarkSent}
             onVoid={onVoid}
             onDelete={onDelete}
           />

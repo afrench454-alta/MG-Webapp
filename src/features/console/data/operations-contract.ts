@@ -73,5 +73,6 @@ export type DeleteJobAction = (id: string) => Promise<DeleteActionResult>;
 export type SaveInvoiceAction = (input: InvoiceDraftInput) => Promise<InvoiceActionResult>;
 export type UpdateInvoicePaymentAction = (id: string, status: z.infer<typeof invoicePaymentStatusSchema>) => Promise<InvoiceActionResult>;
 export type FinalizeInvoiceAction = (id: string) => Promise<InvoiceActionResult>;
+export type MarkInvoiceSentAction = (id: string) => Promise<InvoiceActionResult>;
 export type VoidInvoiceAction = (id: string) => Promise<InvoiceActionResult>;
 export type DeleteInvoiceAction = (id: string) => Promise<DeleteActionResult>;
