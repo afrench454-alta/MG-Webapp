@@ -89,6 +89,11 @@ import {
   markInvoiceSent,
   voidInvoice,
 } from "./data/invoice-lifecycle";
+import {
+  canCreateInvoiceFromQuote,
+  draftInvoiceFromQuote,
+  liveInvoiceForQuote,
+} from "./data/quote-invoice";
 
 export type DialogState =
   | { type: "estimator" }
@@ -99,7 +104,7 @@ export type DialogState =
   | { type: "delete-job"; job: Job }
   | { type: "delete-invoice"; record: Invoice }
   | { type: "quote-form" }
-  | { type: "invoice-form" }
+  | { type: "invoice-form"; quote?: Quote }
   | { type: "send-questionnaire" }
   | { type: "public-questionnaire"; questionnaire: Questionnaire }
   | { type: "schedule" }
@@ -916,6 +921,7 @@ export function ConsoleApp({
             clientId: draft.clientId,
             serviceAddressId: draft.propertyId,
             jobId: draft.jobId,
+            quoteId: draft.quoteId,
             client: client?.name || "Client",
             address: property?.address || "No billing address",
             issued: formatDisplay(issuedAt),
@@ -957,6 +963,7 @@ export function ConsoleApp({
     }
     setInvoiceRecords((current) => [result.invoice, ...current]);
     setDialog(null);
+    setActive("invoices");
     showToast("Invoice saved as draft.");
   };
 
@@ -1202,9 +1209,12 @@ export function ConsoleApp({
         return (
           <QuotesView
             quotes={quotes}
+            invoices={invoiceRecords}
             onNew={() => setDialog({ type: "quote-form" })}
             onView={(quote) => setDialog({ type: "quote-document", quote })}
             onEstimate={() => setDialog({ type: "estimator" })}
+            onCreateInvoice={(quote) => setDialog({ type: "invoice-form", quote })}
+            onViewInvoice={(record) => setDialog({ type: "invoice-document", record })}
             onDelete={(quote) => setDialog({ type: "delete-quote", quote })}
           />
         );
@@ -1418,10 +1428,21 @@ export function ConsoleApp({
       ) : null}
 
       {dialog?.type === "invoice-form" ? (
-        <Dialog title="New Invoice" onClose={closeDialog} wide>
+        <Dialog
+          title={dialog.quote ? "Invoice from quote" : "New Invoice"}
+          onClose={closeDialog}
+          wide
+        >
           <InvoiceFormDialog
+            key={dialog.quote?.id || "new-invoice"}
             clients={clients}
             jobs={jobs}
+            prefill={
+              dialog.quote
+                ? draftInvoiceFromQuote(dialog.quote, clients, jobs)
+                : undefined
+            }
+            sourceQuote={dialog.quote}
             onClose={closeDialog}
             onSave={persistInvoice}
             pending={operationMutationPending}
@@ -1480,7 +1501,7 @@ export function ConsoleApp({
 
       {dialog?.type === "quote-document" ? (
         <Dialog
-          title={`Quote ${dialog.quote.id}`}
+          title={`Quote ${dialog.quote.documentNumber || dialog.quote.id}`}
           onClose={closeDialog}
           wide
           document
@@ -1491,6 +1512,25 @@ export function ConsoleApp({
             onClose={closeDialog}
             onStatusChange={(status) =>
               updateQuoteStatus(dialog.quote.id, status as Quote["status"])
+            }
+            onCreateInvoice={
+              canCreateInvoiceFromQuote(dialog.quote) &&
+              !liveInvoiceForQuote(dialog.quote, invoiceRecords)
+                ? () => setDialog({ type: "invoice-form", quote: dialog.quote })
+                : undefined
+            }
+            onViewInvoice={
+              liveInvoiceForQuote(dialog.quote, invoiceRecords)
+                ? () => {
+                    const existing = liveInvoiceForQuote(
+                      dialog.quote,
+                      invoiceRecords,
+                    );
+                    if (existing) {
+                      setDialog({ type: "invoice-document", record: existing });
+                    }
+                  }
+                : undefined
             }
           />
         </Dialog>

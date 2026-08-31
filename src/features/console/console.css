@@ -34,6 +34,8 @@
 html {
   min-width: 320px;
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
   background: var(--surface);
 }
 
@@ -41,6 +43,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: clip;
   background: var(--surface);
   -webkit-font-smoothing: antialiased;
 }
@@ -94,6 +98,18 @@ textarea {
   margin: 0;
   color: var(--red);
   font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.form-banner {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-soft);
+  color: var(--ink);
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.45;
 }
@@ -304,6 +320,7 @@ textarea {
 
 .app-main {
   width: calc(100% - var(--sidebar-width));
+  min-width: 0;
   min-height: 100vh;
   margin-left: var(--sidebar-width);
 }
@@ -311,6 +328,7 @@ textarea {
 .workspace {
   width: 100%;
   max-width: 1400px;
+  min-width: 0;
   margin: 0 auto;
   padding: 36px 40px;
 }
@@ -1396,15 +1414,17 @@ textarea {
 
 .job-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(320px, 1fr));
-  gap: 20px;
-  overflow-x: auto;
-  padding-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
 }
 
 .job-column {
-  min-height: 350px;
-  padding: 14px;
+  min-width: 0;
+  min-height: 280px;
+  padding: 12px;
   border-radius: 10px;
   background: #e6ebe2;
 }
@@ -2654,7 +2674,11 @@ textarea {
     gap: 9px;
     padding-inline: 0;
   }
-  .job-board { margin-right: -18px; padding-right: 18px; }
+  .job-board {
+    grid-template-columns: 1fr;
+    margin-right: 0;
+    padding-right: 0;
+  }
   .dialog-backdrop { align-items: end; padding: 0; }
   .dialog,
   .dialog--wide,

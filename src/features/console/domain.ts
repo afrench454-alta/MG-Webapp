@@ -67,6 +67,7 @@ export type Invoice = {
   clientId?: string;
   serviceAddressId?: string | null;
   jobId?: string | null;
+  quoteId?: string | null;
   client: string;
   address: string;
   issued: string;

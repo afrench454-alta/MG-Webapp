@@ -38,11 +38,11 @@ const invoiceItemRowSchema = itemSchema.extend({ invoice_id: z.uuid() });
 const recurrenceRowSchema = z.object({ job_id: z.uuid(), frequency: z.enum(["daily", "weekly", "monthly", "yearly", "custom"]), interval_count: z.number() });
 const quoteRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), service_address_id: z.uuid().nullable(), job_request_id: z.uuid().nullable(), document_number: z.string().nullable(), status: z.enum(["draft", "sent", "approved", "declined", "expired", "void"]), title: z.string(), issue_date: z.string(), valid_until: z.string().nullable(), customer_message: z.string().nullable(), internal_notes: z.string().nullable() });
 const jobRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), service_address_id: z.uuid().nullable(), job_request_id: z.uuid().nullable(), status: z.enum(["unscheduled", "scheduled", "in_progress", "paused", "completed", "cancelled"]), title: z.string(), scope_of_work: z.string().nullable(), internal_instructions: z.string().nullable(), scheduled_start: z.string().nullable() });
-const invoiceRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), billing_address_id: z.uuid().nullable(), job_id: z.uuid().nullable(), document_number: z.string().nullable(), document_status: z.string(), payment_status: z.string(), title: z.string(), issue_date: z.string(), due_date: z.string().nullable(), payment_instructions: z.string().nullable(), internal_notes: z.string().nullable() });
+const invoiceRowSchema = z.object({ id: z.uuid(), client_id: z.uuid(), billing_address_id: z.uuid().nullable(), job_id: z.uuid().nullable(), quote_id: z.uuid().nullable(), document_number: z.string().nullable(), document_status: z.string(), payment_status: z.string(), title: z.string(), issue_date: z.string(), due_date: z.string().nullable(), payment_instructions: z.string().nullable(), internal_notes: z.string().nullable() });
 
 const QUOTE_SELECT = "id, client_id, service_address_id, job_request_id, document_number, status, title, issue_date, valid_until, customer_message, internal_notes";
 const JOB_SELECT = "id, client_id, service_address_id, job_request_id, status, title, scope_of_work, internal_instructions, scheduled_start";
-const INVOICE_SELECT = "id, client_id, billing_address_id, job_id, document_number, document_status, payment_status, title, issue_date, due_date, payment_instructions, internal_notes";
+const INVOICE_SELECT = "id, client_id, billing_address_id, job_id, quote_id, document_number, document_status, payment_status, title, issue_date, due_date, payment_instructions, internal_notes";
 
 type AddressLookup = { label: string; line1: string };
 type LookupMaps = { clients: Map<string, string>; addresses: Map<string, AddressLookup> };
@@ -87,7 +87,7 @@ function mapLineItems(items: Array<{ label?: string | null; description: string;
 }
 function mapQuote(row: z.infer<typeof quoteRowSchema>, lookups: LookupMaps, items: z.infer<typeof quoteItemRowSchema>[]): Quote { const address = row.service_address_id ? lookups.addresses.get(row.service_address_id)?.line1 : null; return { id: row.id, documentNumber: row.document_number || undefined, clientId: row.client_id, serviceAddressId: row.service_address_id, jobRequestId: row.job_request_id, client: lookups.clients.get(row.client_id) || "Client", address: address || "No service address", issued: formatDate(row.issue_date), expires: formatDate(row.valid_until), validDays: 14, status: mapQuoteStatus(row.status), scope: row.title, clientNotes: row.customer_message || "", discount: 0, taxRate: 0, items: mapLineItems(items) }; }
 function mapJob(row: z.infer<typeof jobRowSchema>, lookups: LookupMaps, recurrence: z.infer<typeof recurrenceRowSchema> | undefined, assignments: z.infer<typeof assignmentRowSchema>[], profiles: Map<string, z.infer<typeof profileRowSchema>>, photos: JobPhoto[]): Job { const schedule = row.scheduled_start ? formatScheduledDate(row.scheduled_start) : { date: "Unscheduled", time: "", dateKey: "" }; const client = lookups.clients.get(row.client_id) || "Client"; const address = row.service_address_id ? lookups.addresses.get(row.service_address_id) : undefined; const orderedAssignments = [...assignments].sort((a, b) => Number(b.is_lead) - Number(a.is_lead)); const assignees = orderedAssignments.map((assignment) => profiles.get(assignment.profile_id)?.display_name || profiles.get(assignment.profile_id)?.email || "Team member"); const property = address?.label || address?.line1 || "Service property"; return { id: row.id, displayName: `${client} · ${property} · ${schedule.date}`, clientId: row.client_id, serviceAddressId: row.service_address_id, jobRequestId: row.job_request_id, client, property, address: address?.line1 || "No service address", category: row.title, scope: row.scope_of_work || "", date: schedule.date, time: schedule.time, dateKey: schedule.dateKey, status: mapJobStatus(row.status), notes: row.internal_instructions || "", recurrence: mapRecurrence(recurrence), assigneeIds: orderedAssignments.map((assignment) => assignment.profile_id), assignees, photos }; }
-function mapInvoice(row: z.infer<typeof invoiceRowSchema>, lookups: LookupMaps, items: z.infer<typeof invoiceItemRowSchema>[]): Invoice { const address = row.billing_address_id ? lookups.addresses.get(row.billing_address_id)?.line1 : null; return { id: row.id, documentNumber: row.document_number || undefined, clientId: row.client_id, serviceAddressId: row.billing_address_id, jobId: row.job_id, client: lookups.clients.get(row.client_id) || "Client", address: address || "No billing address", issued: formatDate(row.issue_date), due: formatDate(row.due_date), dueDate: row.due_date, documentStatus: mapInvoiceDocumentStatus(row.document_status), paymentStatus: mapInvoicePaymentStatus(row.payment_status), scope: items.map((item) => item.description), notes: row.payment_instructions || row.internal_notes || "", discount: 0, taxRate: 0, items: mapLineItems(items) }; }
+function mapInvoice(row: z.infer<typeof invoiceRowSchema>, lookups: LookupMaps, items: z.infer<typeof invoiceItemRowSchema>[]): Invoice { const address = row.billing_address_id ? lookups.addresses.get(row.billing_address_id)?.line1 : null; return { id: row.id, documentNumber: row.document_number || undefined, clientId: row.client_id, serviceAddressId: row.billing_address_id, jobId: row.job_id, quoteId: row.quote_id, client: lookups.clients.get(row.client_id) || "Client", address: address || "No billing address", issued: formatDate(row.issue_date), due: formatDate(row.due_date), dueDate: row.due_date, documentStatus: mapInvoiceDocumentStatus(row.document_status), paymentStatus: mapInvoicePaymentStatus(row.payment_status), scope: items.map((item) => item.description), notes: row.payment_instructions || row.internal_notes || "", discount: 0, taxRate: 0, items: mapLineItems(items) }; }
 
 async function getQuote(context: BusinessContext, id: string): Promise<Quote> {
   const [quote] = await listQuotes(context, id);
@@ -146,7 +146,16 @@ export async function createInvoice(context: BusinessContext, input: InvoiceDraf
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_invoice_with_details", invoiceCreateRpcArgs(input));
   if (error) throw new Error(error.message);
-  return getInvoice(context, z.uuid().parse(data));
+  const invoiceId = z.uuid().parse(data);
+  if (input.quoteId) {
+    const { error: linkError } = await supabase
+      .from("invoices")
+      .update({ quote_id: input.quoteId })
+      .eq("business_id", context.businessId)
+      .eq("id", invoiceId);
+    if (linkError) throw new Error(linkError.message);
+  }
+  return getInvoice(context, invoiceId);
 }
 
 export async function updateInvoicePayment(context: BusinessContext, id: string, status: Invoice["paymentStatus"]): Promise<Invoice> {

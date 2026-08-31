@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
-import type { Client, Job, LineItem } from "../domain";
+import type { Client, Job, LineItem, Quote } from "../domain";
 import { Button, Field } from "../components/ui-elements";
 import { LineItemEditor, Totals } from "../components/line-item-editor";
 
@@ -12,6 +12,7 @@ export type InvoiceDraft = {
   propertyId: string;
   extraPropertyIds?: string[];
   jobId?: string;
+  quoteId?: string;
   items: LineItem[];
   dueDays: string;
   notes: string;
@@ -20,6 +21,8 @@ export type InvoiceDraft = {
 export function InvoiceFormDialog({
   clients,
   jobs,
+  prefill,
+  sourceQuote,
   onClose,
   onSave,
   pending = false,
@@ -27,22 +30,29 @@ export function InvoiceFormDialog({
 }: {
   clients: Client[];
   jobs: Job[];
+  prefill?: InvoiceDraft;
+  sourceQuote?: Quote;
   onClose: () => void;
   onSave: (draft: InvoiceDraft) => void | Promise<void>;
   pending?: boolean;
   error?: string;
 }) {
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(prefill?.clientId || "");
   const selectedClient = clients.find((client) => client.id === clientId);
-  const [propertyId, setPropertyId] = useState("");
-  const [extraPropertyIds, setExtraPropertyIds] = useState<string[]>([]);
-  const [jobId, setJobId] = useState("");
-  const [items, setItems] = useState<LineItem[]>([
-    { description: "", quantity: 1, rate: 0 },
-  ]);
-  const [dueDays, setDueDays] = useState("7");
+  const [propertyId, setPropertyId] = useState(prefill?.propertyId || "");
+  const [extraPropertyIds, setExtraPropertyIds] = useState<string[]>(
+    prefill?.extraPropertyIds || [],
+  );
+  const [jobId, setJobId] = useState(prefill?.jobId || "");
+  const [items, setItems] = useState<LineItem[]>(
+    prefill?.items?.length
+      ? prefill.items.map((item) => ({ ...item }))
+      : [{ description: "", quantity: 1, rate: 0 }],
+  );
+  const [dueDays, setDueDays] = useState(prefill?.dueDays || "7");
   const [notes, setNotes] = useState(
-    "Invoices are due upon completion with a 7-day grace period.",
+    prefill?.notes ||
+      "Invoices are due upon completion with a 7-day grace period.",
   );
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -54,6 +64,7 @@ export function InvoiceFormDialog({
       propertyId,
       extraPropertyIds: extraPropertyIds.filter((id) => id !== propertyId),
       jobId: jobId || undefined,
+      quoteId: prefill?.quoteId,
       items,
       dueDays,
       notes,
@@ -62,6 +73,12 @@ export function InvoiceFormDialog({
 
   return (
     <form className="form-stack" onSubmit={submit} aria-busy={pending}>
+      {sourceQuote ? (
+        <p className="form-banner">
+          Prefilling from quote {sourceQuote.documentNumber || sourceQuote.id}.
+          Review line items, dates, and notes before saving.
+        </p>
+      ) : null}
       <div className="form-grid form-grid--two">
         <Field label="Client" required>
           <select

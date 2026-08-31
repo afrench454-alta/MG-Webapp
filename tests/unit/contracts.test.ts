@@ -116,6 +116,12 @@ test("contracts: invoiceDraftSchema validates single and multi-property invoices
 
   const parsed = invoiceDraftSchema.safeParse(validInvoice);
   assert.equal(parsed.success, true);
+
+  const fromQuote = invoiceDraftSchema.safeParse({
+    ...validInvoice,
+    quoteId: VALID_UUID,
+  });
+  assert.equal(fromQuote.success, true);
 });
 
 test("contracts: scheduleJobSchema validates job schedule inputs", () => {

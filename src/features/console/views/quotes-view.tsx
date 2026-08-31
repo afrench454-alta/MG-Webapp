@@ -1,14 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
-import { money, quoteTotals, type Quote } from "../domain";
+import { DollarSign, Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { money, quoteTotals, type Invoice, type Quote } from "../domain";
 import {
   countMatching,
   matchesQuoteFilter,
   quoteFilterIds,
   type QuoteFilterId,
 } from "../data/list-filters";
+import {
+  canCreateInvoiceFromQuote,
+  liveInvoiceForQuote,
+} from "../data/quote-invoice";
 import {
   Badge,
   Button,
@@ -22,15 +26,21 @@ import {
 
 export function QuotesView({
   quotes,
+  invoices,
   onNew,
   onView,
   onEstimate,
+  onCreateInvoice,
+  onViewInvoice,
   onDelete,
 }: {
   quotes: Quote[];
+  invoices: Invoice[];
   onNew: () => void;
   onView: (quote: Quote) => void;
   onEstimate: () => void;
+  onCreateInvoice: (quote: Quote) => void;
+  onViewInvoice: (invoice: Invoice) => void;
   onDelete: (quote: Quote) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -59,7 +69,7 @@ export function QuotesView({
       <PageHeader
         eyebrow="Pricing"
         title="Quotes"
-        subtitle="14-day validity · No GST applied."
+        subtitle="14-day validity · No GST applied. Accepted quotes can prefill an invoice."
       >
         <Button variant="secondary" icon={Sparkles} onClick={onEstimate}>
           AI Estimator
@@ -95,6 +105,7 @@ export function QuotesView({
       <section className="record-list">
         {visible.map((quote) => {
           const totals = quoteTotals(quote.items);
+          const existingInvoice = liveInvoiceForQuote(quote, invoices);
           return (
             <article className="record-row" key={quote.id}>
               <div>
@@ -122,6 +133,22 @@ export function QuotesView({
                 >
                   View
                 </Button>
+                {existingInvoice ? (
+                  <Button
+                    variant="secondary"
+                    icon={DollarSign}
+                    onClick={() => onViewInvoice(existingInvoice)}
+                  >
+                    View invoice
+                  </Button>
+                ) : canCreateInvoiceFromQuote(quote) ? (
+                  <Button
+                    icon={DollarSign}
+                    onClick={() => onCreateInvoice(quote)}
+                  >
+                    Create invoice
+                  </Button>
+                ) : null}
                 <IconButton
                   label={`Delete ${quote.documentNumber || quote.id}`}
                   icon={Trash2}

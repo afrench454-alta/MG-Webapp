@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronDown, FileCheck2, Printer, Send } from "lucide-react";
+import { ChevronDown, DollarSign, FileCheck2, Printer, Send } from "lucide-react";
 import {
   businessProfile,
   invoiceTerms,
@@ -58,6 +58,8 @@ export function DocumentViewDialog({
   onFinalize,
   onMarkSent,
   onVoid,
+  onCreateInvoice,
+  onViewInvoice,
 }: {
   type: "quote" | "invoice";
   record: Quote | Invoice;
@@ -66,6 +68,8 @@ export function DocumentViewDialog({
   onFinalize?: () => void;
   onMarkSent?: () => void;
   onVoid?: () => void;
+  onCreateInvoice?: () => void;
+  onViewInvoice?: () => void;
 }) {
   const isQuote = "expires" in record;
   if ((type === "quote") !== isQuote) return null;
@@ -329,6 +333,16 @@ export function DocumentViewDialog({
           <Button variant="secondary" icon={Printer} onClick={printDocument}>
             Save / Print PDF
           </Button>
+          {isQuote && onViewInvoice ? (
+            <Button variant="secondary" icon={DollarSign} onClick={onViewInvoice}>
+              View invoice
+            </Button>
+          ) : null}
+          {isQuote && onCreateInvoice ? (
+            <Button icon={DollarSign} onClick={onCreateInvoice}>
+              Create invoice
+            </Button>
+          ) : null}
           {!isQuote && canMarkPaid(record as Invoice) ? (
             <Button
               onClick={() => onStatusChange?.("Paid")}
