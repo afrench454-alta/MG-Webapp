@@ -1,17 +1,19 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("FieldCentral Pro Console - Demo Mode", () => {
+test.describe("Mow & Glow Console - Demo Mode", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
   });
 
   test("renders dashboard with metrics and recent scheduled jobs", async ({ page }) => {
-    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-    await expect(page.getByText("Clients")).toBeVisible();
-    await expect(page.getByText("Open job requests")).toBeVisible();
-    await expect(page.getByText("Quotes awaiting")).toBeVisible();
-    await expect(page.getByText("Unpaid invoices")).toBeVisible();
+    await expect(page.getByText("Mow & Glow", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /G'day,/ })).toBeVisible();
+    const metrics = page.getByLabel("Business metrics");
+    await expect(metrics.getByText("Clients")).toBeVisible();
+    await expect(metrics.getByText("Open job requests")).toBeVisible();
+    await expect(metrics.getByText("Quotes awaiting")).toBeVisible();
+    await expect(metrics.getByText("Unpaid invoices")).toBeVisible();
   });
 
   test("navigates to Clients directory and filters records", async ({ page }) => {
@@ -35,14 +37,14 @@ test.describe("FieldCentral Pro Console - Demo Mode", () => {
 
     // View first quote
     await page.getByRole("button", { name: "View" }).first().click();
-    await expect(page.getByRole("heading", { name: "QUOTE" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "QUOTE", exact: true })).toBeVisible();
     await expect(page.getByText("Mow & Glow Property Services")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save / Print PDF" })).toBeVisible();
-    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
   });
 
   test("navigates to Schedule calendar and daily agenda", async ({ page }) => {
-    await page.getByRole("button", { name: "Schedule" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Schedule" }).click();
     await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
 
     // Month switcher buttons are accessible
@@ -69,14 +71,10 @@ test.describe("FieldCentral Pro Console - Demo Mode", () => {
     await page.getByRole("button", { name: "Invoices" }).click();
     
     // Find the first draft invoice's finalize button
-    const finalizeBtn = page.getByRole("button", { name: "Finalize" }).first();
-    if (await finalizeBtn.isVisible()) {
-      await finalizeBtn.click();
-      
-      // Should show the finalized document view
-      await expect(page.getByRole("heading", { name: "INVOICE" })).toBeVisible();
-      await expect(page.getByText("Status: Finalized")).toBeVisible();
-      await page.getByRole("button", { name: "Close" }).click();
+    const issueBtn = page.getByRole("button", { name: "Issue" }).first();
+    if (await issueBtn.isVisible()) {
+      await issueBtn.click();
+      await expect(page.getByText("Invoice issued.")).toBeVisible();
     }
   });
 

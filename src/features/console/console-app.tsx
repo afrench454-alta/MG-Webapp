@@ -40,6 +40,7 @@ import type {
   DeleteJobPhotoAction,
   DeleteQuoteAction,
   FinalizeInvoiceAction,
+  VoidInvoiceAction,
   SaveInvoiceAction,
   SaveQuoteAction,
   ScheduleJobAction,
@@ -76,6 +77,16 @@ import {
   ConfirmDeleteClientDialog,
   ConfirmRecordDeleteDialog,
 } from "./dialogs/confirm-delete-dialog";
+import {
+  OperationsRuleError,
+  assertInvoiceCanBeDeleted,
+  assertJobCanBeDeleted,
+} from "./data/operations-rules";
+import {
+  applyInvoicePayment,
+  finalizeInvoiceRecord,
+  voidInvoice,
+} from "./data/invoice-lifecycle";
 
 export type DialogState =
   | { type: "estimator" }
@@ -124,6 +135,7 @@ export type ConsoleAppProps = {
   onSaveInvoice?: SaveInvoiceAction;
   onUpdateInvoicePayment?: UpdateInvoicePaymentAction;
   onFinalizeInvoice?: FinalizeInvoiceAction;
+  onVoidInvoice?: VoidInvoiceAction;
   onDeleteInvoice?: DeleteInvoiceAction;
   onSendQuestionnaire?: SendQuestionnaireAction;
   onSignOut?: () => Promise<void>;
@@ -158,6 +170,7 @@ export function ConsoleApp({
   onSaveInvoice,
   onUpdateInvoicePayment,
   onFinalizeInvoice,
+  onVoidInvoice,
   onDeleteInvoice,
   onSendQuestionnaire,
   onSignOut,
@@ -460,6 +473,17 @@ export function ConsoleApp({
   };
 
   const removeJob = async (job: Job) => {
+    try {
+      assertJobCanBeDeleted(job);
+    } catch (error) {
+      setOperationMutationError(
+        error instanceof OperationsRuleError
+          ? error.message
+          : "The job could not be deleted.",
+      );
+      return;
+    }
+
     if (dataMode === "live") {
       if (!onDeleteJob) {
         setOperationMutationError("Live job deletion is not available.");
@@ -486,6 +510,17 @@ export function ConsoleApp({
   };
 
   const removeInvoice = async (record: Invoice) => {
+    try {
+      assertInvoiceCanBeDeleted(record);
+    } catch (error) {
+      setOperationMutationError(
+        error instanceof OperationsRuleError
+          ? error.message
+          : "The invoice could not be deleted.",
+      );
+      return;
+    }
+
     if (dataMode === "live") {
       if (!onDeleteInvoice) {
         setOperationMutationError("Live invoice deletion is not available.");
@@ -776,23 +811,26 @@ export function ConsoleApp({
       showToast(`Invoice payment status set to ${status.toLowerCase()}.`);
       return;
     }
-    setInvoiceRecords((current) =>
-      current.map((record) => {
-        if (record.id === invoiceId) {
-          const autoFinalize = record.documentStatus === "Draft" && (status === "Paid" || status === "Part paid");
-          return { ...record, paymentStatus: status, documentStatus: autoFinalize ? "Finalized" : record.documentStatus };
+    try {
+      setInvoiceRecords((current) =>
+        current.map((record) =>
+          record.id === invoiceId ? applyInvoicePayment(record, status) : record,
+        ),
+      );
+      setDialog((current) => {
+        if (current?.type === "invoice-document" && current.record.id === invoiceId) {
+          return { ...current, record: applyInvoicePayment(current.record, status) };
         }
-        return record;
-      })
-    );
-    setDialog((current) => {
-      if (current?.type === "invoice-document" && current.record.id === invoiceId) {
-        const record = current.record as Invoice;
-        const autoFinalize = record.documentStatus === "Draft" && (status === "Paid" || status === "Part paid");
-        return { ...current, record: { ...record, paymentStatus: status, documentStatus: autoFinalize ? "Finalized" : record.documentStatus } };
-      }
-      return current;
-    });
+        return current;
+      });
+    } catch (error) {
+      setOperationMutationError(
+        error instanceof OperationsRuleError
+          ? error.message
+          : "The invoice payment could not be updated.",
+      );
+      return;
+    }
     showToast(`Invoice payment status set to ${status.toLowerCase()}.`);
   };
 
@@ -938,19 +976,78 @@ export function ConsoleApp({
           ? { ...current, record: result.invoice }
           : current,
       );
-      showToast("Invoice finalized.");
+      showToast("Invoice issued.");
       return;
     }
-    const finalized: Invoice = { ...record, documentStatus: "Finalized" };
-    setInvoiceRecords((current) =>
-      current.map((item) => (item.id === finalized.id ? finalized : item)),
-    );
-    setDialog((current) =>
-      current?.type === "invoice-document" && current.record.id === record.id
-        ? { ...current, record: finalized }
-        : current,
-    );
-    showToast("Invoice finalized.");
+    try {
+      const issued = finalizeInvoiceRecord(record);
+      setInvoiceRecords((current) =>
+        current.map((item) => (item.id === issued.id ? issued : item)),
+      );
+      setDialog((current) =>
+        current?.type === "invoice-document" && current.record.id === record.id
+          ? { ...current, record: issued }
+          : current,
+      );
+      showToast("Invoice issued.");
+    } catch (error) {
+      setOperationMutationError(
+        error instanceof OperationsRuleError
+          ? error.message
+          : "The invoice could not be finalized.",
+      );
+    }
+  };
+
+  const voidIssuedInvoiceRecord = async (record: Invoice) => {
+    if (dataMode === "live") {
+      if (!onVoidInvoice) {
+        setOperationMutationError("Live invoice voiding is not available.");
+        return;
+      }
+      setOperationMutationPending(true);
+      let result;
+      try {
+        result = await onVoidInvoice(record.id);
+      } catch {
+        setOperationMutationError("A network error occurred. Please try again.");
+        setOperationMutationPending(false);
+        return;
+      }
+      setOperationMutationPending(false);
+      if (!result.ok) {
+        setOperationMutationError(result.message);
+        return;
+      }
+      setInvoiceRecords((current) =>
+        current.map((item) => (item.id === record.id ? result.invoice : item)),
+      );
+      setDialog((current) =>
+        current?.type === "invoice-document" && current.record.id === record.id
+          ? { ...current, record: result.invoice }
+          : current,
+      );
+      showToast("Invoice voided.");
+      return;
+    }
+    try {
+      const voided = voidInvoice(record);
+      setInvoiceRecords((current) =>
+        current.map((item) => (item.id === voided.id ? voided : item)),
+      );
+      setDialog((current) =>
+        current?.type === "invoice-document" && current.record.id === record.id
+          ? { ...current, record: voided }
+          : current,
+      );
+      showToast("Invoice voided.");
+    } catch (error) {
+      setOperationMutationError(
+        error instanceof OperationsRuleError
+          ? error.message
+          : "The invoice could not be voided.",
+      );
+    }
   };
 
   const renderView = () => {
@@ -1040,6 +1137,7 @@ export function ConsoleApp({
             }
             onPaymentStatusChange={updateInvoicePaymentStatus}
             onFinalize={finalizeInvoice}
+            onVoid={voidIssuedInvoiceRecord}
             onDelete={(record) =>
               setDialog({ type: "delete-invoice", record })
             }
@@ -1053,6 +1151,7 @@ export function ConsoleApp({
             jobRequests={jobRequests}
             quotes={quotes}
             invoices={invoiceRecords}
+            signedInEmail={signedInEmail}
             onNavigate={setActive}
           />
         );
@@ -1086,8 +1185,8 @@ export function ConsoleApp({
             <Menu aria-hidden="true" />
           </button>
           <div>
-            <small>FieldCentral</small>
-            <strong>Pro Console</strong>
+            <small>Mow & Glow</small>
+            <strong>Console</strong>
           </div>
         </header>
         <main className="workspace">{renderView()}</main>
@@ -1302,6 +1401,7 @@ export function ConsoleApp({
               )
             }
             onFinalize={() => void finalizeInvoice(dialog.record)}
+            onVoid={() => void voidIssuedInvoiceRecord(dialog.record)}
           />
         </Dialog>
       ) : null}

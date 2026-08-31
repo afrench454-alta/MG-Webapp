@@ -38,12 +38,14 @@ export type FieldProps = {
 export function quoteStatusTone(status: Quote["status"]): BadgeTone {
   if (status === "Accepted") return "success";
   if (status === "Sent") return "olive";
-  if (status === "Declined") return "amber";
+  if (status === "Declined" || status === "Expired") return "amber";
+  if (status === "Void") return "red";
   return "neutral";
 }
 
 export function documentStatusTone(status: Invoice["documentStatus"]): BadgeTone {
-  if (status === "Finalized") return "success";
+  if (status === "Issued" || status === "Sent") return "success";
+  if (status === "Overdue") return "unpaid";
   if (status === "Void") return "red";
   return "amber";
 }
@@ -51,8 +53,19 @@ export function documentStatusTone(status: Invoice["documentStatus"]): BadgeTone
 export function paymentStatusTone(status: Invoice["paymentStatus"]): BadgeTone {
   if (status === "Paid") return "success";
   if (status === "Part paid") return "amber";
-  if (status === "Void") return "neutral";
+  if (status === "Refunded") return "neutral";
   return "unpaid";
+}
+
+export function invoiceDisplayTone(
+  status: "Draft" | "Issued" | "Sent" | "Overdue" | "Part paid" | "Paid" | "Refunded" | "Void",
+): BadgeTone {
+  if (status === "Paid" || status === "Issued" || status === "Sent") return "success";
+  if (status === "Part paid") return "amber";
+  if (status === "Overdue") return "unpaid";
+  if (status === "Void") return "red";
+  if (status === "Refunded") return "neutral";
+  return "amber";
 }
 
 export function Button({

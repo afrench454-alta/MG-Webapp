@@ -77,6 +77,8 @@ export function QuotesView({
               <option>Sent</option>
               <option>Accepted</option>
               <option>Declined</option>
+              <option>Expired</option>
+              <option>Void</option>
             </select>
             <ChevronDown aria-hidden="true" size={16} />
           </label>

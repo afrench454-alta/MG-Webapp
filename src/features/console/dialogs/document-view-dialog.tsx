@@ -10,7 +10,8 @@ import {
   type Invoice,
   type Quote,
 } from "../domain";
-import { Badge, Button, documentStatusTone, paymentStatusTone, quoteStatusTone } from "../components/ui-elements";
+import { allowedPaymentStatuses, canFinalizeInvoice, canMarkPaid, canVoidInvoice, invoiceDisplayStatus } from "../data/invoice-lifecycle";
+import { Badge, Button, invoiceDisplayTone, quoteStatusTone } from "../components/ui-elements";
 
 function getDisplayDocumentNumber(record: Quote | Invoice) {
   return record.documentNumber || record.id;
@@ -55,12 +56,14 @@ export function DocumentViewDialog({
   onClose,
   onStatusChange,
   onFinalize,
+  onVoid,
 }: {
   type: "quote" | "invoice";
   record: Quote | Invoice;
   onClose: () => void;
   onStatusChange?: (status: string) => void;
   onFinalize?: () => void;
+  onVoid?: () => void;
 }) {
   const isQuote = "expires" in record;
   if ((type === "quote") !== isQuote) return null;
@@ -159,14 +162,9 @@ export function DocumentViewDialog({
                     {(record as Quote).status}
                   </Badge>
                 ) : (
-                  <>
-                    <Badge tone={documentStatusTone((record as Invoice).documentStatus)}>
-                      {(record as Invoice).documentStatus}
-                    </Badge>
-                    <Badge tone={paymentStatusTone((record as Invoice).paymentStatus)}>
-                      {(record as Invoice).paymentStatus}
-                    </Badge>
-                  </>
+                  <Badge tone={invoiceDisplayTone(invoiceDisplayStatus(record as Invoice))}>
+                    {invoiceDisplayStatus(record as Invoice)}
+                  </Badge>
                 )}
               </dd>
             </div>
@@ -304,6 +302,7 @@ export function DocumentViewDialog({
       </article>
 
       <div className="document-actions" data-print-exclude>
+        {isQuote || allowedPaymentStatuses(record as Invoice).length ? (
         <label className="compact-select">
           <span className="sr-only">
             {isQuote ? "Quote status" : "Payment status"}
@@ -313,28 +312,35 @@ export function DocumentViewDialog({
             onChange={(event) => onStatusChange?.(event.target.value)}
           >
             {(isQuote
-              ? ["Draft", "Sent", "Accepted", "Declined"]
-              : ["Unpaid", "Part paid", "Paid", "Void"]
+              ? ["Draft", "Sent", "Accepted", "Declined", "Expired", "Void"]
+              : allowedPaymentStatuses(record as Invoice)
             ).map((option) => (
               <option key={option}>{option}</option>
             ))}
           </select>
           <ChevronDown aria-hidden="true" size={16} />
         </label>
+        ) : null}
         <div>
           <Button variant="secondary" icon={Printer} onClick={printDocument}>
             Save / Print PDF
           </Button>
-          {!isQuote ? (
-            (record as Invoice).documentStatus === "Draft" ? (
-              <Button icon={FileCheck2} onClick={onFinalize}>
-                Finalize
-              </Button>
-            ) : (
-              <Button icon={FileCheck2} disabled variant="secondary">
-                Finalized
-              </Button>
-            )
+          {!isQuote && canMarkPaid(record as Invoice) ? (
+            <Button
+              onClick={() => onStatusChange?.("Paid")}
+            >
+              Mark paid
+            </Button>
+          ) : null}
+          {!isQuote && canFinalizeInvoice(record as Invoice) ? (
+            <Button variant="secondary" icon={FileCheck2} onClick={onFinalize}>
+              Issue
+            </Button>
+          ) : null}
+          {!isQuote && canVoidInvoice(record as Invoice) ? (
+            <Button variant="secondary" onClick={onVoid}>
+              Void
+            </Button>
           ) : null}
           <Button variant="secondary" onClick={onClose}>
             Close

@@ -8,7 +8,13 @@ export type ConsoleRoute =
   | "jobs"
   | "invoices";
 
-export type JobStatus = "scheduled" | "in-progress" | "on-hold" | "completed";
+export type JobStatus =
+  | "unscheduled"
+  | "scheduled"
+  | "in-progress"
+  | "on-hold"
+  | "completed"
+  | "cancelled";
 
 export type Property = {
   id?: string;
@@ -29,20 +35,25 @@ export type Client = {
 };
 
 export type LineItem = {
+  label?: string;
   description: string;
   quantity: number | string;
+  unitLabel?: string;
   rate: number | string;
 };
 
 export type Quote = {
   id: string;
   documentNumber?: string;
+  clientId?: string;
+  serviceAddressId?: string | null;
+  jobRequestId?: string | null;
   client: string;
   address: string;
   issued: string;
   expires: string;
   validDays: number;
-  status: "Draft" | "Sent" | "Accepted" | "Declined";
+  status: "Draft" | "Sent" | "Accepted" | "Declined" | "Expired" | "Void";
   scope: string;
   clientNotes: string;
   discount?: number;
@@ -53,12 +64,16 @@ export type Quote = {
 export type Invoice = {
   id: string;
   documentNumber?: string;
+  clientId?: string;
+  serviceAddressId?: string | null;
+  jobId?: string | null;
   client: string;
   address: string;
   issued: string;
   due: string;
-  documentStatus: "Draft" | "Finalized" | "Void";
-  paymentStatus: "Unpaid" | "Part paid" | "Paid" | "Void";
+  dueDate?: string | null;
+  documentStatus: "Draft" | "Issued" | "Sent" | "Overdue" | "Void";
+  paymentStatus: "Unpaid" | "Part paid" | "Paid" | "Refunded";
   scope?: string[];
   notes: string;
   discount?: number;
@@ -84,6 +99,9 @@ export const invoiceTerms = "Invoices due upon completion have a grace period of
 export type Job = {
   id: string;
   displayName: string;
+  clientId?: string;
+  serviceAddressId?: string | null;
+  jobRequestId?: string | null;
   client: string;
   property: string;
   address: string;
@@ -248,6 +266,9 @@ export const initialJobs: Job[] = [
     date: "11 Aug 2026",
     time: "9:00 am",
     dateKey: "2026-08-11T09:00",
+    clientId: "client-2",
+    serviceAddressId: "client-2-property-2",
+    jobRequestId: "request-1",
     status: "on-hold",
     notes: "",
     recurrence: "One-off",
@@ -266,6 +287,8 @@ export const initialJobs: Job[] = [
     date: "04 Aug 2026",
     time: "9:00 am",
     dateKey: "2026-08-04T09:00",
+    clientId: "client-2",
+    serviceAddressId: "client-2-property-2",
     status: "completed",
     notes: "Completed without issues.",
     recurrence: "One-off",
@@ -284,6 +307,8 @@ export const initialJobs: Job[] = [
     date: "11 Aug 2026",
     time: "1:00 pm",
     dateKey: "2026-08-11T13:00",
+    clientId: "client-2",
+    serviceAddressId: "client-2-property-1",
     status: "scheduled",
     notes: "",
     recurrence: "Weekly",
@@ -306,9 +331,12 @@ export const initialQuotes: Quote[] = [
     clientNotes: "Please contact us if you wish to amend any items on this quote.",
     discount: 0,
     taxRate: 0,
+    clientId: "client-2",
+    serviceAddressId: "client-2-property-2",
+    jobRequestId: "request-1",
     items: [
-      { description: "Labour", quantity: 2.5, rate: 120 },
-      { description: "Carpet clean", quantity: 1, rate: 10 },
+      { description: "Labour", quantity: 2.5, unitLabel: "hrs", rate: 120 },
+      { description: "Carpet clean", quantity: 1, unitLabel: "ea", rate: 10 },
     ],
   },
   {
@@ -323,16 +351,21 @@ export const initialQuotes: Quote[] = [
     clientNotes: "Ongoing service timing can be adjusted to suit the property.",
     discount: 0,
     taxRate: 0,
-    items: [{ description: "Regular clean", quantity: 1, rate: 250 }],
+    clientId: "client-2",
+    serviceAddressId: "client-2-property-2",
+    items: [{ description: "Regular clean", quantity: 1, unitLabel: "ea", rate: 250 }],
   },
 ];
 
 export const invoiceSeed: Invoice = {
   id: "INV-2026-2001",
+  clientId: "client-1",
+  serviceAddressId: "client-1-property-1",
   client: "Harper & Co",
   address: "1 Paperbark Street, Toowoomba",
   issued: "04 Aug 2026",
   due: "18 Aug 2026",
+  dueDate: "2026-08-18",
   documentStatus: "Draft",
   paymentStatus: "Unpaid",
   scope: ["Deep clean 3BR", "Window cleaning"],
@@ -346,10 +379,12 @@ export const invoiceSeed: Invoice = {
 };
 
 export const statusColumns: Array<{ id: JobStatus; label: string }> = [
+  { id: "unscheduled", label: "Unscheduled" },
   { id: "scheduled", label: "Scheduled" },
   { id: "in-progress", label: "In Progress" },
   { id: "on-hold", label: "On Hold" },
   { id: "completed", label: "Completed" },
+  { id: "cancelled", label: "Cancelled" },
 ];
 
 export function money(value: number): string {

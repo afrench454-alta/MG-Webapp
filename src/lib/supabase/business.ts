@@ -54,7 +54,7 @@ export const getBusinessContext = cache(
     );
 
     if (error) {
-      throw new Error(`Unable to resolve the FieldCentral business: ${error.message}`);
+      throw new Error(`Unable to resolve the Mow & Glow business: ${error.message}`);
     }
 
     const row = businessContextSchema.parse(Array.isArray(data) ? data[0] : data);

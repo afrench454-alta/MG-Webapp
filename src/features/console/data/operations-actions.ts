@@ -6,9 +6,17 @@ import { z } from "zod";
 import { requireBusinessContext } from "@/lib/supabase/business";
 
 import { invoiceDraftSchema, invoicePaymentStatusSchema, jobAssignmentsSchema, jobUpdateSchema, quoteDraftSchema, quoteStatusSchema, scheduleJobSchema, type DeleteActionResult, type InvoiceActionResult, type JobActionResult, type JobPhotoActionResult, type QuoteActionResult } from "./operations-contract";
-import { createInvoice, createQuote, deleteInvoice, deleteJob, deleteJobPhoto, deleteQuote, finalizeInvoice, scheduleJob, updateInvoicePayment, updateJob, updateJobAssignments, updateQuoteStatus, uploadJobPhoto } from "./operations-repository";
+import { createInvoice, createQuote, deleteInvoice, deleteJob, deleteJobPhoto, deleteQuote, finalizeInvoice, scheduleJob, updateInvoicePayment, updateJob, updateJobAssignments, updateQuoteStatus, uploadJobPhoto, voidIssuedInvoice } from "./operations-repository";
+import { OperationsRuleError } from "./operations-rules";
 
-function failure(error: unknown, fallback: string) { if (error instanceof z.ZodError) return "Check the details and try again."; if (error instanceof Error && /permission|owner|co-owner|authentication/i.test(error.message)) return "You do not have permission to make this change."; return fallback; }
+function failure(error: unknown, fallback: string) {
+  if (error instanceof z.ZodError) return "Check the details and try again.";
+  if (error instanceof OperationsRuleError) return error.message;
+  if (error instanceof Error && /permission|owner|co-owner|authentication/i.test(error.message)) {
+    return "You do not have permission to make this change.";
+  }
+  return fallback;
+}
 const idSchema = z.uuid();
 const manager = () => requireBusinessContext(["owner", "co_owner"]);
 
@@ -26,4 +34,5 @@ export async function deleteJobPhotoAction(jobId: string, photoId: string): Prom
 export async function saveInvoiceAction(input: unknown): Promise<InvoiceActionResult> { const parsed = invoiceDraftSchema.safeParse(input); if (!parsed.success) return { ok: false, message: failure(parsed.error, "Invoice details are invalid.") }; try { const invoice = await createInvoice(await manager(), parsed.data); revalidatePath("/"); return { ok: true, invoice }; } catch (error) { return { ok: false, message: failure(error, "The invoice could not be saved.") }; } }
 export async function updateInvoicePaymentAction(id: string, status: unknown): Promise<InvoiceActionResult> { const parsedId = idSchema.safeParse(id); const parsedStatus = invoicePaymentStatusSchema.safeParse(status); if (!parsedId.success || !parsedStatus.success) return { ok: false, message: "The invoice update was invalid." }; try { const invoice = await updateInvoicePayment(await manager(), parsedId.data, parsedStatus.data); revalidatePath("/"); return { ok: true, invoice }; } catch (error) { return { ok: false, message: failure(error, "The invoice could not be updated.") }; } }
 export async function finalizeInvoiceAction(id: string): Promise<InvoiceActionResult> { const parsed = idSchema.safeParse(id); if (!parsed.success) return { ok: false, message: "The invoice identifier was invalid." }; try { const invoice = await finalizeInvoice(await manager(), parsed.data); revalidatePath("/"); return { ok: true, invoice }; } catch (error) { return { ok: false, message: failure(error, "The invoice could not be finalized.") }; } }
+export async function voidInvoiceAction(id: string): Promise<InvoiceActionResult> { const parsed = idSchema.safeParse(id); if (!parsed.success) return { ok: false, message: "The invoice identifier was invalid." }; try { const invoice = await voidIssuedInvoice(await manager(), parsed.data); revalidatePath("/"); return { ok: true, invoice }; } catch (error) { return { ok: false, message: failure(error, "The invoice could not be voided.") }; } }
 export async function deleteInvoiceAction(id: string): Promise<DeleteActionResult> { const parsed = idSchema.safeParse(id); if (!parsed.success) return { ok: false, message: "The invoice identifier was invalid." }; try { const deletedId = await deleteInvoice(await manager(), parsed.data); revalidatePath("/"); return { ok: true, id: deletedId }; } catch (error) { return { ok: false, message: failure(error, "The invoice could not be deleted.") }; } }

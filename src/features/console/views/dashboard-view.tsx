@@ -11,6 +11,11 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
+  brisbaneDateLabel,
+  displayNameFromIdentity,
+  gdayGreeting,
+} from "@/lib/brand";
+import {
   money,
   quoteTotals,
   type Client,
@@ -28,6 +33,7 @@ export function DashboardView({
   jobRequests,
   quotes,
   invoices,
+  signedInEmail,
   onNavigate,
 }: {
   jobs: Job[];
@@ -35,6 +41,7 @@ export function DashboardView({
   jobRequests: JobRequest[];
   quotes: Quote[];
   invoices: Invoice[];
+  signedInEmail?: string;
   onNavigate: (route: ConsoleRoute) => void;
 }) {
   const upcoming = jobs.find((job) => job.status !== "completed");
@@ -46,7 +53,11 @@ export function DashboardView({
     ["Draft", "Sent"].includes(quote.status),
   );
   const unpaidTotal = invoices
-    .filter((record) => !["Paid", "Void"].includes(record.paymentStatus))
+    .filter((record) =>
+      record.documentStatus !== "Void" &&
+      record.paymentStatus !== "Paid" &&
+      record.paymentStatus !== "Refunded",
+    )
     .reduce(
       (sum, record) =>
         sum +
@@ -93,10 +104,17 @@ export function DashboardView({
     },
   ];
 
+  const greeting = gdayGreeting(displayNameFromIdentity(undefined, signedInEmail));
+  const todayLabel = brisbaneDateLabel();
+
   return (
     <>
-      <PageHeader eyebrow="Overview" title="Dashboard">
-        <span className="live-label">Live · 05/08/2026, 6:04 PM</span>
+      <PageHeader
+        eyebrow="Today"
+        title={greeting}
+        subtitle={`Here's what's happening with your field operations · ${todayLabel}`}
+      >
+        <span className="live-label">{todayLabel}</span>
       </PageHeader>
       <section className="metric-grid" aria-label="Business metrics">
         {metrics.map(({ label, value, note, icon: Icon, tone }) => (

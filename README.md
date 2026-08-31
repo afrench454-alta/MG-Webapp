@@ -1,6 +1,6 @@
-# FieldCentral Pro Console
+# Mow & Glow Console
 
-Production web application for FieldCentral's field-service operations workflow.
+Production web application for Mow & Glow Property Services field operations.
 The verified console can run as a seeded demo or as an authenticated Supabase
 application without maintaining separate UI implementations.
 

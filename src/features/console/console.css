@@ -24,7 +24,7 @@
   --unpaid: #a05c3c;
   --shadow: 0 1px 6px rgba(34, 52, 39, 0.07);
   --shadow-dialog: 0 18px 60px rgba(21, 31, 25, 0.24);
-  --sidebar-width: 240px;
+  --sidebar-width: 256px;
 }
 
 * {
@@ -120,15 +120,26 @@ textarea {
 }
 
 .brand-lockup {
-  height: 78px;
-  min-height: 78px;
-  padding: 20px;
+  min-height: 88px;
+  padding: 20px 18px;
   border-bottom: 1px solid var(--border);
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-lockup__mark {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #00c2c7;
 }
 
 .brand-lockup p {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   color: var(--micro);
   font-size: 10px;
@@ -167,7 +178,7 @@ textarea {
   gap: 12px;
   padding: 8px 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 12px;
   color: var(--ink);
   background: transparent;
   font-size: 14px;
@@ -200,7 +211,7 @@ textarea {
   gap: 10px;
   padding: 8px 16px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 12px;
   color: #fff;
   background: var(--brand-dark);
   font-size: 14px;
@@ -249,7 +260,7 @@ textarea {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 32px;
+  padding: 36px 40px;
 }
 
 .mobile-header {
@@ -425,15 +436,14 @@ textarea {
 }
 
 .metric-card {
-  height: 122px;
-  min-height: 122px;
+  min-height: 128px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px;
+  padding: 22px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: #fff;
 }
 
@@ -456,7 +466,7 @@ textarea {
   height: 40px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 12px;
   color: #fff;
 }
 
@@ -487,7 +497,7 @@ textarea {
 .record-row,
 .calendar-wrap {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: #fff;
 }
 
@@ -924,6 +934,12 @@ textarea {
   margin: 7px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.record-payment-locked {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .amount-block {

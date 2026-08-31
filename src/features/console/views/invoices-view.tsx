@@ -2,43 +2,59 @@
 
 import { useState, useMemo, memo } from "react";
 import type { ChangeEvent } from "react";
-import { ChevronDown, Eye, Plus, Search, Trash2, FileCheck2 } from "lucide-react";
+import { Ban, Check, ChevronDown, Eye, Plus, Search, Trash2, FileCheck2 } from "lucide-react";
 import { money, quoteTotals, type Invoice } from "../domain";
-import { Badge, Button, EmptyState, IconButton, matchesText, PageHeader, paymentStatusTone, documentStatusTone } from "../components/ui-elements";
+import {
+  allowedPaymentStatuses,
+  canDeleteInvoice,
+  canFinalizeInvoice,
+  canMarkPaid,
+  canVoidInvoice,
+  invoiceDisplayStatus,
+  type InvoiceDisplayStatus,
+} from "../data/invoice-lifecycle";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  IconButton,
+  matchesText,
+  PageHeader,
+  invoiceDisplayTone,
+} from "../components/ui-elements";
 
 const InvoiceRow = memo(function InvoiceRow({
   record,
   onView,
   onPaymentStatusChange,
   onFinalize,
+  onVoid,
   onDelete,
 }: {
   record: Invoice;
   onView: (record: Invoice) => void;
   onPaymentStatusChange: (id: string, status: Invoice["paymentStatus"]) => void;
   onFinalize: (record: Invoice) => void;
+  onVoid: (record: Invoice) => void;
   onDelete: (record: Invoice) => void;
 }) {
   const totals = quoteTotals(record.items);
+  const display = invoiceDisplayStatus(record);
+  const paymentOptions = allowedPaymentStatuses(record);
 
   const handlePaymentChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    onPaymentStatusChange(record.id, event.target.value as Invoice["paymentStatus"]);
+    onPaymentStatusChange(
+      record.id,
+      event.target.value as Invoice["paymentStatus"],
+    );
   };
-  const handleView = () => onView(record);
-  const handleFinalize = () => onFinalize(record);
-  const handleDelete = () => onDelete(record);
 
   return (
     <article className="record-row">
       <div>
         <div className="title-with-badge">
           <h2>{record.documentNumber || record.id}</h2>
-          <Badge tone={documentStatusTone(record.documentStatus)}>
-            {record.documentStatus}
-          </Badge>
-          <Badge tone={paymentStatusTone(record.paymentStatus)}>
-            {record.paymentStatus}
-          </Badge>
+          <Badge tone={invoiceDisplayTone(display)}>{display}</Badge>
         </div>
         <strong className="record-client">{record.client}</strong>
         <p>
@@ -50,36 +66,55 @@ const InvoiceRow = memo(function InvoiceRow({
           <strong>{money(totals.total)}</strong>
           <small>NO GST</small>
         </div>
-        <label className="compact-select">
-          <span className="sr-only">
-            Payment status for {record.documentNumber || record.id}
-          </span>
-          <select
-            aria-label={`Payment status for ${record.documentNumber || record.id}`}
-            value={record.paymentStatus}
-            onChange={handlePaymentChange}
-          >
-            <option>Unpaid</option>
-            <option>Part paid</option>
-            <option>Paid</option>
-            <option>Void</option>
-          </select>
-          <ChevronDown aria-hidden="true" size={16} />
-        </label>
-        <Button variant="secondary" icon={Eye} onClick={handleView}>
+        {paymentOptions.length ? (
+          <label className="compact-select">
+            <span className="sr-only">
+              Payment status for {record.documentNumber || record.id}
+            </span>
+            <select
+              aria-label={`Payment status for ${record.documentNumber || record.id}`}
+              value={record.paymentStatus}
+              onChange={handlePaymentChange}
+            >
+              {paymentOptions.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+            <ChevronDown aria-hidden="true" size={16} />
+          </label>
+        ) : (
+          <span className="record-payment-locked">{record.paymentStatus}</span>
+        )}
+        <Button variant="secondary" icon={Eye} onClick={() => onView(record)}>
           View
         </Button>
-        {record.documentStatus === "Draft" ? (
-          <Button variant="primary" icon={FileCheck2} onClick={handleFinalize}>
-            Finalize
+        {canMarkPaid(record) ? (
+          <Button
+            variant="primary"
+            icon={Check}
+            onClick={() => onPaymentStatusChange(record.id, "Paid")}
+          >
+            Mark paid
           </Button>
         ) : null}
-        <IconButton
-          label={`Delete ${record.documentNumber || record.id}`}
-          icon={Trash2}
-          tone="danger"
-          onClick={handleDelete}
-        />
+        {canFinalizeInvoice(record) ? (
+          <Button variant="secondary" icon={FileCheck2} onClick={() => onFinalize(record)}>
+            Issue
+          </Button>
+        ) : null}
+        {canVoidInvoice(record) ? (
+          <Button variant="secondary" icon={Ban} onClick={() => onVoid(record)}>
+            Void
+          </Button>
+        ) : null}
+        {canDeleteInvoice(record) ? (
+          <IconButton
+            label={`Delete ${record.documentNumber || record.id}`}
+            icon={Trash2}
+            tone="danger"
+            onClick={() => onDelete(record)}
+          />
+        ) : null}
       </div>
     </article>
   );
@@ -91,6 +126,7 @@ export function InvoicesView({
   onView,
   onPaymentStatusChange,
   onFinalize,
+  onVoid,
   onDelete,
 }: {
   records: Invoice[];
@@ -101,15 +137,11 @@ export function InvoicesView({
     status: Invoice["paymentStatus"],
   ) => void;
   onFinalize: (record: Invoice) => void;
+  onVoid: (record: Invoice) => void;
   onDelete: (record: Invoice) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [documentStatus, setDocumentStatus] = useState<
-    "All" | Invoice["documentStatus"]
-  >("All");
-  const [paymentStatus, setPaymentStatus] = useState<
-    "All" | Invoice["paymentStatus"]
-  >("All");
+  const [status, setStatus] = useState<"All" | InvoiceDisplayStatus>("All");
 
   const visible = useMemo(() => {
     return records.filter((record) => {
@@ -124,23 +156,26 @@ export function InvoicesView({
         ...(record.scope || []),
         ...record.items.map((item) => item.description),
       ].join(" ");
+      const display = invoiceDisplayStatus(record);
       return (
-        matchesText(searchable, query) &&
-        (documentStatus === "All" || record.documentStatus === documentStatus) &&
-        (paymentStatus === "All" || record.paymentStatus === paymentStatus)
+        matchesText(searchable, query) && (status === "All" || display === status)
       );
     });
-  }, [records, query, documentStatus, paymentStatus]);
+  }, [records, query, status]);
 
   const outstanding = useMemo(() => {
     return records
-      .filter((record) => !["Paid", "Void"].includes(record.paymentStatus))
+      .filter((record) =>
+        ["Draft", "Issued", "Sent", "Overdue", "Part paid"].includes(
+          invoiceDisplayStatus(record),
+        ),
+      )
       .reduce((sum, record) => sum + quoteTotals(record.items).total, 0);
   }, [records]);
 
   const paid = useMemo(() => {
     return records
-      .filter((record) => record.paymentStatus === "Paid")
+      .filter((record) => invoiceDisplayStatus(record) === "Paid")
       .reduce((sum, record) => sum + quoteTotals(record.items).total, 0);
   }, [records]);
 
@@ -149,7 +184,7 @@ export function InvoicesView({
       <PageHeader
         eyebrow="Billing"
         title="Invoices"
-        subtitle="Due upon completion · 7-day grace period · No GST."
+        subtitle="Mark paid issues a draft in one step. Void unpaid issued invoices. Delete drafts only."
       >
         <div className="billing-summary">
           <span>
@@ -176,36 +211,21 @@ export function InvoicesView({
         <div className="filter-controls">
           <span className="filter-controls__label">Filter by</span>
           <label className="compact-select">
-            <span className="sr-only">Invoice document status</span>
+            <span className="sr-only">Invoice status</span>
             <select
-              value={documentStatus}
+              value={status}
               onChange={(event) =>
-                setDocumentStatus(
-                  event.target.value as "All" | Invoice["documentStatus"],
-                )
+                setStatus(event.target.value as "All" | InvoiceDisplayStatus)
               }
             >
-              <option value="All">All document statuses</option>
+              <option value="All">All statuses</option>
               <option>Draft</option>
-              <option>Finalized</option>
-              <option>Void</option>
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
-          <label className="compact-select">
-            <span className="sr-only">Invoice payment status</span>
-            <select
-              value={paymentStatus}
-              onChange={(event) =>
-                setPaymentStatus(
-                  event.target.value as "All" | Invoice["paymentStatus"],
-                )
-              }
-            >
-              <option value="All">All payment statuses</option>
-              <option>Unpaid</option>
+              <option>Issued</option>
+              <option>Sent</option>
+              <option>Overdue</option>
               <option>Part paid</option>
               <option>Paid</option>
+              <option>Refunded</option>
               <option>Void</option>
             </select>
             <ChevronDown aria-hidden="true" size={16} />
@@ -220,6 +240,7 @@ export function InvoicesView({
             onView={onView}
             onPaymentStatusChange={onPaymentStatusChange}
             onFinalize={onFinalize}
+            onVoid={onVoid}
             onDelete={onDelete}
           />
         ))}

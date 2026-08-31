@@ -14,8 +14,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "FieldCentral Pro Console",
-    template: "%s | FieldCentral Pro Console",
+    default: "Mow & Glow Console",
+    template: "%s | Mow & Glow Console",
   },
   description:
     "Field service operations, client management, scheduling, quotes, and invoicing in one workspace.",

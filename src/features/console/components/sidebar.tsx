@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   CalendarDays,
   ClipboardList,
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { productBrand } from "@/lib/brand";
 import type { ConsoleRoute } from "../domain";
 import { IconButton } from "./ui-elements";
 
@@ -48,8 +50,17 @@ export function Sidebar({
   return (
     <aside className={`sidebar ${mobileOpen ? "sidebar--open" : ""}`}>
       <div className="brand-lockup">
-        <p>FieldCentral</p>
-        <strong>Pro Console</strong>
+        <Image
+          src="/mow-glow-logo.png"
+          alt=""
+          width={40}
+          height={40}
+          className="brand-lockup__mark"
+        />
+        <div>
+          <p>{productBrand}</p>
+          <strong>Console</strong>
+        </div>
         <IconButton
           label="Close navigation"
           icon={X}

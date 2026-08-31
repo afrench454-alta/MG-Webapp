@@ -3,8 +3,10 @@ import { z } from "zod";
 import type { Invoice, Job, JobPhoto, Quote } from "../domain";
 
 const lineItemSchema = z.object({
+  label: z.string().trim().max(160).optional(),
   description: z.string().trim().min(1).max(1_000),
   quantity: z.coerce.number().positive().max(100_000),
+  unitLabel: z.string().trim().max(32).optional(),
   rate: z.coerce.number().min(0).max(10_000_000),
 });
 
@@ -19,6 +21,7 @@ export const quoteDraftSchema = z.object({
 export const invoiceDraftSchema = z.object({
   clientId: z.uuid(),
   propertyId: z.uuid(),
+  extraPropertyIds: z.array(z.uuid()).max(20).optional(),
   jobId: z.uuid().optional(),
   items: z.array(lineItemSchema).min(1).max(100),
   dueDays: z.coerce.number().int().min(0).max(365),
@@ -32,7 +35,7 @@ export const scheduleJobSchema = z.object({
 
 export const jobUpdateSchema = z.object({
   id: z.uuid(),
-  status: z.enum(["scheduled", "in-progress", "on-hold", "completed"]),
+  status: z.enum(["unscheduled", "scheduled", "in-progress", "on-hold", "completed", "cancelled"]),
   notes: z.string().trim().max(20_000),
   recurrence: z.enum(["One-off", "Weekly", "Fortnightly", "Four-weekly", "Monthly"]),
 });
@@ -42,8 +45,8 @@ export const jobAssignmentsSchema = z.object({
   profileIds: z.array(z.uuid()).max(50),
 });
 
-export const quoteStatusSchema = z.enum(["Draft", "Sent", "Accepted", "Declined"]);
-export const invoicePaymentStatusSchema = z.enum(["Unpaid", "Part paid", "Paid", "Void"]);
+export const quoteStatusSchema = z.enum(["Draft", "Sent", "Accepted", "Declined", "Expired", "Void"]);
+export const invoicePaymentStatusSchema = z.enum(["Unpaid", "Part paid", "Paid", "Refunded"]);
 
 export type QuoteDraftInput = z.infer<typeof quoteDraftSchema>;
 export type InvoiceDraftInput = z.infer<typeof invoiceDraftSchema>;
@@ -70,4 +73,5 @@ export type DeleteJobAction = (id: string) => Promise<DeleteActionResult>;
 export type SaveInvoiceAction = (input: InvoiceDraftInput) => Promise<InvoiceActionResult>;
 export type UpdateInvoicePaymentAction = (id: string, status: z.infer<typeof invoicePaymentStatusSchema>) => Promise<InvoiceActionResult>;
 export type FinalizeInvoiceAction = (id: string) => Promise<InvoiceActionResult>;
+export type VoidInvoiceAction = (id: string) => Promise<InvoiceActionResult>;
 export type DeleteInvoiceAction = (id: string) => Promise<DeleteActionResult>;

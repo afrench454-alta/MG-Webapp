@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { productBrand, signInIntro } from "@/lib/brand";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getSafeReturnPath } from "@/lib/supabase/routing";
 
@@ -20,11 +21,9 @@ export default async function SignInPage({
   return (
     <main className={styles.shell}>
       <section className={styles.card} aria-labelledby="sign-in-title">
-        <p className={styles.brand}>FieldCentral</p>
-        <h1 id="sign-in-title">Pro Console</h1>
-        <p className={styles.intro}>
-          Sign in to manage clients, field work, quotes, and invoices.
-        </p>
+        <p className={styles.brand}>{productBrand}</p>
+        <h1 id="sign-in-title">Console</h1>
+        <p className={styles.intro}>{signInIntro}</p>
         <SignInForm
           nextPath={getSafeReturnPath(params.next)}
           configured={isSupabaseConfigured()}

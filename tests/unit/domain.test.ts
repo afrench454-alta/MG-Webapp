@@ -87,12 +87,12 @@ test("businessProfile & terms integrity", () => {
 import { documentStatusTone, paymentStatusTone } from "../../src/features/console/components/ui-elements";
 
 test("invoice status transitions: valid tone mappings", () => {
-  assert.equal(documentStatusTone("Finalized"), "success");
+  assert.equal(documentStatusTone("Issued"), "success");
   assert.equal(documentStatusTone("Void"), "red");
   assert.equal(documentStatusTone("Draft"), "amber");
   
   assert.equal(paymentStatusTone("Paid"), "success");
   assert.equal(paymentStatusTone("Part paid"), "amber");
-  assert.equal(paymentStatusTone("Void"), "neutral");
+  assert.equal(paymentStatusTone("Refunded"), "neutral");
   assert.equal(paymentStatusTone("Unpaid"), "unpaid");
 });
