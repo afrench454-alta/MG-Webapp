@@ -2,6 +2,7 @@
 
 import { ArrowUpRight, Send } from "lucide-react";
 import type { Questionnaire, QuestionnaireSubmission } from "../domain";
+import { displayServiceCategory } from "../data/service-catalog";
 import { Badge, Button, EmptyState, PageHeader } from "../components/ui-elements";
 
 export function QuestionnairesView({
@@ -20,7 +21,7 @@ export function QuestionnairesView({
       <PageHeader
         eyebrow="Client intake"
         title="Assessment Questionnaires"
-        subtitle="Standard clean, bond clean, yard and maintenance - send a fillable form."
+        subtitle="Cleaning, yard, and property maintenance — send a fillable form."
       >
         <Button icon={Send} onClick={onSend}>
           Send Questionnaire
@@ -30,7 +31,7 @@ export function QuestionnairesView({
         {items.map((item) => (
           <article className="questionnaire-card" key={item.id}>
             <header>
-              <Badge tone={item.tone}>{item.category}</Badge>
+              <Badge tone={item.tone}>{displayServiceCategory(item.category)}</Badge>
               <h2>{item.title}</h2>
             </header>
             <p>{item.description}</p>

@@ -9,6 +9,7 @@ import {
   requestFilterIds,
   type RequestFilterId,
 } from "../data/list-filters";
+import { displayServiceCategory, displayServiceDetail } from "../data/service-catalog";
 import {
   Badge,
   Button,
@@ -92,11 +93,14 @@ export function RequestsView({
         </div>
       </section>
       {visible.length ? (
-        visible.map((request) => (
+        visible.map((request) => {
+          const serviceType = displayServiceDetail(request.category);
+          return (
           <article className="request-card" key={request.id}>
             <div className="request-card__main">
               <div className="title-with-badge request-title">
-                <Badge tone="sage">{request.category}</Badge>
+                <Badge tone="sage">{displayServiceCategory(request.category)}</Badge>
+                {serviceType ? <Badge>{serviceType}</Badge> : null}
                 <h2>{request.client}</h2>
                 <Badge>{request.status}</Badge>
               </div>
@@ -135,7 +139,8 @@ export function RequestsView({
               ) : null}
             </div>
           </article>
-        ))
+          );
+        })
       ) : (
         <EmptyState
           title={

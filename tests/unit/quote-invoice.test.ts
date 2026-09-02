@@ -66,7 +66,7 @@ function job(): Job {
     client: "Northside Studio",
     property: "Owner Residence",
     address: "7 McCauley Drive, Booie",
-    category: "Standard / General Clean",
+    category: "Cleaning Services",
     scope: "Regular studio clean",
     date: "11 Aug 2026",
     time: "9:00 am",

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   money,
   quoteTotals,
+  formatLineQuantity,
   businessProfile,
   quoteTerms,
   invoiceTerms,
@@ -67,6 +68,12 @@ test("quoteTotals: handles empty or invalid line items without NaN", () => {
   assert.equal(result.subtotal, 0);
   assert.equal(result.total, 0);
   assert.equal(Number.isNaN(result.total), false);
+});
+
+test("formatLineQuantity merges qty and optional unit into one value", () => {
+  assert.equal(formatLineQuantity({ quantity: 2.5, unitLabel: "hrs" }), "2.5 hrs");
+  assert.equal(formatLineQuantity({ quantity: 1 }), "1");
+  assert.equal(formatLineQuantity({ quantity: "3", unitLabel: " ea " }), "3 ea");
 });
 
 test("money: formats currency correctly in AUD", () => {

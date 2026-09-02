@@ -1,16 +1,13 @@
 import { z } from "zod";
 
 import type { JobRequest } from "../domain";
+import { serviceCategories } from "./service-catalog";
 
 export const jobRequestDraftSchema = z.object({
   clientId: z.uuid(),
   propertyId: z.uuid(),
-  category: z.enum([
-    "Standard / General Clean",
-    "Bond Clean / End of Lease",
-    "Yard Cleanup",
-    "Property Maintenance",
-  ]),
+  category: z.enum(serviceCategories),
+  serviceDetail: z.string().trim().max(80).optional(),
   scope: z.string().trim().min(1).max(20_000),
 });
 

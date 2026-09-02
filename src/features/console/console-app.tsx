@@ -94,6 +94,7 @@ import {
   draftInvoiceFromQuote,
   liveInvoiceForQuote,
 } from "./data/quote-invoice";
+import { formatServiceTitle } from "./data/service-catalog";
 
 export type DialogState =
   | { type: "estimator" }
@@ -381,7 +382,7 @@ export function ConsoleApp({
           propertyId: selectedProperty?.id,
           client: selectedClient?.name || "Unassigned client",
           address: selectedProperty?.address || "No service address",
-          category: draft.category,
+          category: formatServiceTitle(draft.category, draft.serviceDetail),
           scope: draft.scope,
           status: "New",
           created: "05 Aug 2026",

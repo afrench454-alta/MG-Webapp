@@ -71,7 +71,8 @@ test("contracts: jobRequestDraftSchema validates service category and scope", ()
   const validRequest = {
     clientId: VALID_UUID,
     propertyId: ANOTHER_UUID,
-    category: "Standard / General Clean" as const,
+    category: "Cleaning Services" as const,
+    serviceDetail: "General Clean",
     scope: "3 bed 2 bath house clean",
   };
 
@@ -80,6 +81,12 @@ test("contracts: jobRequestDraftSchema validates service category and scope", ()
 
   const emptyScope = { ...validRequest, scope: "" };
   assert.equal(jobRequestDraftSchema.safeParse(emptyScope).success, false);
+
+  const legacyCategory = {
+    ...validRequest,
+    category: "Standard / General Clean",
+  };
+  assert.equal(jobRequestDraftSchema.safeParse(legacyCategory).success, false);
 });
 
 test("contracts: quoteDraftSchema validates quote payload", () => {

@@ -37,7 +37,7 @@ function scheduledJob(overrides: Partial<Job> = {}): Job {
     client: "Northside Studio",
     property: "Studio",
     address: "4 Railway Terrace",
-    category: "Yard Cleanup",
+    category: "Yard Services",
     scope: "Mow and edge",
     date: "05 Aug 2026",
     time: "9:00 am",

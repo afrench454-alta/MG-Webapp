@@ -27,6 +27,7 @@ import {
 } from "../domain";
 import { invoiceDisplayStatus } from "../data/invoice-lifecycle";
 import { isLiveInvoice, isLiveQuote } from "../data/list-filters";
+import { displayServiceCategory } from "../data/service-catalog";
 import { Badge, EmptyState, PageHeader } from "../components/ui-elements";
 
 export function DashboardView({
@@ -183,7 +184,7 @@ export function DashboardView({
               <span className="upcoming-job__details">
                 <strong>{upcoming.client}</strong>
                 <small>
-                  {upcoming.category} · {upcoming.address}
+                  {displayServiceCategory(upcoming.category)} · {upcoming.address}
                 </small>
               </span>
               <Badge tone="neutral">{upcoming.status.replace("-", " ")}</Badge>

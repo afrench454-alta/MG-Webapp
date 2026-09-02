@@ -48,7 +48,7 @@ function request(overrides: Partial<JobRequest> = {}): JobRequest {
     id: "req-1",
     client: "Northside Studio",
     address: "4 Railway Terrace",
-    category: "Standard / General Clean",
+    category: "Cleaning Services",
     scope: "Weekly clean",
     status: "New",
     created: "05 Aug 2026",

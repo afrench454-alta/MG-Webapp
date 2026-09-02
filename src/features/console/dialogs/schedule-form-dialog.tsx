@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 import type { JobRequest } from "../domain";
+import { displayServiceCategory } from "../data/service-catalog";
 import { Button, Field } from "../components/ui-elements";
 
 export function ScheduleFormDialog({
@@ -46,7 +47,7 @@ export function ScheduleFormDialog({
           <option value="">Choose...</option>
           {requests.map((item) => (
             <option value={item.id} key={item.id}>
-              {item.client} · {item.category}
+              {item.client} · {displayServiceCategory(item.category)}
             </option>
           ))}
         </select>

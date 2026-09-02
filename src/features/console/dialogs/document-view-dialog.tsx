@@ -4,6 +4,7 @@ import Image from "next/image";
 import { ChevronDown, DollarSign, FileCheck2, Printer, Send } from "lucide-react";
 import {
   businessProfile,
+  formatLineQuantity,
   invoiceTerms,
   quoteTerms,
   quoteTotals,
@@ -217,8 +218,6 @@ export function DocumentViewDialog({
           <colgroup>
             <col />
             <col className="document-table__quantity" />
-            <col className="document-table__hours" />
-            <col className="document-table__unit" />
             <col className="document-table__price" />
             <col className="document-table__total" />
           </colgroup>
@@ -226,8 +225,6 @@ export function DocumentViewDialog({
             <tr>
               <th scope="col">Description</th>
               <th scope="col">Qty</th>
-              <th scope="col">Hour&apos;s</th>
-              <th scope="col">Unit</th>
               <th scope="col">Price</th>
               <th scope="col">Total</th>
             </tr>
@@ -236,9 +233,7 @@ export function DocumentViewDialog({
             {record.items.map((item, index) => (
               <tr key={`${item.description}-${index}`}>
                 <td>{item.description}</td>
-                <td>{item.quantity}</td>
-                <td></td>
-                <td>Each</td>
+                <td>{formatLineQuantity(item)}</td>
                 <td>
                   <AccountingAmount value={Number(item.rate)} />
                 </td>
@@ -256,8 +251,6 @@ export function DocumentViewDialog({
                 aria-hidden="true"
               >
                 <td>&nbsp;</td>
-                <td></td>
-                <td></td>
                 <td></td>
                 <td></td>
                 <td>

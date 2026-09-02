@@ -1,3 +1,7 @@
+import type { ServiceCategory } from "./data/service-catalog";
+
+export type { ServiceCategory } from "./data/service-catalog";
+
 export type ConsoleRoute =
   | "dashboard"
   | "clients"
@@ -41,6 +45,15 @@ export type LineItem = {
   unitLabel?: string;
   rate: number | string;
 };
+
+export function formatLineQuantity(
+  item: Pick<LineItem, "quantity" | "unitLabel">,
+): string {
+  const quantity = String(item.quantity ?? "").trim();
+  const unit = item.unitLabel?.trim();
+  if (!quantity) return "";
+  return unit ? `${quantity} ${unit}` : quantity;
+}
 
 export type Quote = {
   id: string;
@@ -165,16 +178,11 @@ export type JobRequest = {
   visit?: string;
 };
 
-export type ServiceCategory =
-  | "Standard / General Clean"
-  | "Bond Clean / End of Lease"
-  | "Yard Cleanup"
-  | "Property Maintenance";
-
 export type JobRequestDraft = {
   clientId: string;
   propertyId: string;
   category: ServiceCategory;
+  serviceDetail?: string;
   scope: string;
 };
 
@@ -207,15 +215,15 @@ export const clientsSeed: Client[] = [
 export const questionnaires: Questionnaire[] = [
   {
     id: "standard",
-    category: "Standard / General Clean",
-    title: "Standard / General Clean Assessment",
-    description: "Lighter, general cleaning - ideal for routine or one-off house cleans.",
+    category: "Cleaning Services",
+    title: "Cleaning Services Assessment",
+    description: "General, bond, and deep cleans — pick the right intake for the job.",
     count: 6,
     tone: "sage",
   },
   {
     id: "bond",
-    category: "Bond Clean / End of Lease",
+    category: "Cleaning Services",
     title: "Bond Clean / End of Lease Questionnaire",
     description: "Detailed intake covering high-risk areas for a bond guarantee.",
     count: 6,
@@ -223,8 +231,8 @@ export const questionnaires: Questionnaire[] = [
   },
   {
     id: "yard",
-    category: "Yard Cleanup",
-    title: "Yard Cleanup & Property Overhaul",
+    category: "Yard Services",
+    title: "Yard Services Questionnaire",
     description: "Overgrown state, green waste, trees, edging and access.",
     count: 4,
     tone: "olive",
@@ -246,7 +254,7 @@ export const initialJobRequests: JobRequest[] = [
     client: "Northside Studio",
     propertyId: "client-2-property-2",
     address: "7 McCauley Drive, Booie",
-    category: "Standard / General Clean",
+    category: "Cleaning Services · General Clean",
     scope: "1 Bed, 2 Bath, 1 Kitchen, 1 Living, 1 Office",
     status: "Scheduled",
     created: "05 Aug 2026",
@@ -262,7 +270,7 @@ export const initialJobs: Job[] = [
     client: "Northside Studio",
     property: "Owner Residence",
     address: "7 McCauley Drive, Booie",
-    category: "Standard / General Clean",
+    category: "Cleaning Services · General Clean",
     scope: "1 Bed, 2 Bath, 1 Kitchen, 1 Living, 1 Office",
     date: "11 Aug 2026",
     time: "9:00 am",
@@ -283,7 +291,7 @@ export const initialJobs: Job[] = [
     client: "Northside Studio",
     property: "Owner Residence",
     address: "7 McCauley Drive, Booie",
-    category: "Standard / General Clean",
+    category: "Cleaning Services · Bond Clean",
     scope: "1 Bed, 2 Bath, 1 Kitchen, 1 Living, 1 Office",
     date: "04 Aug 2026",
     time: "9:00 am",
@@ -303,7 +311,7 @@ export const initialJobs: Job[] = [
     client: "Northside Studio",
     property: "Studio - Commercial",
     address: "4 Railway Terrace, Kingaroy",
-    category: "Standard / General Clean",
+    category: "Cleaning Services · General Clean",
     scope: "Regular commercial studio clean",
     date: "11 Aug 2026",
     time: "1:00 pm",

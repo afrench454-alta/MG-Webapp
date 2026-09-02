@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
 import type { Client, Job, LineItem, Quote } from "../domain";
+import { displayServiceCategory } from "../data/service-catalog";
 import { Button, Field } from "../components/ui-elements";
 import { LineItemEditor, Totals } from "../components/line-item-editor";
 
@@ -128,7 +129,7 @@ export function InvoiceFormDialog({
             <option value="">Start blank</option>
             {jobs.map((job) => (
               <option value={job.id} key={job.id}>
-                {job.displayName} · {job.category}
+                {job.displayName} · {displayServiceCategory(job.category)}
               </option>
             ))}
           </select>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
 import type { JobRequest, LineItem } from "../domain";
+import { displayServiceCategory } from "../data/service-catalog";
 import { Button, Field } from "../components/ui-elements";
 import { LineItemEditor, Totals } from "../components/line-item-editor";
 
@@ -63,7 +64,7 @@ export function QuoteFormDialog({
           <option value="">Choose...</option>
           {requests.map((request) => (
             <option value={request.id} key={request.id}>
-              {request.client} · {request.address}
+              {request.client} · {displayServiceCategory(request.category)}
             </option>
           ))}
         </select>

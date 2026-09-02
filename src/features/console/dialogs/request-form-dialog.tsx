@@ -4,6 +4,11 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
 import type { Client, JobRequestDraft } from "../domain";
+import {
+  detailsForCategory,
+  serviceCatalog,
+  summarizeServiceCategory,
+} from "../data/service-catalog";
 import { Button, Field } from "../components/ui-elements";
 
 export function RequestFormDialog({
@@ -23,14 +28,22 @@ export function RequestFormDialog({
   const selectedClient = clients.find((client) => client.id === clientId);
   const [propertyId, setPropertyId] = useState("");
   const [category, setCategory] = useState<JobRequestDraft["category"]>(
-    "Standard / General Clean",
+    "Cleaning Services",
   );
+  const [serviceDetail, setServiceDetail] = useState("");
   const [scope, setScope] = useState("");
+  const details = detailsForCategory(category);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!clientId || !propertyId || !scope) return;
-    void onSave({ clientId, propertyId, category, scope });
+    void onSave({
+      clientId,
+      propertyId,
+      category,
+      serviceDetail: serviceDetail || undefined,
+      scope,
+    });
   };
 
   return (
@@ -77,25 +90,43 @@ export function RequestFormDialog({
           ))}
         </select>
       </Field>
-      <Field label="Service category" required>
-        <select
-          value={category}
-          onChange={(event) =>
-            setCategory(event.target.value as JobRequestDraft["category"])
-          }
+      <div className="form-grid form-grid--two">
+        <Field
+          label="Service"
           required
-          disabled={pending}
+          hint={summarizeServiceCategory(category) || undefined}
         >
-          <option value="Standard / General Clean">
-            Standard / General Clean
-          </option>
-          <option value="Bond Clean / End of Lease">
-            Bond Clean / End of Lease
-          </option>
-          <option value="Yard Cleanup">Yard Cleanup</option>
-          <option value="Property Maintenance">Property Maintenance</option>
-        </select>
-      </Field>
+          <select
+            value={category}
+            onChange={(event) => {
+              setCategory(event.target.value as JobRequestDraft["category"]);
+              setServiceDetail("");
+            }}
+            required
+            disabled={pending}
+          >
+            {serviceCatalog.map((option) => (
+              <option value={option.id} key={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Service type" hint="Optional">
+          <select
+            value={serviceDetail}
+            onChange={(event) => setServiceDetail(event.target.value)}
+            disabled={pending || !details.length}
+          >
+            <option value="">Any / not specified</option>
+            {details.map((detail) => (
+              <option value={detail} key={detail}>
+                {detail}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       <Field label="Scope summary" required>
         <textarea
           rows={4}

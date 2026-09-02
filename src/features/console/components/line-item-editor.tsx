@@ -5,6 +5,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { money, quoteTotals, type LineItem } from "../domain";
 import { Button, IconButton } from "./ui-elements";
 
+const quantityUnits = ["hrs", "ea"] as const;
+
 export type EditableLineItem = LineItem & {
   id?: string;
 };
@@ -19,7 +21,12 @@ export function LineItemEditor({
   const update = (index: number, key: keyof LineItem, value: string) => {
     setItems((current) =>
       current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [key]: value } : item,
+        itemIndex === index
+          ? {
+              ...item,
+              [key]: key === "unitLabel" ? value || undefined : value,
+            }
+          : item,
       ),
     );
   };
@@ -52,52 +59,77 @@ export function LineItemEditor({
       </div>
       <div className="line-item-labels">
         <span>Description</span>
-        <span>Qty / hours</span>
+        <span>Qty</span>
         <span>Unit price</span>
         <span>Line total</span>
         <span></span>
       </div>
-      {items.map((item, index) => (
-        <div className="line-item-row" key={`line-item-${index}`}>
-          <input
-            aria-label={`Item ${index + 1} description`}
-            value={item.description}
-            onChange={(event) => update(index, "description", event.target.value)}
-            placeholder="Description"
-            required
-          />
-          <input
-            aria-label={`Item ${index + 1} quantity`}
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.25"
-            value={item.quantity}
-            onChange={(event) => update(index, "quantity", event.target.value)}
-            required
-          />
-          <input
-            aria-label={`Item ${index + 1} unit price`}
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={item.rate}
-            onChange={(event) => update(index, "rate", event.target.value)}
-            required
-          />
-          <output aria-label={`Item ${index + 1} total`}>
-            {money(Number(item.quantity || 0) * Number(item.rate || 0))}
-          </output>
-          <IconButton
-            label={`Remove line item ${index + 1}`}
-            icon={Trash2}
-            tone="danger"
-            type="button"
-            onClick={() => removeItem(index)}
-          />
-        </div>
-      ))}
+      {items.map((item, index) => {
+        const unitOptions = Array.from(
+          new Set(["", ...quantityUnits, item.unitLabel?.trim() || ""]),
+        );
+        return (
+          <div className="line-item-row" key={`line-item-${index}`}>
+            <input
+              className="line-item-row__description"
+              aria-label={`Item ${index + 1} description`}
+              value={item.description}
+              onChange={(event) =>
+                update(index, "description", event.target.value)
+              }
+              placeholder="Description"
+              required
+            />
+            <div className="line-item-qty">
+              <input
+                aria-label={`Item ${index + 1} quantity`}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.25"
+                value={item.quantity}
+                onChange={(event) =>
+                  update(index, "quantity", event.target.value)
+                }
+                required
+              />
+              <select
+                aria-label={`Item ${index + 1} unit`}
+                value={item.unitLabel || ""}
+                onChange={(event) =>
+                  update(index, "unitLabel", event.target.value)
+                }
+              >
+                {unitOptions.map((unit) => (
+                  <option value={unit} key={unit || "qty"}>
+                    {unit || "qty"}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <input
+              aria-label={`Item ${index + 1} unit price`}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              value={item.rate}
+              onChange={(event) => update(index, "rate", event.target.value)}
+              required
+            />
+            <output aria-label={`Item ${index + 1} total`}>
+              {money(Number(item.quantity || 0) * Number(item.rate || 0))}
+            </output>
+            <IconButton
+              label={`Remove line item ${index + 1}`}
+              icon={Trash2}
+              tone="danger"
+              type="button"
+              onClick={() => removeItem(index)}
+            />
+          </div>
+        );
+      })}
     </section>
   );
 }

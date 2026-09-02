@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import type { Job } from "../domain";
+import { displayServiceCategory } from "../data/service-catalog";
 import { Button, EmptyState, IconButton, PageHeader } from "../components/ui-elements";
 import { Dialog } from "../components/dialog";
 
@@ -210,7 +211,7 @@ export function ScheduleView({
                         {job.property} · {job.address}
                       </span>
                       <small>
-                        {job.category} · {job.status.replace("-", " ")}
+                        {displayServiceCategory(job.category)} · {job.status.replace("-", " ")}
                         {job.assignees.length
                           ? ` · ${job.assignees.join(", ")}`
                           : " · Unassigned"}

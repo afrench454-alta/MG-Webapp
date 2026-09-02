@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { JobRequest } from "../domain";
 import type { JobRequestMutationInput } from "./job-request-contract";
+import { formatServiceTitle } from "./service-catalog";
 
 const jobRequestRowSchema = z.object({
   id: z.uuid(),
@@ -125,7 +126,7 @@ export async function saveJobRequest(
       client_id: input.clientId,
       service_address_id: input.propertyId,
       status: "new",
-      title: input.category,
+      title: formatServiceTitle(input.category, input.serviceDetail),
       description: input.scope,
       source: "manual",
       created_by: context.actorId,

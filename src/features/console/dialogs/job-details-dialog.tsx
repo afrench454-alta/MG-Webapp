@@ -4,6 +4,10 @@ import { useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, PauseCircle, PlayCircle, RotateCcw, Trash2 } from "lucide-react";
 import type { Job, JobPhoto, JobStatus, TeamMember } from "../domain";
+import {
+  displayServiceCategory,
+  displayServiceDetail,
+} from "../data/service-catalog";
 import { Button, Field, IconButton } from "../components/ui-elements";
 
 export function JobDetailsDialog({
@@ -44,6 +48,8 @@ export function JobDetailsDialog({
     onAssign(next);
   };
 
+  const serviceType = displayServiceDetail(job.category);
+
   return (
     <div className="job-detail">
       <div className="job-facts">
@@ -54,6 +60,13 @@ export function JobDetailsDialog({
         <div>
           <p className="eyebrow">Scheduled</p>
           <span>{job.date}</span>
+        </div>
+        <div>
+          <p className="eyebrow">Service</p>
+          <span>
+            {displayServiceCategory(job.category)}
+            {serviceType ? ` · ${serviceType}` : ""}
+          </span>
         </div>
         <div className="job-facts__scope">
           <p className="eyebrow">Scope</p>
