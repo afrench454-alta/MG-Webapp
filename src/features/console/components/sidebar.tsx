@@ -18,6 +18,7 @@ import type { LucideIcon } from "lucide-react";
 import { productBrand } from "@/lib/brand";
 import type { ConsoleRoute } from "../domain";
 import { IconButton } from "./ui-elements";
+import { InstallAppButton } from "./install-app";
 
 export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -48,7 +49,10 @@ export function Sidebar({
   onSignOut?: () => Promise<void>;
 }) {
   return (
-    <aside className={`sidebar ${mobileOpen ? "sidebar--open" : ""}`}>
+    <aside
+      id="console-sidebar"
+      className={`sidebar ${mobileOpen ? "sidebar--open" : ""}`}
+    >
       <div className="brand-lockup">
         <Image
           src="/mow-glow-logo.png"
@@ -92,6 +96,7 @@ export function Sidebar({
           <Sparkles aria-hidden="true" size={18} />
           <span>AI Estimator</span>
         </button>
+        <InstallAppButton />
         <div className="signed-in">
           <p className="eyebrow">Signed in</p>
           <strong>{signedInEmail}</strong>

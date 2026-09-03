@@ -55,6 +55,7 @@ import type { SendQuestionnaireAction } from "./data/questionnaire-contract";
 
 import { Dialog } from "./components/dialog";
 import { Sidebar } from "./components/sidebar";
+import { MobileDock } from "./components/mobile-dock";
 import { DashboardView } from "./views/dashboard-view";
 import { ClientsView } from "./views/clients-view";
 import { RequestsView } from "./views/requests-view";
@@ -1314,6 +1315,15 @@ export function ConsoleApp({
           ) : null}
           {renderView()}
         </main>
+        <MobileDock
+          active={active}
+          menuOpen={mobileOpen}
+          onNavigate={(route) => {
+            setActive(route);
+            setMobileOpen(false);
+          }}
+          onMore={() => setMobileOpen((open) => !open)}
+        />
       </div>
 
       {dialog?.type === "estimator" ? (

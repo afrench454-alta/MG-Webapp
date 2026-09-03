@@ -59,6 +59,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
+  font-size: 16px;
 }
 
 .field input[aria-invalid="true"] {
@@ -101,10 +102,16 @@
 @media (max-width: 520px) {
   .shell {
     align-items: start;
-    padding: 20px 12px;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
   }
 
   .card {
-    padding: 26px 22px;
+    padding: 26px 18px;
+    border-radius: 14px;
+  }
+
+  .form button {
+    min-height: 48px;
+    width: 100%;
   }
 }
