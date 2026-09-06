@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Send } from "lucide-react";
+import { ArrowUpRight, ClipboardList, Send } from "lucide-react";
 import type { Questionnaire, QuestionnaireSubmission } from "../domain";
 import { displayServiceCategory } from "../data/service-catalog";
 import { Badge, Button, EmptyState, PageHeader } from "../components/ui-elements";
@@ -10,18 +10,20 @@ export function QuestionnairesView({
   submissions,
   onSend,
   onPreview,
+  onOpenSubmission,
 }: {
   items: Questionnaire[];
   submissions: QuestionnaireSubmission[];
   onSend: () => void;
   onPreview: (questionnaire: Questionnaire) => void;
+  onOpenSubmission: (submission: QuestionnaireSubmission) => void;
 }) {
   return (
     <>
       <PageHeader
         eyebrow="Client intake"
         title="Assessment Questionnaires"
-        subtitle="Cleaning, yard, and property maintenance — send a fillable form."
+        subtitle="Send a form, read the answers, then turn a submission into a job request."
       >
         <Button icon={Send} onClick={onSend}>
           Send Questionnaire
@@ -36,7 +38,7 @@ export function QuestionnairesView({
             </header>
             <p>{item.description}</p>
             <span className="question-count">{item.count} questions</span>
-            <div className="questionnaire-card__actions" style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+            <div className="questionnaire-card__actions">
               <Button variant="secondary" icon={ArrowUpRight} onClick={() => onPreview(item)}>
                 Preview Form
               </Button>
@@ -52,17 +54,25 @@ export function QuestionnairesView({
         {submissions.length ? (
           <div className="submission-list">
             {submissions.map((submission) => (
-              <article key={submission.id} className="submission-row">
+              <button
+                type="button"
+                key={submission.id}
+                className="submission-row"
+                onClick={() => onOpenSubmission(submission)}
+              >
                 <div className="submission-row__main">
                   <strong>{submission.respondent}</strong>
                   <span>{submission.email || "No email supplied"}</span>
                 </div>
                 <div className="submission-row__meta">
-                  <Badge tone="success">Received</Badge>
+                  <Badge tone={submission.jobRequestId ? "success" : "sage"}>
+                    {submission.jobRequestId ? "Request created" : "Needs action"}
+                  </Badge>
                   <strong>{submission.questionnaire}</strong>
                   <span>Submitted {submission.submitted}</span>
                 </div>
-              </article>
+                <ClipboardList aria-hidden="true" size={16} />
+              </button>
             ))}
           </div>
         ) : (

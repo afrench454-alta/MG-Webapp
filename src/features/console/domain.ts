@@ -10,7 +10,8 @@ export type ConsoleRoute =
   | "quotes"
   | "schedule"
   | "jobs"
-  | "invoices";
+  | "invoices"
+  | "settings";
 
 export type JobStatus =
   | "unscheduled"
@@ -95,7 +96,18 @@ export type Invoice = {
   items: LineItem[];
 };
 
-export const businessProfile = {
+export type BusinessProfile = {
+  name: string;
+  abn: string;
+  email: string;
+  phone: string;
+  website: string;
+  paymentTo: string;
+  bsb: string;
+  accountNumber: string;
+};
+
+export const businessProfile: BusinessProfile = {
   name: "Mow & Glow Property Services",
   abn: "15 219 585 352",
   email: "team@mowglowpropertyservices.com.au",
@@ -104,7 +116,7 @@ export const businessProfile = {
   paymentTo: "Jodie T/A Mow Glow PS",
   bsb: "084-961",
   accountNumber: "853110869",
-} as const;
+};
 
 export const quoteTerms = "This quotation is an estimate only. Any unforeseen costs, additional materials, or extra labour required may result in additional charges. The client will be notified before any changes or additional work is carried out.";
 
@@ -137,6 +149,16 @@ export type TeamMember = {
   name: string;
   email: string;
   role: "Owner" | "Co-owner" | "Technician";
+  isActive: boolean;
+};
+
+export type TeamInvitation = {
+  id: string;
+  email: string;
+  role: "Co-owner" | "Technician";
+  status: "Pending" | "Accepted" | "Revoked" | "Expired";
+  created: string;
+  expires: string;
 };
 
 export type JobPhoto = {
@@ -147,6 +169,14 @@ export type JobPhoto = {
   created: string;
 };
 
+export type QuestionnaireField = {
+  id: string;
+  label: string;
+  type: "text" | "textarea" | "radio" | "checkbox";
+  required?: boolean;
+  options?: string[];
+};
+
 export type Questionnaire = {
   id: string;
   category: string;
@@ -154,14 +184,19 @@ export type Questionnaire = {
   description: string;
   count: number;
   tone: "sage" | "forest" | "olive" | "amber";
+  fields: QuestionnaireField[];
 };
 
 export type QuestionnaireSubmission = {
   id: string;
+  questionnaireId?: string;
   questionnaire: string;
   respondent: string;
   email: string;
+  phone?: string;
   submitted: string;
+  answers: Record<string, string | string[]>;
+  jobRequestId?: string;
 };
 
 export type JobRequest = {
@@ -184,6 +219,7 @@ export type JobRequestDraft = {
   category: ServiceCategory;
   serviceDetail?: string;
   scope: string;
+  questionnaireResponseId?: string;
 };
 
 export const clientsSeed: Client[] = [
@@ -218,24 +254,41 @@ export const questionnaires: Questionnaire[] = [
     category: "Cleaning Services",
     title: "Cleaning Services Assessment",
     description: "General, bond, and deep cleans — pick the right intake for the job.",
-    count: 6,
+    count: 4,
     tone: "sage",
+    fields: [
+      { id: "property_type", label: "Property type", type: "radio", required: true, options: ["Unit / apartment", "House", "Commercial", "Other"] },
+      { id: "bedrooms", label: "Bedrooms or work areas", type: "text", required: true },
+      { id: "priorities", label: "Priority areas", type: "checkbox", options: ["Kitchen", "Bathrooms", "Floors", "Windows"] },
+      { id: "details", label: "Anything else we should know?", type: "textarea" },
+    ],
   },
   {
     id: "bond",
     category: "Cleaning Services",
     title: "Bond Clean / End of Lease Questionnaire",
     description: "Detailed intake covering high-risk areas for a bond guarantee.",
-    count: 6,
+    count: 4,
     tone: "forest",
+    fields: [
+      { id: "property", label: "Property type and size", type: "text", required: true },
+      { id: "vacate_date", label: "Vacate or handover date", type: "text", required: true },
+      { id: "condition", label: "Current condition", type: "radio", required: true, options: ["Light", "Average", "Heavy"] },
+      { id: "extras", label: "Extra services needed", type: "checkbox", options: ["Carpets", "Oven", "Windows", "Walls"] },
+    ],
   },
   {
     id: "yard",
     category: "Yard Services",
     title: "Yard Services Questionnaire",
     description: "Overgrown state, green waste, trees, edging and access.",
-    count: 4,
+    count: 3,
     tone: "olive",
+    fields: [
+      { id: "yard_size", label: "Approximate yard size", type: "text", required: true },
+      { id: "work", label: "Work required", type: "checkbox", required: true, options: ["Mowing", "Edging", "Pruning", "Green waste", "Weeding"] },
+      { id: "access", label: "Access and equipment restrictions", type: "textarea" },
+    ],
   },
   {
     id: "maintenance",
@@ -244,7 +297,36 @@ export const questionnaires: Questionnaire[] = [
     description: "Minor repairs, handyman tasks, gutters, locks and fixtures.",
     count: 3,
     tone: "amber",
+    fields: [
+      { id: "work", label: "Work or repair required", type: "textarea", required: true },
+      { id: "urgency", label: "Urgency", type: "radio", required: true, options: ["Routine", "Soon", "Urgent"] },
+      { id: "access", label: "Access, safety or material notes", type: "textarea" },
+    ],
   },
+];
+
+export const questionnaireSubmissionsSeed: QuestionnaireSubmission[] = [
+  {
+    id: "submission-1",
+    questionnaireId: "bond",
+    questionnaire: "Bond Clean / End of Lease Questionnaire",
+    respondent: "Harper & Co",
+    email: "hello@harperandco.example",
+    phone: "+61 400 111 333",
+    submitted: "05 Aug 2026",
+    answers: {
+      _site_address: "1 Paperbark Street, Toowoomba",
+      property: "3 bed / 2 bath house",
+      vacate_date: "22 Aug 2026",
+      condition: "Average",
+      extras: ["Carpets", "Oven"],
+    },
+  },
+];
+
+export const teamMembersSeed: TeamMember[] = [
+  { id: "member-1", name: "Jodie", email: "team@mowglowpropertyservices.com.au", role: "Owner", isActive: true },
+  { id: "member-2", name: "Alex", email: "alex@mowglowpropertyservices.com.au", role: "Technician", isActive: true },
 ];
 
 export const initialJobRequests: JobRequest[] = [
@@ -266,7 +348,7 @@ export const initialJobRequests: JobRequest[] = [
 export const initialJobs: Job[] = [
   {
     id: "job-1",
-    displayName: "Northside Studio · Owner Residence · 11 Aug 2026",
+    displayName: "Northside Studio · 7 McCauley Drive, Booie · 11 Aug 2026",
     client: "Northside Studio",
     property: "Owner Residence",
     address: "7 McCauley Drive, Booie",
@@ -287,7 +369,7 @@ export const initialJobs: Job[] = [
   },
   {
     id: "job-2",
-    displayName: "Northside Studio · Owner Residence · 04 Aug 2026",
+    displayName: "Northside Studio · 7 McCauley Drive, Booie · 04 Aug 2026",
     client: "Northside Studio",
     property: "Owner Residence",
     address: "7 McCauley Drive, Booie",
@@ -307,7 +389,7 @@ export const initialJobs: Job[] = [
   },
   {
     id: "job-3",
-    displayName: "Northside Studio · Studio - Commercial · 11 Aug 2026",
+    displayName: "Northside Studio · 4 Railway Terrace, Kingaroy · 11 Aug 2026",
     client: "Northside Studio",
     property: "Studio - Commercial",
     address: "4 Railway Terrace, Kingaroy",
@@ -321,8 +403,8 @@ export const initialJobs: Job[] = [
     status: "scheduled",
     notes: "",
     recurrence: "Weekly",
-    assigneeIds: [],
-    assignees: [],
+    assigneeIds: ["member-2"],
+    assignees: ["Alex"],
     photos: [],
   },
 ];

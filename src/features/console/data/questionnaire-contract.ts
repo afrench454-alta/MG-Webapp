@@ -6,6 +6,7 @@ export const sendQuestionnaireSchema = z.object({
   questionnaireId: z.uuid(),
   recipient: z.string().trim().min(1).max(160),
   email: z.email().max(320),
+  clientId: z.uuid().optional(),
 });
 
 export const publicQuestionnaireSubmissionSchema = z.object({

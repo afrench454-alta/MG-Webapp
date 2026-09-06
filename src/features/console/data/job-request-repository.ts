@@ -128,7 +128,8 @@ export async function saveJobRequest(
       status: "new",
       title: formatServiceTitle(input.category, input.serviceDetail),
       description: input.scope,
-      source: "manual",
+      source: input.questionnaireResponseId ? "questionnaire" : "manual",
+      questionnaire_response_id: input.questionnaireResponseId || null,
       created_by: context.actorId,
       service_address_snapshot: {
         label: address.label,

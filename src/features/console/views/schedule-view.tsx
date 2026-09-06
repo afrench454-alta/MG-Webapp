@@ -132,7 +132,7 @@ export function ScheduleView({
                       <span>
                         {job.time} · {job.client}
                       </span>
-                      <small>{job.property}</small>
+                      <small>{job.address}</small>
                     </button>
                   ))}
                   {dayJobs.length > 1 ? (

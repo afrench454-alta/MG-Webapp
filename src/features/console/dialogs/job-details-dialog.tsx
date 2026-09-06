@@ -110,7 +110,7 @@ export function JobDetailsDialog({
           </span>
         </div>
         <div className="assignment-options">
-          {teamMembers.map((member) => (
+          {teamMembers.filter((member) => member.isActive).map((member) => (
             <label key={member.id}>
               <input
                 type="checkbox"

@@ -87,6 +87,12 @@ test("contracts: jobRequestDraftSchema validates service category and scope", ()
     category: "Standard / General Clean",
   };
   assert.equal(jobRequestDraftSchema.safeParse(legacyCategory).success, false);
+
+  const fromQuestionnaire = {
+    ...validRequest,
+    questionnaireResponseId: VALID_UUID,
+  };
+  assert.equal(jobRequestDraftSchema.safeParse(fromQuestionnaire).success, true);
 });
 
 test("contracts: quoteDraftSchema validates quote payload", () => {
@@ -139,6 +145,12 @@ test("contracts: scheduleJobSchema validates job schedule inputs", () => {
 
   const parsed = scheduleJobSchema.safeParse(validSchedule);
   assert.equal(parsed.success, true);
+
+  const withTeam = {
+    ...validSchedule,
+    profileIds: [VALID_UUID],
+  };
+  assert.equal(scheduleJobSchema.safeParse(withTeam).success, true);
 
   const invalidDate = {
     jobRequestId: VALID_UUID,

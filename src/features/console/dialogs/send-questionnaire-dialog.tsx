@@ -2,20 +2,23 @@
 
 import { useState } from "react";
 import { FileCheck2, FileText, Mail, Send } from "lucide-react";
-import type { Questionnaire } from "../domain";
+import type { Client, Questionnaire } from "../domain";
 import type { SendQuestionnaireAction } from "../data/questionnaire-contract";
 import { Button, Field } from "../components/ui-elements";
 
 export function SendQuestionnaireDialog({
   items,
+  clients = [],
   onClose,
   onSend,
 }: {
   items: Questionnaire[];
+  clients?: Client[];
   onClose: () => void;
   onSend?: SendQuestionnaireAction;
 }) {
   const [template, setTemplate] = useState(items[0]?.id || "");
+  const [clientId, setClientId] = useState("");
   const [recipient, setRecipient] = useState("");
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
@@ -78,6 +81,7 @@ export function SendQuestionnaireDialog({
           questionnaireId: template,
           recipient,
           email,
+          clientId: clientId || undefined,
         });
         setPending(false);
         if (!result.ok) {
@@ -103,6 +107,29 @@ export function SendQuestionnaireDialog({
           ))}
         </select>
       </Field>
+      {clients.length ? (
+        <Field label="Existing client" hint="Optional — prefills name and email">
+          <select
+            value={clientId}
+            onChange={(event) => {
+              const next = clients.find((client) => client.id === event.target.value);
+              setClientId(event.target.value);
+              if (next) {
+                setRecipient(next.name);
+                setEmail(next.email);
+              }
+            }}
+            disabled={pending}
+          >
+            <option value="">New recipient</option>
+            {clients.map((client) => (
+              <option value={client.id} key={client.id}>
+                {client.name} · {client.email}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : null}
       <div className="form-grid form-grid--two">
         <Field label="Recipient name" required>
           <input

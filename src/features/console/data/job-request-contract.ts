@@ -9,6 +9,7 @@ export const jobRequestDraftSchema = z.object({
   category: z.enum(serviceCategories),
   serviceDetail: z.string().trim().max(80).optional(),
   scope: z.string().trim().min(1).max(20_000),
+  questionnaireResponseId: z.uuid().optional(),
 });
 
 export type JobRequestMutationInput = z.infer<typeof jobRequestDraftSchema>;

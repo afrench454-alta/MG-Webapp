@@ -7,9 +7,21 @@ import { listClients } from "@/features/console/data/client-repository";
 import { deleteJobRequestAction, saveJobRequestAction } from "@/features/console/data/job-request-actions";
 import { listJobRequests } from "@/features/console/data/job-request-repository";
 import { deleteInvoiceAction, deleteJobAction, deleteJobPhotoAction, deleteQuoteAction, finalizeInvoiceAction, markInvoiceSentAction, saveInvoiceAction, saveQuoteAction, scheduleJobAction, updateInvoicePaymentAction, updateJobAction, updateJobAssignmentsAction, updateQuoteStatusAction, uploadJobPhotoAction, voidInvoiceAction } from "@/features/console/data/operations-actions";
-import { listInvoices, listJobs, listQuotes, listTeamMembers } from "@/features/console/data/operations-repository";
+import { listInvoices, listJobs, listQuotes } from "@/features/console/data/operations-repository";
+import { estimateJobAction } from "@/features/console/data/estimator-actions";
 import { sendQuestionnaireAction } from "@/features/console/data/questionnaire-actions";
 import { listQuestionnaires, listQuestionnaireSubmissions } from "@/features/console/data/questionnaire-repository";
+import {
+  inviteTeamMemberAction,
+  revokeTeamInviteAction,
+  updateBusinessProfileAction,
+  updateTeamMemberAction,
+} from "@/features/console/data/team-actions";
+import {
+  getBusinessProfile,
+  listTeamInvitations,
+  listTeamMembers,
+} from "@/features/console/data/team-repository";
 import { getBusinessContext } from "@/lib/supabase/business";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -23,14 +35,16 @@ export default async function Home() {
   const context = await getBusinessContext();
   if (!context) redirect("/sign-in");
 
-  const [clients, jobRequests, questionnaires, questionnaireSubmissions, quotes, jobs, teamMembers, invoices] = await Promise.all([
+  const [clients, jobRequests, questionnaires, questionnaireSubmissions, quotes, jobs, teamMembers, invitations, businessDetails, invoices] = await Promise.all([
     listClients(context),
     listJobRequests(context),
     listQuestionnaires(context),
     listQuestionnaireSubmissions(context),
     listQuotes(context),
     listJobs(context),
-    listTeamMembers(context),
+    listTeamMembers(context, { includeInactive: true }),
+    listTeamInvitations(context),
+    getBusinessProfile(context),
     listInvoices(context),
   ]);
 
@@ -43,6 +57,8 @@ export default async function Home() {
       initialQuotes={quotes}
       initialJobs={jobs}
       teamMembers={teamMembers}
+      teamInvitations={invitations}
+      businessDetails={businessDetails}
       initialInvoices={invoices}
       dataMode="live"
       signedInEmail={context.actorEmail || "Signed-in operator"}
@@ -68,6 +84,11 @@ export default async function Home() {
       onVoidInvoice={voidInvoiceAction}
       onDeleteInvoice={deleteInvoiceAction}
       onSendQuestionnaire={sendQuestionnaireAction}
+      onEstimateJob={estimateJobAction}
+      onInviteTeamMember={inviteTeamMemberAction}
+      onRevokeTeamInvite={revokeTeamInviteAction}
+      onUpdateTeamMember={updateTeamMemberAction}
+      onUpdateBusinessProfile={updateBusinessProfileAction}
       onSignOut={signOutAction}
     />
   );

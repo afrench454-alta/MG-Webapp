@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
 import type { JobRequest, LineItem } from "../domain";
-import { displayServiceCategory } from "../data/service-catalog";
+import { formatWorkLabel } from "../data/work-identity";
 import { Button, Field } from "../components/ui-elements";
 import { LineItemEditor, Totals } from "../components/line-item-editor";
 
@@ -18,26 +18,33 @@ export type QuoteDraft = {
 
 export function QuoteFormDialog({
   requests,
+  prefill,
   onClose,
   onSave,
   pending = false,
   error = "",
 }: {
   requests: JobRequest[];
+  prefill?: Partial<QuoteDraft>;
   onClose: () => void;
   onSave: (draft: QuoteDraft) => void | Promise<void>;
   pending?: boolean;
   error?: string;
 }) {
-  const [jobRequestId, setJobRequestId] = useState("");
-  const [scope, setScope] = useState("");
-  const [items, setItems] = useState<LineItem[]>([
-    { description: "", quantity: 1, rate: 0 },
-  ]);
-  const [clientNotes, setClientNotes] = useState(
-    "Please contact us if you wish to amend any items on this quote.",
+  const [jobRequestId, setJobRequestId] = useState(prefill?.jobRequestId || "");
+  const [scope, setScope] = useState(prefill?.scope || "");
+  const [items, setItems] = useState<LineItem[]>(
+    prefill?.items?.length
+      ? prefill.items.map((item) => ({ ...item }))
+      : [{ description: "", quantity: 1, rate: 0 }],
   );
-  const [internalNotes, setInternalNotes] = useState("");
+  const [clientNotes, setClientNotes] = useState(
+    prefill?.clientNotes ||
+      "Please contact us if you wish to amend any items on this quote.",
+  );
+  const [internalNotes, setInternalNotes] = useState(
+    prefill?.internalNotes || "",
+  );
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +71,7 @@ export function QuoteFormDialog({
           <option value="">Choose...</option>
           {requests.map((request) => (
             <option value={request.id} key={request.id}>
-              {request.client} · {displayServiceCategory(request.category)}
+              {formatWorkLabel(request)}
             </option>
           ))}
         </select>

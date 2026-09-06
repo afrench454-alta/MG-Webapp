@@ -13,7 +13,7 @@ type Payload = z.infer<typeof publicQuestionnaireSchema>;
 export function QuestionnaireForm({ token, payload }: { token: string; payload: Payload }) {
   const questionnaire = payload.questionnaire!;
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-  const [identity, setIdentity] = useState({ name: "", email: "", phone: "" });
+  const [identity, setIdentity] = useState({ name: "", email: "", phone: "", address: "" });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -49,7 +49,7 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
         </div>
       </div>
 
-      <form className={styles.form} onSubmit={async (event) => { event.preventDefault(); setError(""); const missing = questionnaire.form_schema.fields.some((field: z.infer<typeof formFieldSchema>) => field.required && (!answers[field.id] || answers[field.id].length === 0)); if (missing) { setError("Complete each required question."); return; } setPending(true); const result = await submitQuestionnaireAction({ token, ...identity, answers }); setPending(false); if (!result.ok) { setError(result.message); return; } setSubmitted(true); }}>
+      <form className={styles.form} onSubmit={async (event) => { event.preventDefault(); setError(""); const missing = questionnaire.form_schema.fields.some((field: z.infer<typeof formFieldSchema>) => field.required && (!answers[field.id] || answers[field.id].length === 0)); if (missing) { setError("Complete each required question."); return; } setPending(true); const result = await submitQuestionnaireAction({ token, name: identity.name, email: identity.email, phone: identity.phone, answers: { ...answers, ...(identity.address.trim() ? { _site_address: identity.address.trim() } : {}) } }); setPending(false); if (!result.ok) { setError(result.message); return; } setSubmitted(true); }}>
         
         <fieldset className={styles.fieldCard}>
           <legend className={styles.cardTitle}>Contact Information</legend>
@@ -66,6 +66,10 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
             <label className={styles.inputGroup}>
               <span>Email</span>
               <input type="email" value={identity.email} onChange={(event) => setIdentity((current) => ({ ...current, email: event.target.value }))} />
+            </label>
+            <label className={styles.inputGroup}>
+              <span>Property address <span aria-hidden="true" className={styles.asterisk}>*</span></span>
+              <input value={identity.address} onChange={(event) => setIdentity((current) => ({ ...current, address: event.target.value }))} required aria-required="true" placeholder="Street, suburb" />
             </label>
           </div>
         </fieldset>

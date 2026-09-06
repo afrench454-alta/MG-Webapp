@@ -13,25 +13,29 @@ import { Button, Field } from "../components/ui-elements";
 
 export function RequestFormDialog({
   clients,
+  prefill,
   onClose,
   onSave,
   pending = false,
   error = "",
 }: {
   clients: Client[];
+  prefill?: Partial<JobRequestDraft> & { clientId?: string; propertyId?: string };
   onClose: () => void;
   onSave: (draft: JobRequestDraft) => void | Promise<void>;
   pending?: boolean;
   error?: string;
 }) {
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(prefill?.clientId || "");
   const selectedClient = clients.find((client) => client.id === clientId);
-  const [propertyId, setPropertyId] = useState("");
-  const [category, setCategory] = useState<JobRequestDraft["category"]>(
-    "Cleaning Services",
+  const [propertyId, setPropertyId] = useState(
+    prefill?.propertyId || selectedClient?.properties[0]?.id || "",
   );
-  const [serviceDetail, setServiceDetail] = useState("");
-  const [scope, setScope] = useState("");
+  const [category, setCategory] = useState<JobRequestDraft["category"]>(
+    prefill?.category || "Cleaning Services",
+  );
+  const [serviceDetail, setServiceDetail] = useState(prefill?.serviceDetail || "");
+  const [scope, setScope] = useState(prefill?.scope || "");
   const details = detailsForCategory(category);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -43,6 +47,7 @@ export function RequestFormDialog({
       category,
       serviceDetail: serviceDetail || undefined,
       scope,
+      questionnaireResponseId: prefill?.questionnaireResponseId,
     });
   };
 

@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   ReceiptText,
+  Settings,
   Sparkles,
   Users,
   X,
@@ -29,6 +30,7 @@ export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon
   { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "jobs", label: "Job Board", icon: Columns3 },
   { id: "invoices", label: "Invoices", icon: DollarSign },
+  { id: "settings", label: "Team & business", icon: Settings },
 ];
 
 export function Sidebar({
@@ -39,6 +41,7 @@ export function Sidebar({
   onClose,
   signedInEmail,
   onSignOut,
+  canManage = true,
 }: {
   active: ConsoleRoute;
   onNavigate: (route: ConsoleRoute) => void;
@@ -47,6 +50,7 @@ export function Sidebar({
   onClose: () => void;
   signedInEmail: string;
   onSignOut?: () => Promise<void>;
+  canManage?: boolean;
 }) {
   return (
     <aside
@@ -73,7 +77,9 @@ export function Sidebar({
         />
       </div>
       <nav aria-label="Main navigation" className="sidebar-nav">
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => item.id !== "settings" || canManage)
+          .map((item) => {
           const Icon = item.icon;
           return (
             <button

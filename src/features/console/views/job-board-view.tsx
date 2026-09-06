@@ -110,7 +110,7 @@ export function JobBoardView({
                         <small>{job.date}</small>
                       </span>
                       <strong>{job.client}</strong>
-                      <span className="job-card__property">{job.property}</span>
+                      <span className="job-card__property">{job.address}</span>
                       {serviceType ? (
                         <span className="job-card__detail">{serviceType}</span>
                       ) : null}

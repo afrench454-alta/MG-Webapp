@@ -32,6 +32,7 @@ export const invoiceDraftSchema = z.object({
 export const scheduleJobSchema = z.object({
   jobRequestId: z.uuid(),
   scheduledStart: z.string().datetime({ offset: true }),
+  profileIds: z.array(z.uuid()).max(50).optional(),
 });
 
 export const jobUpdateSchema = z.object({

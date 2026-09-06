@@ -4,14 +4,18 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Menu, Sparkles } from "lucide-react";
 import "./console.css";
 import {
+  businessProfile as defaultBusinessProfile,
   clientsSeed,
   initialJobRequests,
   initialJobs,
   initialQuotes,
   invoiceSeed as invoice,
   questionnaires,
+  questionnaireSubmissionsSeed,
+  teamMembersSeed,
 } from "./domain";
 import type {
+  BusinessProfile,
   Client,
   ConsoleRoute,
   Invoice,
@@ -24,6 +28,7 @@ import type {
   Questionnaire,
   QuestionnaireSubmission,
   Quote,
+  TeamInvitation,
   TeamMember,
 } from "./domain";
 import type {
@@ -52,6 +57,13 @@ import type {
   UploadJobPhotoAction,
 } from "./data/operations-contract";
 import type { SendQuestionnaireAction } from "./data/questionnaire-contract";
+import type { EstimateJobAction } from "./data/estimator-contract";
+import type {
+  InviteTeamAction,
+  RevokeTeamInviteAction,
+  UpdateBusinessProfileAction,
+  UpdateTeamMemberAction,
+} from "./data/team-contract";
 
 import { Dialog } from "./components/dialog";
 import { Sidebar } from "./components/sidebar";
@@ -64,6 +76,7 @@ import { QuotesView } from "./views/quotes-view";
 import { ScheduleView } from "./views/schedule-view";
 import { JobBoardView } from "./views/job-board-view";
 import { InvoicesView } from "./views/invoices-view";
+import { SettingsView } from "./views/settings-view";
 
 import { ClientFormDialog } from "./dialogs/client-form-dialog";
 import { QuoteFormDialog, type QuoteDraft } from "./dialogs/quote-form-dialog";
@@ -75,6 +88,7 @@ import { ScheduleFormDialog } from "./dialogs/schedule-form-dialog";
 import { SendQuestionnaireDialog } from "./dialogs/send-questionnaire-dialog";
 import { RequestFormDialog } from "./dialogs/request-form-dialog";
 import { PublicQuestionnairePreview } from "./dialogs/public-questionnaire-preview";
+import { SubmissionDialog } from "./dialogs/submission-dialog";
 import {
   ConfirmDeleteClientDialog,
   ConfirmRecordDeleteDialog,
@@ -95,25 +109,27 @@ import {
   draftInvoiceFromQuote,
   liveInvoiceForQuote,
 } from "./data/quote-invoice";
-import { formatServiceTitle } from "./data/service-catalog";
+import { formatServiceTitle, isServiceCategory, parseServiceTitle } from "./data/service-catalog";
+import { formatJobDisplayName, formatSubmissionScope } from "./data/work-identity";
 
 export type DialogState =
   | { type: "estimator" }
-  | { type: "client"; client?: Client }
+  | { type: "client"; client?: Client; returnTo?: DialogState }
   | { type: "delete-client"; client: Client }
   | { type: "delete-request"; request: JobRequest }
   | { type: "delete-quote"; quote: Quote }
   | { type: "delete-job"; job: Job }
   | { type: "delete-invoice"; record: Invoice }
-  | { type: "quote-form" }
+  | { type: "quote-form"; prefill?: Partial<QuoteDraft> }
   | { type: "invoice-form"; quote?: Quote }
   | { type: "send-questionnaire" }
   | { type: "public-questionnaire"; questionnaire: Questionnaire }
+  | { type: "submission"; submission: QuestionnaireSubmission }
   | { type: "schedule" }
   | { type: "job"; job: Job }
   | { type: "quote-document"; quote: Quote }
   | { type: "invoice-document"; record: Invoice }
-  | { type: "request" };
+  | { type: "request"; prefill?: JobRequestDraft };
 
 export type ConsoleAppProps = {
   initialClients?: Client[];
@@ -123,6 +139,8 @@ export type ConsoleAppProps = {
   initialQuotes?: Quote[];
   initialJobs?: Job[];
   teamMembers?: TeamMember[];
+  teamInvitations?: TeamInvitation[];
+  businessDetails?: BusinessProfile;
   initialInvoices?: Invoice[];
   dataMode?: "demo" | "live";
   signedInEmail?: string;
@@ -148,6 +166,11 @@ export type ConsoleAppProps = {
   onVoidInvoice?: VoidInvoiceAction;
   onDeleteInvoice?: DeleteInvoiceAction;
   onSendQuestionnaire?: SendQuestionnaireAction;
+  onEstimateJob?: EstimateJobAction;
+  onInviteTeamMember?: InviteTeamAction;
+  onRevokeTeamInvite?: RevokeTeamInviteAction;
+  onUpdateTeamMember?: UpdateTeamMemberAction;
+  onUpdateBusinessProfile?: UpdateBusinessProfileAction;
   onSignOut?: () => Promise<void>;
 };
 
@@ -158,7 +181,9 @@ export function ConsoleApp({
   initialQuestionnaireSubmissions: providedQuestionnaireSubmissions,
   initialQuotes: providedQuotes,
   initialJobs: providedJobs,
-  teamMembers = [],
+  teamMembers: providedTeamMembers,
+  teamInvitations: providedInvitations,
+  businessDetails,
   initialInvoices: providedInvoices,
   dataMode = "demo",
   signedInEmail = "ops@fieldcentral.local",
@@ -184,6 +209,11 @@ export function ConsoleApp({
   onVoidInvoice,
   onDeleteInvoice,
   onSendQuestionnaire,
+  onEstimateJob,
+  onInviteTeamMember,
+  onRevokeTeamInvite,
+  onUpdateTeamMember,
+  onUpdateBusinessProfile,
   onSignOut,
 }: ConsoleAppProps = {}) {
   const [active, setActive] = useState<ConsoleRoute>("dashboard");
@@ -198,8 +228,10 @@ export function ConsoleApp({
   const [questionnaireItems] = useState<Questionnaire[]>(() =>
     structuredClone(providedQuestionnaires ?? questionnaires),
   );
-  const [questionnaireSubmissions] = useState<QuestionnaireSubmission[]>(() =>
-    structuredClone(providedQuestionnaireSubmissions ?? []),
+  const [questionnaireSubmissions, setQuestionnaireSubmissions] = useState<
+    QuestionnaireSubmission[]
+  >(() =>
+    structuredClone(providedQuestionnaireSubmissions ?? questionnaireSubmissionsSeed),
   );
   const [quotes, setQuotes] = useState<Quote[]>(() =>
     structuredClone(providedQuotes ?? initialQuotes),
@@ -209,6 +241,15 @@ export function ConsoleApp({
   );
   const [invoiceRecords, setInvoiceRecords] = useState<Invoice[]>(() =>
     structuredClone(providedInvoices ?? [invoice]),
+  );
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() =>
+    structuredClone(providedTeamMembers ?? teamMembersSeed),
+  );
+  const [teamInvitations, setTeamInvitations] = useState<TeamInvitation[]>(() =>
+    structuredClone(providedInvitations ?? []),
+  );
+  const [businessDetailsState, setBusinessDetailsState] = useState<BusinessProfile>(
+    () => structuredClone(businessDetails ?? defaultBusinessProfile),
   );
   const [toast, setToast] = useState("");
   const [clientMutationPending, setClientMutationPending] = useState(false);
@@ -295,12 +336,18 @@ export function ConsoleApp({
     );
   };
 
+  const closeClientDialog = () => {
+    setDialog((current) =>
+      current?.type === "client" && current.returnTo ? current.returnTo : null,
+    );
+  };
+
   const persistClient = async (saved: Client) => {
     setClientMutationError("");
 
     if (dataMode === "demo") {
       upsertClient(saved);
-      setDialog(null);
+      closeClientDialog();
       showToast("Client saved.");
       return;
     }
@@ -318,7 +365,7 @@ export function ConsoleApp({
         return;
       }
       upsertClient(result.client);
-      setDialog(null);
+      closeClientDialog();
       showToast("Client saved.");
     } catch {
       setClientMutationError("The client could not be saved. Try again.");
@@ -376,9 +423,10 @@ export function ConsoleApp({
     );
 
     if (dataMode === "demo") {
+      const createdId = `request-${Date.now()}`;
       setJobRequests((current) => [
         {
-          id: `request-${current.length + 1}`,
+          id: createdId,
           clientId: selectedClient?.id,
           propertyId: selectedProperty?.id,
           client: selectedClient?.name || "Unassigned client",
@@ -390,6 +438,15 @@ export function ConsoleApp({
         },
         ...current,
       ]);
+      if (draft.questionnaireResponseId) {
+        setQuestionnaireSubmissions((current) =>
+          current.map((submission) =>
+            submission.id === draft.questionnaireResponseId
+              ? { ...submission, jobRequestId: createdId }
+              : submission,
+          ),
+        );
+      }
       setDialog(null);
       showToast("Job request created.");
       return;
@@ -408,6 +465,15 @@ export function ConsoleApp({
         return;
       }
       setJobRequests((current) => [result.request, ...current]);
+      if (draft.questionnaireResponseId) {
+        setQuestionnaireSubmissions((current) =>
+          current.map((submission) =>
+            submission.id === draft.questionnaireResponseId
+              ? { ...submission, jobRequestId: result.request.id }
+              : submission,
+          ),
+        );
+      }
       setDialog(null);
       showToast("Job request created.");
     } catch {
@@ -972,8 +1038,55 @@ export function ConsoleApp({
   const persistScheduledJob = async (draft: {
     jobRequestId: string;
     scheduledStart: string;
+    profileIds?: string[];
   }) => {
     if (dataMode === "demo") {
+      const request = jobRequests.find((item) => item.id === draft.jobRequestId);
+      if (request) {
+        const start = new Date(draft.scheduledStart);
+        const date = new Intl.DateTimeFormat("en-AU", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          timeZone: "Australia/Brisbane",
+        }).format(start);
+        const time = new Intl.DateTimeFormat("en-AU", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: "Australia/Brisbane",
+        }).format(start);
+        const assigned = (draft.profileIds || []).map((id) => {
+          const member = teamMembers.find((item) => item.id === id);
+          return member?.name || "Team member";
+        });
+        const job: Job = {
+          id: `job-${Date.now()}`,
+          displayName: formatJobDisplayName({
+            client: request.client,
+            address: request.address,
+            category: request.category,
+            date,
+          }),
+          client: request.client,
+          property: request.address,
+          address: request.address,
+          category: request.category,
+          scope: request.scope,
+          date,
+          time,
+          dateKey: draft.scheduledStart.slice(0, 16),
+          clientId: request.clientId,
+          serviceAddressId: request.propertyId,
+          jobRequestId: request.id,
+          status: "scheduled",
+          notes: "",
+          recurrence: "One-off",
+          assigneeIds: draft.profileIds || [],
+          assignees: assigned,
+          photos: [],
+        };
+        setJobs((current) => [...current, job]);
+      }
       setDialog(null);
       showToast("Job scheduled.");
       return;
@@ -1187,7 +1300,15 @@ export function ConsoleApp({
               setRequestMutationError("");
               setDialog({ type: "request" });
             }}
-            onQuote={() => setDialog({ type: "quote-form" })}
+            onQuote={(request) =>
+              setDialog({
+                type: "quote-form",
+                prefill: {
+                  jobRequestId: request.id,
+                  scope: request.scope,
+                },
+              })
+            }
             onEstimate={() => setDialog({ type: "estimator" })}
             onDelete={(request) => {
               setRequestMutationError("");
@@ -1204,6 +1325,9 @@ export function ConsoleApp({
             onSend={() => setDialog({ type: "send-questionnaire" })}
             onPreview={(questionnaire) =>
               setDialog({ type: "public-questionnaire", questionnaire })
+            }
+            onOpenSubmission={(submission) =>
+              setDialog({ type: "submission", submission })
             }
           />
         );
@@ -1255,6 +1379,115 @@ export function ConsoleApp({
             }
           />
         );
+      case "settings":
+        return (
+          <SettingsView
+            profile={businessDetailsState}
+            teamMembers={teamMembers}
+            invitations={teamInvitations}
+            canManage={canManageClients}
+            currentEmail={signedInEmail}
+            onSaveProfile={async (input) => {
+              if (onUpdateBusinessProfile) {
+                const result = await onUpdateBusinessProfile(input);
+                if (result.ok) {
+                  setBusinessDetailsState(result.profile);
+                  showToast("Business details saved.");
+                }
+                return result;
+              }
+              const profile = { ...businessDetailsState, ...input };
+              setBusinessDetailsState(profile);
+              showToast("Business details saved.");
+              return { ok: true, profile };
+            }}
+            onInvite={async (input) => {
+              if (onInviteTeamMember) {
+                const result = await onInviteTeamMember(input);
+                if (result.ok) {
+                  setTeamInvitations((current) => [
+                    {
+                      id: result.id,
+                      email: result.email,
+                      role: result.role,
+                      status: "Pending",
+                      created: "Today",
+                      expires: "in 14 days",
+                    },
+                    ...current,
+                  ]);
+                }
+                return result;
+              }
+              const id = crypto.randomUUID();
+              const token = `${id.replace(/-/g, "")}${crypto.randomUUID().replace(/-/g, "")}`;
+              setTeamInvitations((current) => [
+                {
+                  id,
+                  email: input.email,
+                  role: input.role,
+                  status: "Pending",
+                  created: "Today",
+                  expires: "in 14 days",
+                },
+                ...current,
+              ]);
+              return {
+                ok: true,
+                id,
+                path: `/join/${token}`,
+                email: input.email,
+                role: input.role,
+              };
+            }}
+            onRevoke={async (id) => {
+              if (onRevokeTeamInvite) {
+                const result = await onRevokeTeamInvite(id);
+                if (result.ok) {
+                  setTeamInvitations((current) =>
+                    current.filter((invite) => invite.id !== id),
+                  );
+                }
+                return result;
+              }
+              setTeamInvitations((current) =>
+                current.filter((invite) => invite.id !== id),
+              );
+              return { ok: true, id };
+            }}
+            onUpdateMember={async (input) => {
+              if (onUpdateTeamMember) {
+                const result = await onUpdateTeamMember(input);
+                if (result.ok) {
+                  setTeamMembers((current) =>
+                    current.map((member) =>
+                      member.id === result.member.id ? result.member : member,
+                    ),
+                  );
+                }
+                return result;
+              }
+              const member = teamMembers.find((item) => item.id === input.profileId);
+              if (!member) {
+                return { ok: false, message: "That team member was not found." };
+              }
+              const updated = {
+                ...member,
+                role: input.role || member.role,
+                isActive:
+                  typeof input.isActive === "boolean"
+                    ? input.isActive
+                    : member.isActive,
+              };
+              setTeamMembers((current) =>
+                current.map((item) =>
+                  item.id === updated.id ? updated : item,
+                ),
+              );
+              return { ok: true, member: updated };
+            }}
+          />
+        );
       default:
         return (
           <DashboardView
@@ -1280,6 +1513,7 @@ export function ConsoleApp({
         onClose={() => setMobileOpen(false)}
         signedInEmail={signedInEmail}
         onSignOut={onSignOut}
+        canManage={canManageClients}
       />
       {mobileOpen ? (
         <button
@@ -1333,10 +1567,20 @@ export function ConsoleApp({
           onClose={closeDialog}
         >
           <EstimatorDialog
+            requests={jobRequests}
             onClose={closeDialog}
-            onEstimate={() => {
-              closeDialog();
-              showToast("Estimate drafted for review.");
+            onEstimate={onEstimateJob}
+            onUseQuote={(payload) => {
+              setDialog({
+                type: "quote-form",
+                prefill: {
+                  jobRequestId: payload.jobRequestId || "",
+                  scope: payload.scope,
+                  items: payload.items,
+                  clientNotes: "Please contact us if you wish to amend any items on this quote.",
+                  internalNotes: "",
+                },
+              });
             }}
           />
         </Dialog>
@@ -1344,7 +1588,12 @@ export function ConsoleApp({
 
       {dialog?.type === "client" ? (
         <Dialog
-          title={dialog.client ? "Edit Client" : "New Client"}
+          title={
+            dialog.client &&
+            clients.some((client) => client.id === dialog.client?.id)
+              ? "Edit Client"
+              : "New Client"
+          }
           onClose={closeDialog}
           wide
         >
@@ -1429,7 +1678,9 @@ export function ConsoleApp({
       {dialog?.type === "quote-form" ? (
         <Dialog title="New Quote" onClose={closeDialog} wide>
           <QuoteFormDialog
+            key={dialog.prefill?.jobRequestId || dialog.prefill?.scope || "new-quote"}
             requests={jobRequests}
+            prefill={dialog.prefill}
             onClose={closeDialog}
             onSave={persistQuote}
             pending={operationMutationPending}
@@ -1466,6 +1717,7 @@ export function ConsoleApp({
         <Dialog title="Send Questionnaire" onClose={closeDialog}>
           <SendQuestionnaireDialog
             items={questionnaireItems}
+            clients={clients}
             onClose={closeDialog}
             onSend={onSendQuestionnaire}
           />
@@ -1485,6 +1737,7 @@ export function ConsoleApp({
         <Dialog title="Schedule Job" onClose={closeDialog}>
           <ScheduleFormDialog
             requests={jobRequests}
+            teamMembers={teamMembers}
             onClose={closeDialog}
             onSchedule={persistScheduledJob}
             pending={operationMutationPending}
@@ -1520,6 +1773,7 @@ export function ConsoleApp({
           <DocumentViewDialog
             type="quote"
             record={dialog.quote}
+            profile={businessDetailsState}
             onClose={closeDialog}
             onStatusChange={(status) =>
               updateQuoteStatus(dialog.quote.id, status as Quote["status"])
@@ -1557,6 +1811,7 @@ export function ConsoleApp({
           <DocumentViewDialog
             type="invoice"
             record={dialog.record}
+            profile={businessDetailsState}
             onClose={closeDialog}
             onStatusChange={(status) =>
               updateInvoicePaymentStatus(
@@ -1574,11 +1829,101 @@ export function ConsoleApp({
       {dialog?.type === "request" ? (
         <Dialog title="New Job Request" onClose={closeDialog}>
           <RequestFormDialog
+            key={
+              dialog.prefill?.questionnaireResponseId ||
+              dialog.prefill?.scope ||
+              "new-request"
+            }
             clients={clients}
+            prefill={dialog.prefill}
             onClose={closeDialog}
             onSave={persistJobRequest}
             pending={requestMutationPending}
             error={requestMutationError}
+          />
+        </Dialog>
+      ) : null}
+
+      {dialog?.type === "submission" ? (
+        <Dialog title="Questionnaire answers" onClose={closeDialog} wide>
+          <SubmissionDialog
+            submission={dialog.submission}
+            questionnaire={questionnaireItems.find(
+              (item) => item.id === dialog.submission.questionnaireId,
+            ) || questionnaireItems.find((item) => item.title === dialog.submission.questionnaire)}
+            clients={clients}
+            onClose={closeDialog}
+            onAddClient={() =>
+              setDialog({
+                type: "client",
+                client: {
+                  id: "",
+                  name: dialog.submission.respondent,
+                  status: "Lead",
+                  phone: dialog.submission.phone || "",
+                  email: dialog.submission.email,
+                  preferred: "Email",
+                  properties: [
+                    {
+                      name: "Property",
+                      address:
+                        typeof dialog.submission.answers._site_address === "string"
+                          ? dialog.submission.answers._site_address
+                          : "",
+                      cadence: "One-off",
+                    },
+                  ],
+                  notes: `From questionnaire: ${dialog.submission.questionnaire}`,
+                },
+                returnTo: {
+                  type: "submission",
+                  submission: dialog.submission,
+                },
+              })
+            }
+            onCreateRequest={() => {
+              const matching = clients.find(
+                (client) =>
+                  Boolean(dialog.submission.email) &&
+                  client.email.toLowerCase() ===
+                    dialog.submission.email.toLowerCase(),
+              );
+              const parsed = parseServiceTitle(
+                questionnaireItems.find(
+                  (item) => item.id === dialog.submission.questionnaireId,
+                )?.category || dialog.submission.questionnaire,
+              );
+              const category = isServiceCategory(parsed.category)
+                ? parsed.category
+                : "Cleaning Services";
+              const questionnaire = questionnaireItems.find(
+                (item) => item.id === dialog.submission.questionnaireId,
+              );
+              const siteAddress =
+                typeof dialog.submission.answers._site_address === "string"
+                  ? dialog.submission.answers._site_address.trim().toLowerCase()
+                  : "";
+              const matchedProperty =
+                matching?.properties.find(
+                  (property) =>
+                    siteAddress &&
+                    property.address.trim().toLowerCase() === siteAddress,
+                ) || matching?.properties[0];
+              setDialog({
+                type: "request",
+                prefill: {
+                  clientId: matching?.id || "",
+                  propertyId: matchedProperty?.id || "",
+                  category,
+                  serviceDetail: parsed.detail,
+                  scope: formatSubmissionScope(
+                    dialog.submission.answers,
+                    questionnaire?.fields || [],
+                  ) || dialog.submission.questionnaire,
+                  questionnaireResponseId: dialog.submission.id,
+                },
+              });
+            }}
           />
         </Dialog>
       ) : null}

@@ -3,11 +3,12 @@
 import Image from "next/image";
 import { ChevronDown, DollarSign, FileCheck2, Printer, Send } from "lucide-react";
 import {
-  businessProfile,
+  businessProfile as defaultBusinessProfile,
   formatLineQuantity,
   invoiceTerms,
   quoteTerms,
   quoteTotals,
+  type BusinessProfile,
   type Invoice,
   type Quote,
 } from "../domain";
@@ -54,6 +55,7 @@ function AccountingAmount({
 export function DocumentViewDialog({
   type,
   record,
+  profile = defaultBusinessProfile,
   onClose,
   onStatusChange,
   onFinalize,
@@ -64,6 +66,7 @@ export function DocumentViewDialog({
 }: {
   type: "quote" | "invoice";
   record: Quote | Invoice;
+  profile?: BusinessProfile;
   onClose: () => void;
   onStatusChange?: (status: string) => void;
   onFinalize?: () => void;
@@ -112,13 +115,13 @@ export function DocumentViewDialog({
       >
         <header className="document-letterhead">
           <div className="document-business">
-            <h3>{businessProfile.name}</h3>
+            <h3>{profile.name}</h3>
             <p>
-              <strong>ABN:</strong> {businessProfile.abn}
+              <strong>ABN:</strong> {profile.abn}
             </p>
-            <p>{businessProfile.email}</p>
-            <p>{businessProfile.phone}</p>
-            <p>{businessProfile.website}</p>
+            <p>{profile.email}</p>
+            <p>{profile.phone}</p>
+            <p>{profile.website}</p>
           </div>
           <div className="document-heading">
             <Image
@@ -198,15 +201,15 @@ export function DocumentViewDialog({
               <dl>
                 <div>
                   <dt>To:</dt>
-                  <dd>{businessProfile.paymentTo}</dd>
+                  <dd>{profile.paymentTo}</dd>
                 </div>
                 <div>
                   <dt>BSB:</dt>
-                  <dd>{businessProfile.bsb}</dd>
+                  <dd>{profile.bsb}</dd>
                 </div>
                 <div>
                   <dt>ACC:</dt>
-                  <dd>{businessProfile.accountNumber}</dd>
+                  <dd>{profile.accountNumber}</dd>
                 </div>
               </dl>
             </div>
