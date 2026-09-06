@@ -82,9 +82,9 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
 
   test("tests questionnaire preview flow", async ({ page }) => {
     await page.getByRole("button", { name: "Questionnaires" }).click();
-    await expect(page.getByRole("heading", { name: "Assessment Questionnaires" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Intake forms" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Preview Form" }).first().click();
+    await page.getByRole("button", { name: "Preview" }).first().click();
     
     // Preview dialog should open and show form steps
     await expect(page.getByRole("heading", { name: "End of Lease Questionnaire" }).or(page.getByRole("heading", { name: "Bond Clean / End of Lease Questionnaire" }))).toBeVisible();

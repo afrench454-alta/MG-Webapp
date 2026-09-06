@@ -62,6 +62,8 @@ export default async function Home() {
       initialInvoices={invoices}
       dataMode="live"
       signedInEmail={context.actorEmail || "Signed-in operator"}
+      actorId={context.actorId}
+      actorRole={context.role}
       canManageClients={context.role !== "technician"}
       canManageRequests={context.role !== "technician"}
       onSaveClient={saveClientAction}

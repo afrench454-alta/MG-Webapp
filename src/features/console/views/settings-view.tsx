@@ -45,9 +45,33 @@ export function SettingsView({
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [share, setShare] = useState<{ url: string; email: string } | null>(
     null,
   );
+
+  const copyShareUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("The invite link could not be copied. Select it instead.");
+    }
+  };
+
+  const updateMember = async (input: {
+    profileId: string;
+    role?: "Co-owner" | "Technician";
+    isActive?: boolean;
+  }) => {
+    if (!onUpdateMember) return;
+    setError("");
+    setPending(true);
+    const result = await onUpdateMember(input);
+    setPending(false);
+    if (!result.ok) setError(result.message);
+  };
 
   const saveProfile = async () => {
     if (!onSaveProfile) return;
@@ -239,7 +263,7 @@ export function SettingsView({
                       value={member.role}
                       disabled={pending}
                       onChange={(event) =>
-                        void onUpdateMember?.({
+                        void updateMember({
                           profileId: member.id,
                           role: event.target.value as "Co-owner" | "Technician",
                         })
@@ -253,7 +277,7 @@ export function SettingsView({
                       type="button"
                       disabled={pending}
                       onClick={() =>
-                        void onUpdateMember?.({
+                        void updateMember({
                           profileId: member.id,
                           isActive: !member.isActive,
                         })
@@ -327,9 +351,9 @@ export function SettingsView({
               <Button
                 variant="secondary"
                 type="button"
-                onClick={() => void navigator.clipboard.writeText(share.url)}
+                onClick={() => void copyShareUrl(share.url)}
               >
-                Copy link
+                {copied ? "Copied" : "Copy link"}
               </Button>
             </div>
           ) : null}

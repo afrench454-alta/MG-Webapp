@@ -9,20 +9,28 @@ import { Button, Field } from "../components/ui-elements";
 export function SendQuestionnaireDialog({
   items,
   clients = [],
+  initialQuestionnaireId,
   onClose,
   onSend,
 }: {
   items: Questionnaire[];
   clients?: Client[];
+  initialQuestionnaireId?: string;
   onClose: () => void;
   onSend?: SendQuestionnaireAction;
 }) {
-  const [template, setTemplate] = useState(items[0]?.id || "");
+  const [template, setTemplate] = useState(
+    initialQuestionnaireId &&
+      items.some((item) => item.id === initialQuestionnaireId)
+      ? initialQuestionnaireId
+      : items[0]?.id || "",
+  );
   const [clientId, setClientId] = useState("");
   const [recipient, setRecipient] = useState("");
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [share, setShare] = useState<{
     url: string;
     recipient: string;
@@ -47,9 +55,17 @@ export function SendQuestionnaireDialog({
           <Button
             variant="secondary"
             type="button"
-            onClick={() => void navigator.clipboard.writeText(share.url)}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(share.url);
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 2000);
+              } catch {
+                setCopied(false);
+              }
+            }}
           >
-            Copy link
+            {copied ? "Copied" : "Copy link"}
           </Button>
           <a
             className="button button--primary"

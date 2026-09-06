@@ -4,19 +4,22 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import type { Job } from "../domain";
 import { displayServiceCategory } from "../data/service-catalog";
+import { currentMonthStart, formatCalendarEvent, formatSiteTitle } from "../data/work-identity";
 import { Button, EmptyState, IconButton, PageHeader } from "../components/ui-elements";
 import { Dialog } from "../components/dialog";
 
 export function ScheduleView({
   jobs,
+  canSchedule = true,
   onSchedule,
   onJob,
 }: {
   jobs: Job[];
+  canSchedule?: boolean;
   onSchedule: () => void;
   onJob: (job: Job) => void;
 }) {
-  const [month, setMonth] = useState(() => new Date(2026, 7, 1));
+  const [month, setMonth] = useState(() => currentMonthStart());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
 
   const year = month.getFullYear();
@@ -87,7 +90,9 @@ export function ScheduleView({
             }
           />
         </div>
-        <Button onClick={onSchedule}>Schedule a job</Button>
+        {canSchedule ? (
+          <Button onClick={onSchedule}>Schedule a job</Button>
+        ) : null}
       </PageHeader>
       <div className="calendar-wrap">
         <div className="calendar-weekdays">
@@ -122,26 +127,27 @@ export function ScheduleView({
                   </button>
                 ) : null}
                 <div className="calendar-day__events">
-                  {dayJobs.slice(0, 1).map((job) => (
-                    <button
-                      className={`calendar-event calendar-event--${job.status}`}
-                      key={job.id}
-                      title={job.displayName}
-                      onClick={() => onJob(job)}
-                    >
-                      <span>
-                        {job.time} · {job.client}
-                      </span>
-                      <small>{job.address}</small>
-                    </button>
-                  ))}
-                  {dayJobs.length > 1 ? (
+                  {dayJobs.slice(0, 2).map((job) => {
+                    const event = formatCalendarEvent(job);
+                    return (
+                      <button
+                        className={`calendar-event calendar-event--${job.status}`}
+                        key={job.id}
+                        title={job.displayName}
+                        onClick={() => onJob(job)}
+                      >
+                        <span>{event.primary}</span>
+                        <small>{event.secondary}</small>
+                      </button>
+                    );
+                  })}
+                  {dayJobs.length > 2 ? (
                     <button
                       className="calendar-day__more"
                       type="button"
                       onClick={() => setSelectedDateKey(dateKey)}
                     >
-                      +{dayJobs.length - 1} more
+                      +{dayJobs.length - 2} more
                     </button>
                   ) : null}
                 </div>
@@ -154,7 +160,7 @@ export function ScheduleView({
         {visibleJobs.map((job) => (
           <button key={job.id} onClick={() => onJob(job)}>
             <span>{job.date}</span>
-            <strong>{job.displayName}</strong>
+            <strong>{formatSiteTitle(job)}</strong>
             <small>{job.address}</small>
           </button>
         ))}
@@ -179,6 +185,7 @@ export function ScheduleView({
                   {selectedJobs.length === 1 ? "" : "s"}
                 </strong>
               </div>
+              {canSchedule ? (
               <Button
                 icon={Plus}
                 onClick={() => {
@@ -188,6 +195,7 @@ export function ScheduleView({
               >
                 Schedule another job
               </Button>
+              ) : null}
             </div>
             {selectedJobs.length ? (
               <div className="day-agenda__list">
@@ -206,10 +214,8 @@ export function ScheduleView({
                       {index < selectedJobs.length - 1 ? <b /> : null}
                     </span>
                     <div>
-                      <strong>{job.client}</strong>
-                      <span>
-                        {job.property} · {job.address}
-                      </span>
+                      <strong>{formatSiteTitle(job)}</strong>
+                      <span>{job.address}</span>
                       <small>
                         {displayServiceCategory(job.category)} · {job.status.replace("-", " ")}
                         {job.assignees.length
@@ -224,11 +230,15 @@ export function ScheduleView({
             ) : (
               <EmptyState
                 title="No jobs scheduled for this day."
-                action="Schedule a job"
-                onAction={() => {
-                  setSelectedDateKey(null);
-                  onSchedule();
-                }}
+                action={canSchedule ? "Schedule a job" : undefined}
+                onAction={
+                  canSchedule
+                    ? () => {
+                        setSelectedDateKey(null);
+                        onSchedule();
+                      }
+                    : undefined
+                }
               />
             )}
           </div>

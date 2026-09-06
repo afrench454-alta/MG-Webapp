@@ -22,11 +22,13 @@ import { Button, Field } from "../components/ui-elements";
 
 export function EstimatorDialog({
   requests = [],
+  initialRequestId = "",
   onClose,
   onEstimate,
   onUseQuote,
 }: {
   requests?: JobRequest[];
+  initialRequestId?: string;
   onClose: () => void;
   onEstimate?: EstimateJobAction;
   onUseQuote?: (payload: {
@@ -35,11 +37,17 @@ export function EstimatorDialog({
     items: LineItem[];
   }) => void;
 }) {
-  const [category, setCategory] = useState<ServiceCategory>("Cleaning Services");
-  const [detail, setDetail] = useState("");
-  const [address, setAddress] = useState("");
-  const [scope, setScope] = useState("");
-  const [jobRequestId, setJobRequestId] = useState("");
+  const initial = requests.find((request) => request.id === initialRequestId);
+  const parsedInitial = initial ? parseServiceTitle(initial.category) : null;
+  const [category, setCategory] = useState<ServiceCategory>(
+    parsedInitial && isServiceCategory(parsedInitial.category)
+      ? parsedInitial.category
+      : "Cleaning Services",
+  );
+  const [detail, setDetail] = useState(parsedInitial?.detail || "");
+  const [address, setAddress] = useState(initial?.address || "");
+  const [scope, setScope] = useState(initial?.scope || "");
+  const [jobRequestId, setJobRequestId] = useState(initialRequestId);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
@@ -59,7 +67,9 @@ export function EstimatorDialog({
       serviceDetail: detail || undefined,
       address: address || undefined,
       scope,
-      jobRequestId: jobRequestId || undefined,
+      jobRequestId: /^[0-9a-f-]{36}$/i.test(jobRequestId)
+        ? jobRequestId
+        : undefined,
     });
     setPending(false);
     if (!result.ok) {

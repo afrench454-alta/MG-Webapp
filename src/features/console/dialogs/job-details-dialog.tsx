@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Camera, CheckCircle2, PauseCircle, PlayCircle, RotateCcw, Trash2 } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, PauseCircle, PlayCircle, RotateCcw, Trash2 } from "lucide-react";
 import type { Job, JobPhoto, JobStatus, TeamMember } from "../domain";
 import {
   displayServiceCategory,
   displayServiceDetail,
 } from "../data/service-catalog";
+import { findAssignmentConflicts } from "../data/schedule-planning";
+import { formatSiteTitle } from "../data/work-identity";
 import { Button, Field, IconButton } from "../components/ui-elements";
 
 export function JobDetailsDialog({
   job,
+  jobs = [],
   teamMembers,
+  canAssign = true,
+  canDelete = true,
   onClose,
   onUpdate,
   onAssign,
@@ -23,7 +28,10 @@ export function JobDetailsDialog({
   error,
 }: {
   job: Job;
+  jobs?: Job[];
   teamMembers: TeamMember[];
+  canAssign?: boolean;
+  canDelete?: boolean;
   onClose: () => void;
   onUpdate: (job: Job) => void;
   onAssign: (profileIds: string[]) => void;
@@ -49,10 +57,21 @@ export function JobDetailsDialog({
   };
 
   const serviceType = displayServiceDetail(job.category);
+  const conflicts = findAssignmentConflicts({
+    jobs,
+    scheduledStart: job.dateKey,
+    profileIds: assigneeIds,
+    ignoreJobId: job.id,
+    members: teamMembers,
+  });
 
   return (
     <div className="job-detail">
       <div className="job-facts">
+        <div>
+          <p className="eyebrow">Client & property</p>
+          <span>{formatSiteTitle(job)}</span>
+        </div>
         <div>
           <p className="eyebrow">Address</p>
           <span>{job.address}</span>
@@ -100,6 +119,7 @@ export function JobDetailsDialog({
           onBlur={() => onUpdate({ ...job, notes, recurrence })}
         />
       </Field>
+      {canAssign ? (
       <section className="assignment-section">
         <div>
           <p className="eyebrow">Assigned team</p>
@@ -110,8 +130,15 @@ export function JobDetailsDialog({
           </span>
         </div>
         <div className="assignment-options">
-          {teamMembers.filter((member) => member.isActive).map((member) => (
-            <label key={member.id}>
+          {teamMembers.filter((member) => member.isActive).map((member) => {
+            const busy = conflicts.some(
+              (conflict) => conflict.profileId === member.id,
+            );
+            return (
+            <label
+              key={member.id}
+              className={busy ? "assignment-options__busy" : undefined}
+            >
               <input
                 type="checkbox"
                 checked={assigneeIds.includes(member.id)}
@@ -123,12 +150,34 @@ export function JobDetailsDialog({
                 <small>
                   {member.role}
                   {member.email ? ` · ${member.email}` : ""}
+                  {busy ? " · already booked" : ""}
                 </small>
               </span>
             </label>
-          ))}
+            );
+          })}
         </div>
+        {conflicts.length ? (
+          <div className="conflict-note conflict-note--warn" role="status">
+            <AlertTriangle aria-hidden="true" size={17} />
+            <div>
+              {conflicts.map((conflict) => (
+                <p key={conflict.profileId}>
+                  {conflict.name} is already on {conflict.otherLabel} at this time.
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
+      ) : (
+        <p className="muted-copy">
+          {assigneeIds.length
+            ? `Assigned to ${job.assignees.join(", ") || "team"}.`
+            : "This job is unassigned."}
+        </p>
+      )}
+      {canAssign ? (
       <div className="recurrence-row">
         <RotateCcw aria-hidden="true" size={18} />
         <Field label="Recurring">
@@ -148,6 +197,7 @@ export function JobDetailsDialog({
         </Field>
         <p>Next job is created when this one is completed.</p>
       </div>
+      ) : null}
       <div className="photo-section">
         <div>
           <p className="eyebrow">Photos</p>
@@ -205,13 +255,17 @@ export function JobDetailsDialog({
         </p>
       ) : null}
       <div className="dialog-actions dialog-actions--split">
-        <Button
-          variant="danger"
-          icon={Trash2}
-          onClick={() => onDelete(job)}
-        >
-          Delete job
-        </Button>
+        {canDelete ? (
+          <Button
+            variant="danger"
+            icon={Trash2}
+            onClick={() => onDelete(job)}
+          >
+            Delete job
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button variant="secondary" onClick={onClose}>
           Close
         </Button>

@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowUpRight, ClipboardList, Send } from "lucide-react";
+import { ArrowUpRight, ClipboardList, MapPin, Send } from "lucide-react";
 import type { Questionnaire, QuestionnaireSubmission } from "../domain";
 import { displayServiceCategory } from "../data/service-catalog";
+import { submissionSiteAddress } from "../data/work-identity";
 import { Badge, Button, EmptyState, PageHeader } from "../components/ui-elements";
 
 export function QuestionnairesView({
@@ -14,19 +15,22 @@ export function QuestionnairesView({
 }: {
   items: Questionnaire[];
   submissions: QuestionnaireSubmission[];
-  onSend: () => void;
+  onSend: (questionnaire?: Questionnaire) => void;
   onPreview: (questionnaire: Questionnaire) => void;
   onOpenSubmission: (submission: QuestionnaireSubmission) => void;
 }) {
+  const pending = submissions.filter((item) => !item.jobRequestId);
+  const converted = submissions.filter((item) => item.jobRequestId);
+
   return (
     <>
       <PageHeader
         eyebrow="Client intake"
-        title="Assessment Questionnaires"
-        subtitle="Send a form, read the answers, then turn a submission into a job request."
+        title="Intake forms"
+        subtitle="Send a form to a new or existing client, then turn the answers into a job request for that property."
       >
-        <Button icon={Send} onClick={onSend}>
-          Send Questionnaire
+        <Button icon={Send} onClick={() => onSend()}>
+          Send form
         </Button>
       </PageHeader>
       <section className="questionnaire-grid">
@@ -40,49 +44,84 @@ export function QuestionnairesView({
             <span className="question-count">{item.count} questions</span>
             <div className="questionnaire-card__actions">
               <Button variant="secondary" icon={ArrowUpRight} onClick={() => onPreview(item)}>
-                Preview Form
+                Preview
               </Button>
-              <Button variant="primary" icon={Send} onClick={onSend}>
-                Send Link
+              <Button variant="primary" icon={Send} onClick={() => onSend(item)}>
+                Send link
               </Button>
             </div>
           </article>
         ))}
       </section>
       <section className="submissions-section">
-        <h2>Recent Submissions</h2>
-        {submissions.length ? (
+        <h2>Answers to action</h2>
+        {pending.length ? (
           <div className="submission-list">
-            {submissions.map((submission) => (
-              <button
-                type="button"
+            {pending.map((submission) => (
+              <SubmissionRow
                 key={submission.id}
-                className="submission-row"
-                onClick={() => onOpenSubmission(submission)}
-              >
-                <div className="submission-row__main">
-                  <strong>{submission.respondent}</strong>
-                  <span>{submission.email || "No email supplied"}</span>
-                </div>
-                <div className="submission-row__meta">
-                  <Badge tone={submission.jobRequestId ? "success" : "sage"}>
-                    {submission.jobRequestId ? "Request created" : "Needs action"}
-                  </Badge>
-                  <strong>{submission.questionnaire}</strong>
-                  <span>Submitted {submission.submitted}</span>
-                </div>
-                <ClipboardList aria-hidden="true" size={16} />
-              </button>
+                submission={submission}
+                onOpen={onOpenSubmission}
+              />
             ))}
           </div>
         ) : (
           <EmptyState
-            title="No submissions yet."
-            action="Send the first questionnaire"
-            onAction={onSend}
+            title="No new answers waiting."
+            action="Send the first form"
+            onAction={() => onSend()}
           />
         )}
       </section>
+      {converted.length ? (
+        <section className="submissions-section">
+          <h2>Turned into requests</h2>
+          <div className="submission-list">
+            {converted.map((submission) => (
+              <SubmissionRow
+                key={submission.id}
+                submission={submission}
+                onOpen={onOpenSubmission}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
+  );
+}
+
+function SubmissionRow({
+  submission,
+  onOpen,
+}: {
+  submission: QuestionnaireSubmission;
+  onOpen: (submission: QuestionnaireSubmission) => void;
+}) {
+  const site = submissionSiteAddress(submission.answers);
+  return (
+    <button
+      type="button"
+      className="submission-row"
+      onClick={() => onOpen(submission)}
+    >
+      <div className="submission-row__main">
+        <strong>{submission.respondent}</strong>
+        <span>{submission.email || "No email supplied"}</span>
+        {site ? (
+          <span className="location-line">
+            <MapPin aria-hidden="true" size={14} /> {site}
+          </span>
+        ) : null}
+      </div>
+      <div className="submission-row__meta">
+        <Badge tone={submission.jobRequestId ? "success" : "sage"}>
+          {submission.jobRequestId ? "Request created" : "Needs a request"}
+        </Badge>
+        <strong>{submission.questionnaire}</strong>
+        <span>Submitted {submission.submitted}</span>
+      </div>
+      <ClipboardList aria-hidden="true" size={16} />
+    </button>
   );
 }

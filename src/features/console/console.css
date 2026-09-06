@@ -1903,6 +1903,20 @@ textarea {
   background: var(--panel-soft);
 }
 
+.conflict-note--warn {
+  align-items: flex-start;
+  color: #7a3b12;
+  background: color-mix(in srgb, var(--amber) 22%, var(--surface));
+}
+
+.conflict-note--warn p {
+  margin: 0;
+}
+
+.conflict-note--warn p + p {
+  margin-top: 6px;
+}
+
 .link-preview > div {
   display: grid;
   gap: 3px;
@@ -2059,6 +2073,11 @@ textarea {
 
 .assignment-options small {
   color: var(--muted);
+}
+
+.assignment-options__busy {
+  border-color: color-mix(in srgb, var(--amber) 70%, var(--line));
+  background: color-mix(in srgb, var(--amber) 10%, var(--surface));
 }
 
 .photo-grid {

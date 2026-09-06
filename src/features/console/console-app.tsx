@@ -110,10 +110,10 @@ import {
   liveInvoiceForQuote,
 } from "./data/quote-invoice";
 import { formatServiceTitle, isServiceCategory, parseServiceTitle } from "./data/service-catalog";
-import { formatJobDisplayName, formatSubmissionScope } from "./data/work-identity";
+import { formatJobDisplayName, formatSiteTitle, formatSubmissionScope } from "./data/work-identity";
 
 export type DialogState =
-  | { type: "estimator" }
+  | { type: "estimator"; jobRequestId?: string }
   | { type: "client"; client?: Client; returnTo?: DialogState }
   | { type: "delete-client"; client: Client }
   | { type: "delete-request"; request: JobRequest }
@@ -122,7 +122,7 @@ export type DialogState =
   | { type: "delete-invoice"; record: Invoice }
   | { type: "quote-form"; prefill?: Partial<QuoteDraft> }
   | { type: "invoice-form"; quote?: Quote }
-  | { type: "send-questionnaire" }
+  | { type: "send-questionnaire"; questionnaireId?: string }
   | { type: "public-questionnaire"; questionnaire: Questionnaire }
   | { type: "submission"; submission: QuestionnaireSubmission }
   | { type: "schedule" }
@@ -144,6 +144,8 @@ export type ConsoleAppProps = {
   initialInvoices?: Invoice[];
   dataMode?: "demo" | "live";
   signedInEmail?: string;
+  actorId?: string;
+  actorRole?: "owner" | "co_owner" | "technician";
   canManageClients?: boolean;
   canManageRequests?: boolean;
   onSaveClient?: SaveClientAction;
@@ -187,6 +189,8 @@ export function ConsoleApp({
   initialInvoices: providedInvoices,
   dataMode = "demo",
   signedInEmail = "ops@fieldcentral.local",
+  actorId,
+  actorRole = "owner",
   canManageClients = true,
   canManageRequests = true,
   onSaveClient,
@@ -258,6 +262,17 @@ export function ConsoleApp({
   const [requestMutationError, setRequestMutationError] = useState("");
   const [operationMutationPending, setOperationMutationPending] = useState(false);
   const [operationMutationError, setOperationMutationError] = useState("");
+  const isTechnician = actorRole === "technician";
+  const canOperateOffice = canManageClients && !isTechnician;
+  const officeRoutes: ConsoleRoute[] = [
+    "clients",
+    "questionnaires",
+    "quotes",
+    "invoices",
+    "settings",
+  ];
+  const currentRoute =
+    !canOperateOffice && officeRoutes.includes(active) ? "dashboard" : active;
 
   useEffect(() => {
     if (dataMode !== "demo") return;
@@ -1271,7 +1286,7 @@ export function ConsoleApp({
   };
 
   const renderView = () => {
-    switch (active) {
+    switch (currentRoute) {
       case "clients":
         return (
           <ClientsView
@@ -1309,7 +1324,9 @@ export function ConsoleApp({
                 },
               })
             }
-            onEstimate={() => setDialog({ type: "estimator" })}
+            onEstimate={(request) =>
+              setDialog({ type: "estimator", jobRequestId: request.id })
+            }
             onDelete={(request) => {
               setRequestMutationError("");
               setDialog({ type: "delete-request", request });
@@ -1322,7 +1339,12 @@ export function ConsoleApp({
           <QuestionnairesView
             items={questionnaireItems}
             submissions={questionnaireSubmissions}
-            onSend={() => setDialog({ type: "send-questionnaire" })}
+            onSend={(questionnaire) =>
+              setDialog({
+                type: "send-questionnaire",
+                questionnaireId: questionnaire?.id,
+              })
+            }
             onPreview={(questionnaire) =>
               setDialog({ type: "public-questionnaire", questionnaire })
             }
@@ -1348,6 +1370,7 @@ export function ConsoleApp({
         return (
           <ScheduleView
             jobs={jobs}
+            canSchedule={canOperateOffice}
             onSchedule={() => setDialog({ type: "schedule" })}
             onJob={(job) => setDialog({ type: "job", job })}
           />
@@ -1356,6 +1379,10 @@ export function ConsoleApp({
         return (
           <JobBoardView
             jobs={jobs}
+            teamMembers={teamMembers}
+            currentMemberId={actorId}
+            preferMine={isTechnician}
+            canDelete={canOperateOffice}
             onJob={(job) => setDialog({ type: "job", job })}
             onMove={moveJob}
             onDelete={(job) => setDialog({ type: "delete-job", job })}
@@ -1464,6 +1491,7 @@ export function ConsoleApp({
                       member.id === result.member.id ? result.member : member,
                     ),
                   );
+                  showToast("Team member updated.");
                 }
                 return result;
               }
@@ -1497,6 +1525,8 @@ export function ConsoleApp({
             quotes={quotes}
             invoices={invoiceRecords}
             signedInEmail={signedInEmail}
+            currentMemberId={actorId}
+            canManage={canOperateOffice}
             onNavigate={setActive}
           />
         );
@@ -1506,14 +1536,14 @@ export function ConsoleApp({
   return (
     <div className="app-shell">
       <Sidebar
-        active={active}
+        active={currentRoute}
         onNavigate={setActive}
         onEstimate={() => setDialog({ type: "estimator" })}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         signedInEmail={signedInEmail}
         onSignOut={onSignOut}
-        canManage={canManageClients}
+        canManage={canOperateOffice}
       />
       {mobileOpen ? (
         <button
@@ -1550,8 +1580,9 @@ export function ConsoleApp({
           {renderView()}
         </main>
         <MobileDock
-          active={active}
+          active={currentRoute}
           menuOpen={mobileOpen}
+          canManage={canOperateOffice}
           onNavigate={(route) => {
             setActive(route);
             setMobileOpen(false);
@@ -1568,6 +1599,7 @@ export function ConsoleApp({
         >
           <EstimatorDialog
             requests={jobRequests}
+            initialRequestId={dialog.jobRequestId}
             onClose={closeDialog}
             onEstimate={onEstimateJob}
             onUseQuote={(payload) => {
@@ -1626,7 +1658,7 @@ export function ConsoleApp({
       {dialog?.type === "delete-request" ? (
         <Dialog title="Delete job request" onClose={closeDialog}>
           <ConfirmRecordDeleteDialog
-            label={`request for ${dialog.request.client}`}
+            label={`request for ${formatSiteTitle(dialog.request)}`}
             kind="job request"
             onCancel={closeDialog}
             onConfirm={() => removeJobRequest(dialog.request)}
@@ -1718,6 +1750,7 @@ export function ConsoleApp({
           <SendQuestionnaireDialog
             items={questionnaireItems}
             clients={clients}
+            initialQuestionnaireId={dialog.questionnaireId}
             onClose={closeDialog}
             onSend={onSendQuestionnaire}
           />
@@ -1737,6 +1770,7 @@ export function ConsoleApp({
         <Dialog title="Schedule Job" onClose={closeDialog}>
           <ScheduleFormDialog
             requests={jobRequests}
+            jobs={jobs}
             teamMembers={teamMembers}
             onClose={closeDialog}
             onSchedule={persistScheduledJob}
@@ -1750,7 +1784,10 @@ export function ConsoleApp({
         <Dialog title={dialog.job.displayName} onClose={closeDialog} wide>
           <JobDetailsDialog
             job={dialog.job}
+            jobs={jobs}
             teamMembers={teamMembers}
+            canAssign={canOperateOffice}
+            canDelete={canOperateOffice}
             onClose={closeDialog}
             onUpdate={updateJob}
             onAssign={(profileIds) => void assignJob(dialog.job, profileIds)}

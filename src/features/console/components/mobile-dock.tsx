@@ -26,15 +26,20 @@ export function MobileDock({
   menuOpen,
   onNavigate,
   onMore,
+  canManage = true,
 }: {
   active: ConsoleRoute;
   menuOpen: boolean;
   onNavigate: (route: ConsoleRoute) => void;
   onMore: () => void;
+  canManage?: boolean;
 }) {
+  const items = canManage
+    ? dockItems
+    : dockItems.filter((item) => item.id !== "invoices");
   return (
     <nav className="mobile-dock" aria-label="Quick navigation">
-      {dockItems.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon;
         const selected = !menuOpen && active === item.id;
         return (

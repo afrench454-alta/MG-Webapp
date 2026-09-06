@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { GripVertical, Trash2 } from "lucide-react";
-import { statusColumns, type Job, type JobStatus } from "../domain";
+import { statusColumns, type Job, type JobStatus, type TeamMember } from "../domain";
 import {
   displayServiceCategory,
   displayServiceDetail,
 } from "../data/service-catalog";
+import { formatSiteTitle } from "../data/work-identity";
 import {
   Badge,
   FilterGroup,
@@ -23,20 +24,43 @@ const activeColumnIds: JobStatus[] = [
 
 export function JobBoardView({
   jobs,
+  teamMembers = [],
+  currentMemberId,
+  preferMine = false,
+  canDelete = true,
   onJob,
   onMove,
   onDelete,
 }: {
   jobs: Job[];
+  teamMembers?: TeamMember[];
+  currentMemberId?: string;
+  preferMine?: boolean;
+  canDelete?: boolean;
   onJob: (job: Job) => void;
   onMove: (id: string, status: JobStatus) => void;
   onDelete: (job: Job) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [board, setBoard] = useState<"active" | "done">("active");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(
+    preferMine && currentMemberId ? "mine" : "all",
+  );
   const doneCount = jobs.filter(
     (job) => job.status === "completed" || job.status === "cancelled",
   ).length;
+
+  const filteredJobs = useMemo(() => {
+    if (assigneeFilter === "all") return jobs;
+    if (assigneeFilter === "unassigned") {
+      return jobs.filter((job) => !job.assigneeIds.length);
+    }
+    if (assigneeFilter === "mine" && currentMemberId) {
+      return jobs.filter((job) => job.assigneeIds.includes(currentMemberId));
+    }
+    return jobs.filter((job) => job.assigneeIds.includes(assigneeFilter));
+  }, [jobs, assigneeFilter, currentMemberId]);
+
   const visibleColumns = useMemo(
     () =>
       statusColumns.filter((column) =>
@@ -47,12 +71,39 @@ export function JobBoardView({
     [board],
   );
 
+  const assigneeOptions = [
+    { id: "all", label: "All", count: jobs.length },
+    ...(currentMemberId
+      ? [
+          {
+            id: "mine",
+            label: "My jobs",
+            count: jobs.filter((job) =>
+              job.assigneeIds.includes(currentMemberId),
+            ).length,
+          },
+        ]
+      : []),
+    {
+      id: "unassigned",
+      label: "Unassigned",
+      count: jobs.filter((job) => !job.assigneeIds.length).length,
+    },
+    ...teamMembers
+      .filter((member) => member.isActive && member.id !== currentMemberId)
+      .map((member) => ({
+        id: member.id,
+        label: member.name,
+        count: jobs.filter((job) => job.assigneeIds.includes(member.id)).length,
+      })),
+  ];
+
   return (
     <>
       <PageHeader
         eyebrow="Execution"
         title="Job Board"
-        subtitle="Active work only. Completed and cancelled jobs live on the Done board."
+        subtitle="Cards show the client and property so two same-day cleans stay distinct."
       >
         <FilterGroup
           label="Board view"
@@ -64,12 +115,22 @@ export function JobBoardView({
           ]}
         />
       </PageHeader>
+      {assigneeOptions.length > 2 ? (
+        <section className="list-filters" aria-label="Assigned team filter">
+          <FilterGroup
+            label="Assigned to"
+            value={assigneeFilter}
+            onChange={setAssigneeFilter}
+            options={assigneeOptions}
+          />
+        </section>
+      ) : null}
       <section
         className={`job-board job-board--${board}`}
         aria-label="Job board"
       >
         {visibleColumns.map((column) => {
-          const columnJobs = jobs.filter((job) => job.status === column.id);
+          const columnJobs = filteredJobs.filter((job) => job.status === column.id);
           return (
             <div
               className={`job-column job-column--${column.id}${
@@ -109,7 +170,7 @@ export function JobBoardView({
                         </Badge>
                         <small>{job.date}</small>
                       </span>
-                      <strong>{job.client}</strong>
+                      <strong>{formatSiteTitle(job)}</strong>
                       <span className="job-card__property">{job.address}</span>
                       {serviceType ? (
                         <span className="job-card__detail">{serviceType}</span>
@@ -120,13 +181,15 @@ export function JobBoardView({
                           : "Unassigned"}
                       </small>
                     </button>
+                    {canDelete ? (
                     <IconButton
                       className="job-card__delete"
-                      label={`Delete job for ${job.client} on ${job.date}`}
+                      label={`Delete job for ${formatSiteTitle(job)} on ${job.date}`}
                       icon={Trash2}
                       tone="danger"
                       onClick={() => onDelete(job)}
                     />
+                    ) : null}
                   </article>
                 );
               })}

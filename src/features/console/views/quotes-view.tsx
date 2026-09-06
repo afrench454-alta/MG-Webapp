@@ -23,6 +23,7 @@ import {
   PageHeader,
   quoteStatusTone,
 } from "../components/ui-elements";
+import { formatSiteTitle } from "../data/work-identity";
 
 export function QuotesView({
   quotes,
@@ -115,10 +116,9 @@ export function QuotesView({
                     {quote.status}
                   </Badge>
                 </div>
-                <strong className="record-client">{quote.client}</strong>
+                <strong className="record-client">{formatSiteTitle(quote)}</strong>
                 <p>
-                  {quote.address} · Issued {quote.issued} · Expires{" "}
-                  {quote.expires}
+                  Issued {quote.issued} · Expires {quote.expires}
                 </p>
               </div>
               <div className="record-row__actions">

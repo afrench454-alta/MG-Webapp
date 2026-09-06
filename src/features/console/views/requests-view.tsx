@@ -10,6 +10,7 @@ import {
   type RequestFilterId,
 } from "../data/list-filters";
 import { displayServiceCategory, displayServiceDetail } from "../data/service-catalog";
+import { formatSiteTitle } from "../data/work-identity";
 import {
   Badge,
   Button,
@@ -31,7 +32,7 @@ export function RequestsView({
   requests: JobRequest[];
   onCreate: () => void;
   onQuote: (request: JobRequest) => void;
-  onEstimate: () => void;
+  onEstimate: (request: JobRequest) => void;
   onDelete: (request: JobRequest) => void;
   canManage: boolean;
 }) {
@@ -60,7 +61,7 @@ export function RequestsView({
       <PageHeader
         eyebrow="Intake"
         title="Job Requests"
-        subtitle="Log scope, site visits and quote intent per property."
+        subtitle="Each request is a client at a property — not just a service type."
       >
         {canManage ? (
           <Button icon={Plus} onClick={onCreate}>
@@ -101,7 +102,7 @@ export function RequestsView({
               <div className="title-with-badge request-title">
                 <Badge tone="sage">{displayServiceCategory(request.category)}</Badge>
                 {serviceType ? <Badge>{serviceType}</Badge> : null}
-                <h2>{request.client}</h2>
+                <h2>{formatSiteTitle(request)}</h2>
                 <Badge>{request.status}</Badge>
               </div>
               <p className="location-line">
@@ -115,6 +116,8 @@ export function RequestsView({
               </p>
             </div>
             <div className="request-card__actions">
+              {canManage ? (
+                <>
               <Button
                 variant="secondary"
                 icon={ReceiptText}
@@ -125,17 +128,17 @@ export function RequestsView({
               <button
                 className="ai-secondary"
                 type="button"
-                onClick={onEstimate}
+                onClick={() => onEstimate(request)}
               >
                 <Sparkles aria-hidden="true" size={17} /> AI estimate
               </button>
-              {canManage ? (
                 <IconButton
-                  label={`Delete request for ${request.client}`}
+                  label={`Delete request for ${formatSiteTitle(request)}`}
                   icon={Trash2}
                   tone="danger"
                   onClick={() => onDelete(request)}
                 />
+                </>
               ) : null}
             </div>
           </article>

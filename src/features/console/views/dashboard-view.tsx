@@ -28,6 +28,7 @@ import {
 import { invoiceDisplayStatus } from "../data/invoice-lifecycle";
 import { isLiveInvoice, isLiveQuote } from "../data/list-filters";
 import { displayServiceCategory } from "../data/service-catalog";
+import { formatSiteTitle } from "../data/work-identity";
 import { Badge, EmptyState, PageHeader } from "../components/ui-elements";
 
 export function DashboardView({
@@ -37,6 +38,8 @@ export function DashboardView({
   quotes,
   invoices,
   signedInEmail,
+  currentMemberId,
+  canManage = true,
   onNavigate,
 }: {
   jobs: Job[];
@@ -45,11 +48,19 @@ export function DashboardView({
   quotes: Quote[];
   invoices: Invoice[];
   signedInEmail?: string;
+  currentMemberId?: string;
+  canManage?: boolean;
   onNavigate: (route: ConsoleRoute) => void;
 }) {
   const liveQuotes = quotes.filter(isLiveQuote);
   const liveInvoices = invoices.filter(isLiveInvoice);
-  const upcoming = jobs.find((job) => job.status !== "completed" && job.status !== "cancelled");
+  const myJobs = currentMemberId
+    ? jobs.filter((job) => job.assigneeIds.includes(currentMemberId))
+    : jobs;
+  const fieldJobs = canManage ? jobs : myJobs;
+  const upcoming = fieldJobs.find(
+    (job) => job.status !== "completed" && job.status !== "cancelled",
+  );
   const upcomingDate = upcoming ? new Date(`${upcoming.date} 00:00:00`) : null;
   const openRequests = jobRequests.filter(
     (request) => !["Closed", "Rejected"].includes(request.status),
@@ -77,37 +88,6 @@ export function DashboardView({
       0,
     );
 
-  const metrics = [
-    {
-      label: "Clients",
-      value: String(clients.length),
-      note: `${clients.filter((client) => client.status === "Lead").length} lead`,
-      icon: Users,
-      tone: "forest" as const,
-    },
-    {
-      label: "Open job requests",
-      value: String(openRequests.length),
-      note: `${openRequests.filter((request) => request.status === "Scheduled").length} scheduled`,
-      icon: ClipboardList,
-      tone: "olive" as const,
-    },
-    {
-      label: "Quotes awaiting",
-      value: String(quotesAwaiting.length),
-      note: `${liveQuotes.filter((quote) => quote.status === "Accepted").length} accepted`,
-      icon: ReceiptText,
-      tone: "amber" as const,
-    },
-    {
-      label: "Unpaid invoices",
-      value: money(unpaidTotal),
-      note: `${money(paidTotal)} paid to date`,
-      icon: DollarSign,
-      tone: "red" as const,
-    },
-  ];
-
   const greeting = gdayGreeting(displayNameFromIdentity(undefined, signedInEmail));
   const todayLabel = brisbaneDateLabel();
   const todayKey = new Intl.DateTimeFormat("en-CA", {
@@ -119,11 +99,86 @@ export function DashboardView({
   const overdueInvoices = liveInvoices.filter(
     (record) => invoiceDisplayStatus(record) === "Overdue",
   ).length;
-  const siteVisitsDue = jobs.filter((job) => {
+  const siteVisitsDue = fieldJobs.filter((job) => {
     if (job.status !== "scheduled" && job.status !== "in-progress") return false;
     const day = job.dateKey?.slice(0, 10);
     return Boolean(day) && day <= todayKey;
   }).length;
+
+  const metrics = canManage
+    ? [
+        {
+          label: "Clients",
+          value: String(clients.length),
+          note: `${clients.filter((client) => client.status === "Lead").length} lead`,
+          icon: Users,
+          tone: "forest" as const,
+        },
+        {
+          label: "Open job requests",
+          value: String(openRequests.length),
+          note: `${openRequests.filter((request) => request.status === "Scheduled").length} scheduled`,
+          icon: ClipboardList,
+          tone: "olive" as const,
+        },
+        {
+          label: "Quotes awaiting",
+          value: String(quotesAwaiting.length),
+          note: `${liveQuotes.filter((quote) => quote.status === "Accepted").length} accepted`,
+          icon: ReceiptText,
+          tone: "amber" as const,
+        },
+        {
+          label: "Unpaid invoices",
+          value: money(unpaidTotal),
+          note: `${money(paidTotal)} paid to date`,
+          icon: DollarSign,
+          tone: "red" as const,
+        },
+      ]
+    : [
+        {
+          label: "Assigned to me",
+          value: String(
+            myJobs.filter(
+              (job) => job.status !== "completed" && job.status !== "cancelled",
+            ).length,
+          ),
+          note: `${myJobs.filter((job) => job.status === "scheduled").length} scheduled`,
+          icon: ClipboardList,
+          tone: "forest" as const,
+        },
+        {
+          label: "In progress",
+          value: String(
+            myJobs.filter((job) => job.status === "in-progress").length,
+          ),
+          note: "Jobs you have started",
+          icon: TrendingUp,
+          tone: "olive" as const,
+        },
+        {
+          label: "Site visits due",
+          value: String(
+            myJobs.filter((job) => {
+              if (job.status !== "scheduled" && job.status !== "in-progress")
+                return false;
+              const day = job.dateKey?.slice(0, 10);
+              return Boolean(day) && day <= todayKey;
+            }).length,
+          ),
+          note: "Scheduled through today",
+          icon: Clock3,
+          tone: "amber" as const,
+        },
+        {
+          label: "Completed",
+          value: String(myJobs.filter((job) => job.status === "completed").length),
+          note: "On the board",
+          icon: DollarSign,
+          tone: "red" as const,
+        },
+      ];
 
   return (
     <>
@@ -182,9 +237,10 @@ export function DashboardView({
                 </strong>
               </span>
               <span className="upcoming-job__details">
-                <strong>{upcoming.client}</strong>
+                <strong>{formatSiteTitle(upcoming)}</strong>
                 <small>
-                  {displayServiceCategory(upcoming.category)} · {upcoming.address}
+                  {upcoming.time ? `${upcoming.time} · ` : ""}
+                  {displayServiceCategory(upcoming.category)}
                 </small>
               </span>
               <Badge tone="neutral">{upcoming.status.replace("-", " ")}</Badge>
@@ -205,20 +261,41 @@ export function DashboardView({
             </div>
           </div>
           {(
-            [
-              [
-                TrendingUp,
-                "Jobs in progress",
-                jobs.filter((job) => job.status === "in-progress").length,
-              ],
-              [Clock3, "Site visits due", siteVisitsDue],
-              [
-                ReceiptText,
-                "Quotes to send",
-                liveQuotes.filter((quote) => quote.status === "Draft").length,
-              ],
-              [DollarSign, "Invoices overdue", overdueInvoices],
-            ] satisfies Array<[LucideIcon, string, number]>
+            (
+              canManage
+                ? [
+                    [
+                      TrendingUp,
+                      "Jobs in progress",
+                      jobs.filter((job) => job.status === "in-progress").length,
+                    ],
+                    [Clock3, "Site visits due", siteVisitsDue],
+                    [
+                      ReceiptText,
+                      "Quotes to send",
+                      liveQuotes.filter((quote) => quote.status === "Draft").length,
+                    ],
+                    [DollarSign, "Invoices overdue", overdueInvoices],
+                  ]
+                : [
+                    [
+                      TrendingUp,
+                      "Jobs in progress",
+                      myJobs.filter((job) => job.status === "in-progress").length,
+                    ],
+                    [Clock3, "Site visits due", siteVisitsDue],
+                    [
+                      ClipboardList,
+                      "Unassigned jobs",
+                      jobs.filter((job) => !job.assigneeIds.length).length,
+                    ],
+                    [
+                      ReceiptText,
+                      "On hold",
+                      myJobs.filter((job) => job.status === "on-hold").length,
+                    ],
+                  ]
+            ) satisfies Array<[LucideIcon, string, number]>
           ).map(([Icon, label, count]) => (
             <div className="ops-row" key={label}>
               <span>

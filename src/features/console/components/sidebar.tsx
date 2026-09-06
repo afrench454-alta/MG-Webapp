@@ -25,12 +25,19 @@ export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "clients", label: "Clients", icon: Users },
   { id: "requests", label: "Job Requests", icon: ClipboardList },
-  { id: "questionnaires", label: "Questionnaires", icon: FileText },
+  { id: "questionnaires", label: "Intake forms", icon: FileText },
   { id: "quotes", label: "Quotes", icon: ReceiptText },
   { id: "schedule", label: "Schedule", icon: CalendarDays },
   { id: "jobs", label: "Job Board", icon: Columns3 },
   { id: "invoices", label: "Invoices", icon: DollarSign },
   { id: "settings", label: "Team & business", icon: Settings },
+];
+
+const fieldRoutes: ConsoleRoute[] = [
+  "dashboard",
+  "requests",
+  "schedule",
+  "jobs",
 ];
 
 export function Sidebar({
@@ -78,7 +85,9 @@ export function Sidebar({
       </div>
       <nav aria-label="Main navigation" className="sidebar-nav">
         {navItems
-          .filter((item) => item.id !== "settings" || canManage)
+          .filter((item) =>
+            canManage ? true : fieldRoutes.includes(item.id),
+          )
           .map((item) => {
           const Icon = item.icon;
           return (
@@ -98,10 +107,12 @@ export function Sidebar({
         })}
       </nav>
       <div className="sidebar-footer">
-        <button className="ai-button" type="button" onClick={onEstimate}>
-          <Sparkles aria-hidden="true" size={18} />
-          <span>AI Estimator</span>
-        </button>
+        {canManage ? (
+          <button className="ai-button" type="button" onClick={onEstimate}>
+            <Sparkles aria-hidden="true" size={18} />
+            <span>AI Estimator</span>
+          </button>
+        ) : null}
         <InstallAppButton />
         <div className="signed-in">
           <p className="eyebrow">Signed in</p>

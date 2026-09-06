@@ -29,6 +29,7 @@ import {
   PageHeader,
   invoiceDisplayTone,
 } from "../components/ui-elements";
+import { formatSiteTitle } from "../data/work-identity";
 
 const InvoiceRow = memo(function InvoiceRow({
   record,
@@ -67,9 +68,9 @@ const InvoiceRow = memo(function InvoiceRow({
           <h2>{record.documentNumber || record.id}</h2>
           <Badge tone={invoiceDisplayTone(display)}>{display}</Badge>
         </div>
-        <strong className="record-client">{record.client}</strong>
+        <strong className="record-client">{formatSiteTitle(record)}</strong>
         <p>
-          {record.address} · Issued {record.issued} · Due {record.due}
+          Issued {record.issued} · Due {record.due}
         </p>
       </div>
       <div className="record-row__actions">
