@@ -265,8 +265,6 @@ begin
     raise exception 'This account already belongs to a workspace';
   end if;
 
-  display_name_value := nullif(btrim(coalesce(auth.jwt() ->> 'user_metadata', '')), '');
-
   insert into public.profiles (
     id,
     business_id,
