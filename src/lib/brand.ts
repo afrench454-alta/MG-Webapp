@@ -4,8 +4,19 @@ export const signInIntro =
   "Sign in to manage clients, field work, quotes, and invoices.";
 export const DEFAULT_OWNER_NAME = "Jodie";
 
+export const OPERATOR_DISPLAY_NAMES: Readonly<Record<string, string>> = {
+  "team@mowglowpropertyservices.com.au": "Jodie",
+  "ashtonfrench454@gmail.com": "Ashton",
+};
+
 function titleCaseToken(token: string): string {
   return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+}
+
+function knownOperatorName(email?: string | null): string | null {
+  const key = email?.trim().toLowerCase();
+  if (!key) return null;
+  return OPERATOR_DISPLAY_NAMES[key] ?? null;
 }
 
 export function displayNameFromIdentity(
@@ -13,9 +24,14 @@ export function displayNameFromIdentity(
   email?: string | null,
 ): string {
   const trimmedName = name?.trim();
-  if (trimmedName) return trimmedName;
+  const known = knownOperatorName(email);
+  const local = email?.split("@", 1)[0]?.trim().toLowerCase();
+  if (trimmedName) {
+    if (known && local && trimmedName.toLowerCase() === local) return known;
+    return trimmedName;
+  }
+  if (known) return known;
 
-  const local = email?.split("@", 1)[0]?.trim();
   if (!local) return "there";
 
   return local

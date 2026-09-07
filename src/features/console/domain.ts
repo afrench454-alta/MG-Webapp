@@ -115,9 +115,9 @@ export const businessProfile: BusinessProfile = {
   email: "team@mowglowpropertyservices.com.au",
   phone: "(+61) 400 856 532",
   website: "www.mowglowpropertyservices.com.au",
-  paymentTo: "Jodie T/A Mow Glow PS",
-  bsb: "084-961",
-  accountNumber: "853110869",
+  paymentTo: "",
+  bsb: "",
+  accountNumber: "",
 };
 
 export const quoteTerms = "This quotation is an estimate only. Any unforeseen costs, additional materials, or extra labour required may result in additional charges. The client will be notified before any changes or additional work is carried out.";
@@ -328,7 +328,7 @@ export const questionnaireSubmissionsSeed: QuestionnaireSubmission[] = [
 
 export const teamMembersSeed: TeamMember[] = [
   { id: "member-1", name: "Jodie", email: "team@mowglowpropertyservices.com.au", role: "Owner", isActive: true },
-  { id: "member-2", name: "Alex", email: "alex@mowglowpropertyservices.com.au", role: "Worker", isActive: true },
+  { id: "member-2", name: "Ashton", email: "ashtonfrench454@gmail.com", role: "Co-owner", isActive: true },
 ];
 
 export const initialJobRequests: JobRequest[] = [

@@ -44,6 +44,25 @@ test("formatMemberDisplayName uses Jodie for an unnamed owner", () => {
   assert.equal(formatMemberDisplayName(null, null, "Worker"), "Team member");
 });
 
+test("known operator emails map to Jodie and Ashton", () => {
+  assert.equal(
+    displayNameFromIdentity(null, "ashtonfrench454@gmail.com"),
+    "Ashton",
+  );
+  assert.equal(
+    displayNameFromIdentity("ashtonfrench454", "ashtonfrench454@gmail.com"),
+    "Ashton",
+  );
+  assert.equal(
+    displayNameFromIdentity(null, "team@mowglowpropertyservices.com.au"),
+    "Jodie",
+  );
+  assert.equal(
+    formatMemberDisplayName(null, "ashtonfrench454@gmail.com", "Co-owner"),
+    "Ashton",
+  );
+});
+
 test("brisbaneDateLabel formats a weekday date in Australia/Brisbane", () => {
   const label = brisbaneDateLabel(new Date("2025-05-21T00:00:00+10:00"));
   assert.match(label, /Wed/);
