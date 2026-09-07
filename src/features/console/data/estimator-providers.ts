@@ -8,8 +8,17 @@ export const ESTIMATOR_NOT_CONNECTED =
   "AI quoting is not connected on this deployment yet. You can still build the quote by hand.";
 export const ESTIMATOR_UNAVAILABLE =
   "The estimator is briefly unavailable. Try again.";
+export const ESTIMATOR_UNAUTHORIZED =
+  "The Gemini API key was rejected. Check GEMINI_API_KEY on this deployment.";
+export const ESTIMATOR_RATE_LIMITED =
+  "The estimator is busy. Try again in a moment.";
 
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"] as const;
+export const GEMINI_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash",
+] as const;
 
 export const ESTIMATOR_SYSTEM_PROMPT = `You are the quoting assistant for Mow & Glow Property Services, a field-ops business in regional Queensland (Toowoomba / Kingaroy and nearby).
 
@@ -127,11 +136,18 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
+type GeminiDraftResult =
+  | { ok: true; content: string }
+  | {
+      ok: false;
+      reason: "unauthorized" | "rate_limited" | "unavailable";
+    };
+
 async function requestGeminiDraft(
   apiKey: string,
   userPrompt: string,
   fetchImpl: FetchLike,
-): Promise<string | null> {
+): Promise<GeminiDraftResult> {
   for (const model of GEMINI_MODELS) {
     const response = await fetchImpl(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -156,12 +172,21 @@ async function requestGeminiDraft(
     if (response.status === 404) {
       continue;
     }
-    if (!response.ok) {
-      return null;
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, reason: "unauthorized" };
     }
-    return extractGeminiText(await readJson(response));
+    if (response.status === 429) {
+      return { ok: false, reason: "rate_limited" };
+    }
+    if (!response.ok) {
+      continue;
+    }
+    const content = extractGeminiText(await readJson(response));
+    if (content) {
+      return { ok: true, content };
+    }
   }
-  return null;
+  return { ok: false, reason: "unavailable" };
 }
 
 async function requestXaiDraft(
@@ -206,13 +231,24 @@ export async function draftEstimateFromProvider(
   const content =
     provider.kind === "gemini"
       ? await requestGeminiDraft(provider.apiKey, userPrompt, fetchImpl)
-      : await requestXaiDraft(provider.apiKey, userPrompt, fetchImpl);
+      : await requestXaiDraft(provider.apiKey, userPrompt, fetchImpl).then(
+          (text) =>
+            text
+              ? ({ ok: true, content: text } as const)
+              : ({ ok: false, reason: "unavailable" } as const),
+        );
 
-  if (!content) {
+  if (!content.ok) {
+    if (content.reason === "unauthorized") {
+      return { ok: false, message: ESTIMATOR_UNAUTHORIZED };
+    }
+    if (content.reason === "rate_limited") {
+      return { ok: false, message: ESTIMATOR_RATE_LIMITED };
+    }
     return { ok: false, message: ESTIMATOR_UNAVAILABLE };
   }
 
-  const estimate = parseEstimatePayload(content);
+  const estimate = parseEstimatePayload(content.content);
   if (!estimate) {
     return {
       ok: false,

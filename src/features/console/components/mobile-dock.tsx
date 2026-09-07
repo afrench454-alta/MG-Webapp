@@ -2,10 +2,10 @@
 
 import {
   CalendarDays,
-  Columns3,
   DollarSign,
   LayoutDashboard,
   Menu,
+  ReceiptText,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ConsoleRoute } from "../domain";
@@ -14,11 +14,12 @@ const dockItems: Array<{
   id: ConsoleRoute;
   label: string;
   icon: LucideIcon;
+  managersOnly?: boolean;
 }> = [
   { id: "dashboard", label: "Home", icon: LayoutDashboard },
-  { id: "jobs", label: "Jobs", icon: Columns3 },
   { id: "schedule", label: "Schedule", icon: CalendarDays },
-  { id: "invoices", label: "Invoices", icon: DollarSign },
+  { id: "quotes", label: "Quotes", icon: ReceiptText, managersOnly: true },
+  { id: "invoices", label: "Invoices", icon: DollarSign, managersOnly: true },
 ];
 
 export function MobileDock({
@@ -36,7 +37,7 @@ export function MobileDock({
 }) {
   const items = canManage
     ? dockItems
-    : dockItems.filter((item) => item.id !== "invoices");
+    : dockItems.filter((item) => !item.managersOnly);
   return (
     <nav className="mobile-dock" aria-label="Quick navigation">
       {items.map((item) => {

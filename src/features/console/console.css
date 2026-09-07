@@ -3110,6 +3110,17 @@ textarea {
   font-size: 13px;
 }
 
+.team-row__name {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+  font-weight: 650;
+}
+
 .team-row__actions {
   display: flex;
   flex-wrap: wrap;

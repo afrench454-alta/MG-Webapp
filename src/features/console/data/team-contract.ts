@@ -9,6 +9,7 @@ export const teamInviteSchema = z.object({
 
 export const teamMemberUpdateSchema = z.object({
   profileId: z.uuid(),
+  name: z.string().trim().min(1).max(80).optional(),
   role: z.enum(["Co-owner", "Worker"]).optional(),
   isActive: z.boolean().optional(),
 });

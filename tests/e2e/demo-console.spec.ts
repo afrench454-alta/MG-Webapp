@@ -8,12 +8,21 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
 
   test("renders dashboard with metrics and recent scheduled jobs", async ({ page }) => {
     await expect(page.getByText("Mow & Glow", { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: /G'day,/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "G'day, Jodie" })).toBeVisible();
     const metrics = page.getByLabel("Business metrics");
     await expect(metrics.getByText("Clients")).toBeVisible();
     await expect(metrics.getByText("Open job requests")).toBeVisible();
     await expect(metrics.getByText("Quotes awaiting")).toBeVisible();
     await expect(metrics.getByText("Unpaid invoices")).toBeVisible();
+  });
+
+  test("lets owners rename the default team member", async ({ page }) => {
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Team & business" }).click();
+    const ownerName = page.getByLabel("Owner name");
+    await expect(ownerName).toHaveValue("Jodie");
+    await ownerName.fill("Ashton");
+    await ownerName.blur();
+    await expect(ownerName).toHaveValue("Ashton");
   });
 
   test("navigates to Clients directory and filters records", async ({ page }) => {
@@ -55,7 +64,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   test("navigates to Job Board kanban", async ({ page }) => {
     await page.getByRole("button", { name: "Job Board" }).click();
     await expect(page.getByRole("heading", { name: "Job Board" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Scheduled" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Scheduled", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "In Progress" })).toBeVisible();
     await expect(page.getByRole("radio", { name: /Active/ })).toBeVisible();
     await page.getByRole("radio", { name: /Done/ }).click();
@@ -81,7 +90,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("tests questionnaire preview flow", async ({ page }) => {
-    await page.getByRole("button", { name: "Questionnaires" }).click();
+    await page.getByRole("button", { name: "Intake forms" }).click();
     await expect(page.getByRole("heading", { name: "Intake forms" })).toBeVisible();
 
     await page.getByRole("button", { name: "Preview" }).first().click();

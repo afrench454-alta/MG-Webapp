@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 
 import {
   brisbaneDateLabel,
+  DEFAULT_OWNER_NAME,
   displayNameFromIdentity,
+  formatMemberDisplayName,
   gdayGreeting,
   productBrand,
   productName,
@@ -31,6 +33,15 @@ test("displayNameFromIdentity prefers a real name and otherwise titles the email
 test("gdayGreeting uses Australian hello and the display name", () => {
   assert.equal(gdayGreeting("Alex Shepherd"), "G'day, Alex");
   assert.equal(gdayGreeting("Ops"), "G'day, Ops");
+});
+
+test("formatMemberDisplayName uses Jodie for an unnamed owner", () => {
+  assert.equal(DEFAULT_OWNER_NAME, "Jodie");
+  assert.equal(formatMemberDisplayName(null, null, "owner"), "Jodie");
+  assert.equal(formatMemberDisplayName("  ", "", "Owner"), "Jodie");
+  assert.equal(formatMemberDisplayName("Ashton", "team@example.com", "owner"), "Ashton");
+  assert.equal(formatMemberDisplayName(null, "alex.shepherd@example.com", "Worker"), "Alex Shepherd");
+  assert.equal(formatMemberDisplayName(null, null, "Worker"), "Team member");
 });
 
 test("brisbaneDateLabel formats a weekday date in Australia/Brisbane", () => {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { formatMemberDisplayName } from "@/lib/brand";
 import type { BusinessContext } from "@/lib/supabase/business";
 import { createClient } from "@/lib/supabase/server";
 
@@ -69,11 +70,12 @@ function mapAppRole(
 }
 
 function mapMember(row: z.infer<typeof profileRowSchema>): TeamMember {
+  const role = mapAppRole(row.role);
   return {
     id: row.id,
-    name: row.display_name || row.email || "Team member",
+    name: formatMemberDisplayName(row.display_name, row.email, role),
     email: row.email || "",
-    role: mapAppRole(row.role),
+    role,
     isActive: row.is_active,
   };
 }
@@ -293,6 +295,9 @@ export async function updateTeamMember(
 ): Promise<TeamMember> {
   const supabase = await createClient();
   const patch: Record<string, unknown> = {};
+  if (input.name) {
+    patch.display_name = input.name;
+  }
   if (input.role) {
     patch.role = input.role === "Co-owner" ? "co_owner" : "technician";
   }
@@ -312,7 +317,7 @@ export async function updateTeamMember(
   const currentRole = z
     .object({ role: z.enum(["owner", "co_owner", "technician"]) })
     .parse(existing).role;
-  if (currentRole === "owner") {
+  if (currentRole === "owner" && (input.role || input.isActive === false)) {
     throw new Error("The owner account cannot be changed from here.");
   }
   if (input.profileId === context.actorId && input.isActive === false) {

@@ -12,7 +12,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import {
   brisbaneDateLabel,
-  displayNameFromIdentity,
+  formatMemberDisplayName,
   gdayGreeting,
 } from "@/lib/brand";
 import {
@@ -24,6 +24,7 @@ import {
   type Job,
   type JobRequest,
   type Quote,
+  type TeamMember,
 } from "../domain";
 import { invoiceDisplayStatus } from "../data/invoice-lifecycle";
 import { isLiveInvoice, isLiveQuote } from "../data/list-filters";
@@ -39,6 +40,7 @@ export function DashboardView({
   invoices,
   signedInEmail,
   currentMemberId,
+  teamMembers = [],
   canManage = true,
   onNavigate,
 }: {
@@ -49,6 +51,7 @@ export function DashboardView({
   invoices: Invoice[];
   signedInEmail?: string;
   currentMemberId?: string;
+  teamMembers?: TeamMember[];
   canManage?: boolean;
   onNavigate: (route: ConsoleRoute) => void;
 }) {
@@ -88,7 +91,19 @@ export function DashboardView({
       0,
     );
 
-  const greeting = gdayGreeting(displayNameFromIdentity(undefined, signedInEmail));
+  const currentMember =
+    teamMembers.find((member) => member.id === currentMemberId) ||
+    teamMembers.find(
+      (member) => member.email && member.email === signedInEmail,
+    ) ||
+    teamMembers.find((member) => member.role === "Owner");
+  const greeting = gdayGreeting(
+    formatMemberDisplayName(
+      currentMember?.name,
+      signedInEmail,
+      currentMember?.role,
+    ),
+  );
   const todayLabel = brisbaneDateLabel();
   const todayKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Australia/Brisbane",

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   ESTIMATOR_NOT_CONNECTED,
+  ESTIMATOR_UNAUTHORIZED,
+  GEMINI_MODELS,
   draftEstimateFromProvider,
   extractGeminiText,
   parseEstimatePayload,
@@ -36,6 +38,15 @@ test("resolveEstimatorProvider prefers Gemini over xAI", () => {
     apiKey: "xai-live",
   });
   assert.equal(resolveEstimatorProvider({}), null);
+});
+
+test("Gemini model list prefers current Flash models over shutdown 2.0", () => {
+  assert.equal(GEMINI_MODELS[0], "gemini-3.8-flash");
+  assert.ok(GEMINI_MODELS.includes("gemini-3.5-flash"));
+  assert.equal(
+    (GEMINI_MODELS as readonly string[]).includes("gemini-2.0-flash"),
+    false,
+  );
 });
 
 test("parseEstimatePayload accepts fenced JSON from Gemini", () => {
@@ -79,7 +90,7 @@ test("draftEstimateFromProvider uses Gemini when a Studio key is set", async () 
   if (result.ok) {
     assert.equal(result.estimate.items[0]?.description, "Mow and edge");
   }
-  assert.match(calls[0] ?? "", /gemini-2\.5-flash:generateContent$/);
+  assert.match(calls[0] ?? "", /gemini-3\.8-flash:generateContent$/);
 });
 
 test("draftEstimateFromProvider falls back to xAI and reports a missing key", async () => {
@@ -100,4 +111,35 @@ test("draftEstimateFromProvider falls back to xAI and reports a missing key", as
       ),
   );
   assert.equal(result.ok, true);
+});
+
+test("draftEstimateFromProvider reports a rejected Gemini key", async () => {
+  const result = await draftEstimateFromProvider(
+    "Service: Yard Services\nScope:\nOvergrown backyard.",
+    { GEMINI_API_KEY: "bad-key" },
+    async () => new Response("denied", { status: 401 }),
+  );
+  assert.deepEqual(result, { ok: false, message: ESTIMATOR_UNAUTHORIZED });
+});
+
+test("draftEstimateFromProvider skips a retired Gemini model and uses the next one", async () => {
+  const calls: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    calls.push(String(input));
+    if (String(input).includes("gemini-3.8-flash")) {
+      return new Response("not found", { status: 404 });
+    }
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify(SAMPLE_ESTIMATE) }] } }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const result = await draftEstimateFromProvider(
+    "Service: Yard Services\nScope:\nOvergrown backyard.",
+    { GEMINI_API_KEY: "studio-key" },
+    fetchImpl,
+  );
+  assert.equal(result.ok, true);
+  assert.match(calls[0] ?? "", /gemini-3\.8-flash/);
+  assert.match(calls[1] ?? "", /gemini-3\.5-flash/);
 });

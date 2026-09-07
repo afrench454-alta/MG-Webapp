@@ -7,7 +7,7 @@ import {
   invoiceDraftSchema,
   scheduleJobSchema,
 } from "../../src/features/console/data/operations-contract";
-import { joinWithPasswordSchema } from "../../src/features/console/data/team-contract";
+import { joinWithPasswordSchema, teamMemberUpdateSchema } from "../../src/features/console/data/team-contract";
 import { getSafeReturnPath, isAuthOnlyPath, isPublicPath } from "../../src/lib/supabase/routing";
 
 const VALID_UUID = "123e4567-e89b-12d3-a456-426614174000";
@@ -36,6 +36,28 @@ test("routing: getSafeReturnPath prevents open redirect attacks", () => {
   assert.equal(getSafeReturnPath("/clients?status=Active"), "/clients?status=Active");
   assert.equal(getSafeReturnPath("/sign-in"), "/");
   assert.equal(getSafeReturnPath("/join/invite-token-value"), "/join/invite-token-value");
+});
+
+test("contracts: teamMemberUpdateSchema allows renaming the owner without changing role", () => {
+  const parsed = teamMemberUpdateSchema.safeParse({
+    profileId: VALID_UUID,
+    name: "Jodie",
+  });
+  assert.equal(parsed.success, true);
+  assert.equal(
+    teamMemberUpdateSchema.safeParse({
+      profileId: VALID_UUID,
+      name: "   ",
+    }).success,
+    false,
+  );
+  assert.equal(
+    teamMemberUpdateSchema.safeParse({
+      profileId: VALID_UUID,
+      role: "Owner",
+    }).success,
+    false,
+  );
 });
 
 test("contracts: joinWithPasswordSchema requires a matching password", () => {

@@ -11,14 +11,20 @@ test.describe("Mow & Glow Console - Mobile", () => {
   test("uses a phone shell with dock navigation", async ({ page }) => {
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Quick navigation" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /G'day,/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "G'day, Jodie" })).toBeVisible();
 
     const dock = page.getByRole("navigation", { name: "Quick navigation" });
-    await dock.getByRole("button", { name: "Jobs" }).click();
-    await expect(page.getByRole("heading", { name: "Job Board" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Completed" })).toHaveCount(0);
+    await expect(dock.getByRole("button", { name: "Home" })).toBeVisible();
+    await expect(dock.getByRole("button", { name: "Schedule" })).toBeVisible();
+    await expect(dock.getByRole("button", { name: "Quotes" })).toBeVisible();
+    await expect(dock.getByRole("button", { name: "Invoices" })).toBeVisible();
+    await expect(dock.getByRole("button", { name: "More" })).toBeVisible();
+    await expect(dock.getByRole("button", { name: "Jobs" })).toHaveCount(0);
 
     await dock.getByRole("button", { name: "Schedule" }).click();
     await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
+
+    await dock.getByRole("button", { name: "Quotes" }).click();
+    await expect(page.getByRole("heading", { name: "Quotes" })).toBeVisible();
   });
 });

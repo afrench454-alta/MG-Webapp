@@ -1565,6 +1565,7 @@ export function ConsoleApp({
               }
               const updated = {
                 ...member,
+                name: input.name || member.name,
                 role: input.role || member.role,
                 isActive:
                   typeof input.isActive === "boolean"
@@ -1590,6 +1591,7 @@ export function ConsoleApp({
             invoices={invoiceRecords}
             signedInEmail={signedInEmail}
             currentMemberId={actorId}
+            teamMembers={teamMembers}
             canManage={canOperateOffice}
             onNavigate={setActive}
           />

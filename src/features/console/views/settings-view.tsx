@@ -62,6 +62,7 @@ export function SettingsView({
 
   const updateMember = async (input: {
     profileId: string;
+    name?: string;
     role?: "Co-owner" | "Worker";
     isActive?: boolean;
   }) => {
@@ -251,7 +252,30 @@ export function SettingsView({
                 className={`team-row${member.isActive ? "" : " team-row--inactive"}`}
               >
                 <div>
-                  <strong>{member.name}</strong>
+                  {canManage ? (
+                    <input
+                      key={member.name}
+                      className="team-row__name"
+                      defaultValue={member.name}
+                      aria-label={`${member.role} name`}
+                      maxLength={80}
+                      disabled={pending}
+                      onBlur={(event) => {
+                        const next = event.target.value.trim();
+                        if (!next) {
+                          event.target.value = member.name;
+                          return;
+                        }
+                        if (next === member.name) return;
+                        void updateMember({
+                          profileId: member.id,
+                          name: next,
+                        });
+                      }}
+                    />
+                  ) : (
+                    <strong>{member.name}</strong>
+                  )}
                   <span>{member.email || "No email"}</span>
                 </div>
                 <Badge tone={member.role === "Worker" ? "olive" : "forest"}>
@@ -286,8 +310,10 @@ export function SettingsView({
                       {member.isActive ? "Deactivate" : "Reactivate"}
                     </Button>
                   </div>
-                ) : member.email === currentEmail ? (
-                  <span className="muted-copy">You</span>
+                ) : member.email === currentEmail || member.role === "Owner" ? (
+                  <span className="muted-copy">
+                    {member.email === currentEmail ? "You" : "Owner"}
+                  </span>
                 ) : null}
               </article>
             ))}
