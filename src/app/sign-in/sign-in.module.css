@@ -99,6 +99,10 @@
   opacity: 0.65;
 }
 
+.install {
+  margin-top: 18px;
+}
+
 @media (max-width: 520px) {
   .shell {
     align-items: start;

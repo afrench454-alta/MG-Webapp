@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { productBrand, signInIntro } from "@/lib/brand";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getSafeReturnPath } from "@/lib/supabase/routing";
+import { InstallAppButton } from "@/features/console/components/install-app";
 
 import { SignInForm } from "./sign-in-form";
 import styles from "./sign-in.module.css";
@@ -28,6 +29,9 @@ export default async function SignInPage({
           nextPath={getSafeReturnPath(params.next)}
           configured={isSupabaseConfigured()}
         />
+        <div className={styles.install}>
+          <InstallAppButton />
+        </div>
       </section>
     </main>
   );

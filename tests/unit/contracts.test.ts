@@ -23,6 +23,8 @@ test("routing: isAuthOnlyPath correctly identifies protected auth endpoints", ()
 test("routing: isPublicPath correctly identifies public endpoints", () => {
   assert.equal(isPublicPath("/questionnaire/sample-token"), true);
   assert.equal(isPublicPath("/join/invite-token-value"), true);
+  assert.equal(isPublicPath("/sw.js"), true);
+  assert.equal(isPublicPath("/manifest.webmanifest"), true);
   assert.equal(isPublicPath("/"), false);
   assert.equal(isPublicPath("/sign-in"), false);
 });

@@ -1,8 +1,9 @@
-const CACHE = "mow-glow-console-v1";
+const CACHE = "mow-glow-console-v2";
 const PRECACHE = [
   "/mow-glow-logo.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  "/icons/maskable-192.png",
   "/icons/maskable-512.png",
   "/icons/apple-touch-icon.png",
 ];
@@ -11,7 +12,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
+      .then((cache) => cache.addAll(PRECACHE).catch(() => undefined))
       .then(() => self.skipWaiting()),
   );
 });
@@ -48,6 +49,8 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || Response.error())),
+      .catch(() =>
+        caches.match(request).then((cached) => cached || Response.error()),
+      ),
   );
 });

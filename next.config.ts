@@ -30,6 +30,14 @@ const nextConfig: NextConfig = {
           ...securityHeaders,
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
           { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+      {
+        source: "/manifest.webmanifest",
+        headers: [
+          ...securityHeaders,
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
         ],
       },
     ];

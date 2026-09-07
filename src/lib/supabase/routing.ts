@@ -1,6 +1,11 @@
 const FALLBACK_PATH = "/";
 const AUTH_ONLY_PATHS = ["/sign-in", "/auth/callback"] as const;
 const PUBLIC_PATH_PREFIXES = ["/questionnaire/", "/join/"] as const;
+const PUBLIC_EXACT_PATHS = new Set([
+  "/sw.js",
+  "/manifest.webmanifest",
+  "/manifest.json",
+]);
 
 export function isAuthOnlyPath(pathname: string): boolean {
   return AUTH_ONLY_PATHS.some(
@@ -9,7 +14,10 @@ export function isAuthOnlyPath(pathname: string): boolean {
 }
 
 export function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATH_PREFIXES.some((path) => pathname.startsWith(path));
+  return (
+    PUBLIC_EXACT_PATHS.has(pathname) ||
+    PUBLIC_PATH_PREFIXES.some((path) => pathname.startsWith(path))
+  );
 }
 
 /** Prevents callback and form parameters from becoming open redirects. */
