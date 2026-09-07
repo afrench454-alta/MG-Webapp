@@ -1,6 +1,6 @@
 const FALLBACK_PATH = "/";
 const AUTH_ONLY_PATHS = ["/sign-in", "/auth/callback"] as const;
-const PUBLIC_PATH_PREFIXES = ["/questionnaire/"] as const;
+const PUBLIC_PATH_PREFIXES = ["/questionnaire/", "/join/"] as const;
 
 export function isAuthOnlyPath(pathname: string): boolean {
   return AUTH_ONLY_PATHS.some(

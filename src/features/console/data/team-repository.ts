@@ -14,6 +14,7 @@ import {
 import type {
   BusinessProfileUpdateInput,
   TeamInviteInput,
+  TeamInvitePreview,
   TeamMemberUpdateInput,
 } from "./team-contract";
 
@@ -34,6 +35,14 @@ const invitationRowSchema = z.object({
   expires_at: z.string(),
 });
 
+const previewRowSchema = z.object({
+  email: z.string(),
+  business_name: z.string(),
+  member_role: z.enum(["owner", "co_owner", "technician"]),
+  expires_at: z.string(),
+  status: z.enum(["pending", "accepted", "revoked", "expired"]),
+});
+
 const businessRowSchema = z.object({
   name: z.string(),
   abn: z.string().nullable(),
@@ -51,9 +60,11 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function mapRole(role: "owner" | "co_owner" | "technician"): TeamMember["role"] {
+function mapAppRole(
+  role: "owner" | "co_owner" | "technician",
+): TeamMember["role"] {
   if (role === "co_owner") return "Co-owner";
-  if (role === "technician") return "Technician";
+  if (role === "technician") return "Worker";
   return "Owner";
 }
 
@@ -62,7 +73,7 @@ function mapMember(row: z.infer<typeof profileRowSchema>): TeamMember {
     id: row.id,
     name: row.display_name || row.email || "Team member",
     email: row.email || "",
-    role: mapRole(row.role),
+    role: mapAppRole(row.role),
     isActive: row.is_active,
   };
 }
@@ -103,7 +114,7 @@ export async function listTeamInvitations(
   return z.array(invitationRowSchema).parse(data || []).map((row) => ({
     id: row.id,
     email: row.email,
-    role: row.role === "co_owner" ? "Co-owner" : "Technician",
+    role: row.role === "co_owner" ? "Co-owner" : "Worker",
     status:
       row.status === "accepted"
         ? "Accepted"
@@ -224,6 +235,38 @@ export async function revokeTeamInvitation(
   if (error) throw new Error(error.message);
   void context;
   return invitationId;
+}
+
+export async function previewTeamInvitation(
+  rawToken: string,
+): Promise<TeamInvitePreview | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("preview_team_invitation", {
+    raw_token: rawToken,
+  });
+  if (error) {
+    if (
+      /preview_team_invitation|schema cache|does not exist|function/i.test(
+        error.message,
+      )
+    ) {
+      return null;
+    }
+    throw new Error(error.message);
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  const parsed = previewRowSchema.parse(row);
+  const expired =
+    parsed.status === "pending" &&
+    new Date(parsed.expires_at).getTime() <= Date.now();
+  return {
+    email: parsed.email,
+    businessName: parsed.business_name,
+    role: parsed.member_role === "co_owner" ? "Co-owner" : "Worker",
+    expiresAt: parsed.expires_at,
+    status: expired ? "expired" : parsed.status,
+  };
 }
 
 export async function acceptTeamInvitation(

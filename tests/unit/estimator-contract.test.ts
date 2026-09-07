@@ -44,11 +44,18 @@ test("estimateResultSchema maps into quote line items", () => {
 });
 
 test("team invite and business profile contracts reject empty payloads", () => {
-  assert.equal(teamInviteSchema.safeParse({ email: "not-an-email", role: "Technician" }).success, false);
+  assert.equal(teamInviteSchema.safeParse({ email: "not-an-email", role: "Worker" }).success, false);
   assert.equal(
     teamInviteSchema.safeParse({
       email: "alex@mowglowpropertyservices.com.au",
       role: "Technician",
+    }).success,
+    false,
+  );
+  assert.equal(
+    teamInviteSchema.safeParse({
+      email: "alex@mowglowpropertyservices.com.au",
+      role: "Worker",
     }).success,
     true,
   );

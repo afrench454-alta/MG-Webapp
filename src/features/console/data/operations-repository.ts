@@ -15,7 +15,9 @@ import {
 } from "./operations-map";
 import {
   assertInvoiceCanBeDeleted,
+  assertInvoiceCanBeEdited,
   assertJobCanBeDeleted,
+  assertQuoteCanBeEdited,
   invoiceCreateRpcArgs,
 } from "./operations-rules";
 import { formatJobDisplayName } from "./work-identity";
@@ -86,9 +88,9 @@ function mapLineItems(items: Array<{ label?: string | null; description: string;
     rate: item.unit_price,
   }));
 }
-function mapQuote(row: z.infer<typeof quoteRowSchema>, lookups: LookupMaps, items: z.infer<typeof quoteItemRowSchema>[]): Quote { const address = row.service_address_id ? lookups.addresses.get(row.service_address_id)?.line1 : null; return { id: row.id, documentNumber: row.document_number || undefined, clientId: row.client_id, serviceAddressId: row.service_address_id, jobRequestId: row.job_request_id, client: lookups.clients.get(row.client_id) || "Client", address: address || "No service address", issued: formatDate(row.issue_date), expires: formatDate(row.valid_until), validDays: 14, status: mapQuoteStatus(row.status), scope: row.title, clientNotes: row.customer_message || "", discount: 0, taxRate: 0, items: mapLineItems(items) }; }
+function mapQuote(row: z.infer<typeof quoteRowSchema>, lookups: LookupMaps, items: z.infer<typeof quoteItemRowSchema>[]): Quote { const address = row.service_address_id ? lookups.addresses.get(row.service_address_id)?.line1 : null; return { id: row.id, documentNumber: row.document_number || undefined, clientId: row.client_id, serviceAddressId: row.service_address_id, jobRequestId: row.job_request_id, client: lookups.clients.get(row.client_id) || "Client", address: address || "No service address", issued: formatDate(row.issue_date), expires: formatDate(row.valid_until), validDays: 14, status: mapQuoteStatus(row.status), scope: row.title, clientNotes: row.customer_message || "", internalNotes: row.internal_notes || "", discount: 0, taxRate: 0, items: mapLineItems(items) }; }
 function mapJob(row: z.infer<typeof jobRowSchema>, lookups: LookupMaps, recurrence: z.infer<typeof recurrenceRowSchema> | undefined, assignments: z.infer<typeof assignmentRowSchema>[], profiles: Map<string, z.infer<typeof profileRowSchema>>, photos: JobPhoto[]): Job { const schedule = row.scheduled_start ? formatScheduledDate(row.scheduled_start) : { date: "Unscheduled", time: "", dateKey: "" }; const client = lookups.clients.get(row.client_id) || "Client"; const address = row.service_address_id ? lookups.addresses.get(row.service_address_id) : undefined; const orderedAssignments = [...assignments].sort((a, b) => Number(b.is_lead) - Number(a.is_lead)); const assignees = orderedAssignments.map((assignment) => profiles.get(assignment.profile_id)?.display_name || profiles.get(assignment.profile_id)?.email || "Team member"); const property = address?.label || address?.line1 || "Service property"; return { id: row.id, displayName: formatJobDisplayName({ client, address: address?.line1, property, category: row.title, date: schedule.date }), clientId: row.client_id, serviceAddressId: row.service_address_id, jobRequestId: row.job_request_id, client, property, address: address?.line1 || "No service address", category: row.title, scope: row.scope_of_work || "", date: schedule.date, time: schedule.time, dateKey: schedule.dateKey, status: mapJobStatus(row.status), notes: row.internal_instructions || "", recurrence: mapRecurrence(recurrence), assigneeIds: orderedAssignments.map((assignment) => assignment.profile_id), assignees, photos }; }
-function mapInvoice(row: z.infer<typeof invoiceRowSchema>, lookups: LookupMaps, items: z.infer<typeof invoiceItemRowSchema>[]): Invoice { const address = row.billing_address_id ? lookups.addresses.get(row.billing_address_id)?.line1 : null; return { id: row.id, documentNumber: row.document_number || undefined, clientId: row.client_id, serviceAddressId: row.billing_address_id, jobId: row.job_id, quoteId: row.quote_id, client: lookups.clients.get(row.client_id) || "Client", address: address || "No billing address", issued: formatDate(row.issue_date), due: formatDate(row.due_date), dueDate: row.due_date, documentStatus: mapInvoiceDocumentStatus(row.document_status), paymentStatus: mapInvoicePaymentStatus(row.payment_status), scope: items.map((item) => item.description), notes: row.payment_instructions || row.internal_notes || "", discount: 0, taxRate: 0, items: mapLineItems(items) }; }
+function mapInvoice(row: z.infer<typeof invoiceRowSchema>, lookups: LookupMaps, items: z.infer<typeof invoiceItemRowSchema>[], extraIds: string[] = []): Invoice { const address = row.billing_address_id ? lookups.addresses.get(row.billing_address_id)?.line1 : null; return { id: row.id, documentNumber: row.document_number || undefined, clientId: row.client_id, serviceAddressId: row.billing_address_id, extraPropertyIds: extraIds.filter((id) => id !== row.billing_address_id), jobId: row.job_id, quoteId: row.quote_id, client: lookups.clients.get(row.client_id) || "Client", address: address || "No billing address", issued: formatDate(row.issue_date), due: formatDate(row.due_date), dueDate: row.due_date, documentStatus: mapInvoiceDocumentStatus(row.document_status), paymentStatus: mapInvoicePaymentStatus(row.payment_status), scope: items.map((item) => item.description), notes: row.payment_instructions || row.internal_notes || "", discount: 0, taxRate: 0, items: mapLineItems(items) }; }
 
 async function getQuote(context: BusinessContext, id: string): Promise<Quote> {
   const [quote] = await listQuotes(context, id);
@@ -129,11 +131,87 @@ async function assertTechnicianAssigned(
 
 export async function listQuotes(context: BusinessContext, recordId?: string): Promise<Quote[]> { if (context.role === "technician") return []; const supabase = await createClient(); const quotesQuery = recordId ? supabase.from("quotes").select(QUOTE_SELECT).eq("business_id", context.businessId).eq("id", recordId) : supabase.from("quotes").select(QUOTE_SELECT).eq("business_id", context.businessId); const itemsQuery = recordId ? supabase.from("quote_line_items").select("quote_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId).eq("quote_id", recordId) : supabase.from("quote_line_items").select("quote_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId); const [rowsResult, itemsResult, lookups] = await Promise.all([quotesQuery.order("issue_date", { ascending: false }), itemsQuery.order("position"), loadLookupMaps(context)]); if (rowsResult.error) throw new Error(rowsResult.error.message); if (itemsResult.error) throw new Error(itemsResult.error.message); const rows = z.array(quoteRowSchema).parse(rowsResult.data || []); const items = z.array(quoteItemRowSchema).parse(itemsResult.data || []); const grouped = groupByParent(items, (item) => item.quote_id); return rows.map((row) => mapQuote(row, lookups, grouped.get(row.id) || [])); }
 export async function listJobs(context: BusinessContext, recordId?: string): Promise<Job[]> { const supabase = await createClient(); const jobsQuery = recordId ? supabase.from("jobs").select(JOB_SELECT).eq("business_id", context.businessId).eq("id", recordId) : supabase.from("jobs").select(JOB_SELECT).eq("business_id", context.businessId); const recurrencesQuery = recordId ? supabase.from("job_recurrences").select("job_id, frequency, interval_count").eq("business_id", context.businessId).eq("job_id", recordId) : supabase.from("job_recurrences").select("job_id, frequency, interval_count").eq("business_id", context.businessId); const assignmentsQuery = recordId ? supabase.from("job_assignments").select("job_id, profile_id, is_lead").eq("business_id", context.businessId).eq("job_id", recordId) : supabase.from("job_assignments").select("job_id, profile_id, is_lead").eq("business_id", context.businessId); const attachmentsQuery = recordId ? supabase.from("job_attachments").select("id, job_id, storage_bucket, storage_path, original_filename, caption, created_at").eq("business_id", context.businessId).eq("job_id", recordId) : supabase.from("job_attachments").select("id, job_id, storage_bucket, storage_path, original_filename, caption, created_at").eq("business_id", context.businessId); const [rowsResult, recurrencesResult, assignmentsResult, profilesResult, attachmentsResult, lookups] = await Promise.all([jobsQuery.order("scheduled_start", { ascending: true, nullsFirst: false }), recurrencesQuery, assignmentsQuery, supabase.from("profiles").select("id, display_name, email, role").eq("business_id", context.businessId).eq("is_active", true), attachmentsQuery.order("created_at", { ascending: false }), loadLookupMaps(context)]); for (const result of [rowsResult, recurrencesResult, assignmentsResult, profilesResult, attachmentsResult]) if (result.error) throw new Error(result.error.message); const rows = z.array(jobRowSchema).parse(rowsResult.data || []); const recurrences = z.array(recurrenceRowSchema).parse(recurrencesResult.data || []); const assignments = z.array(assignmentRowSchema).parse(assignmentsResult.data || []); const profiles = z.array(profileRowSchema).parse(profilesResult.data || []); const attachments = z.array(attachmentRowSchema).parse(attachmentsResult.data || []); const recurrenceByJob = new Map(recurrences.map((row) => [row.job_id, row])); const assignmentsByJob = groupRows(assignments, (row) => row.job_id); const profileById = new Map(profiles.map((row) => [row.id, row])); const signedPhotos = await Promise.all(attachments.map(async (attachment): Promise<[string, JobPhoto]> => { const { data } = await supabase.storage.from(attachment.storage_bucket).createSignedUrl(attachment.storage_path, 60 * 60); return [attachment.job_id, { id: attachment.id, name: attachment.original_filename, url: data?.signedUrl || "", caption: attachment.caption || "", created: formatDate(attachment.created_at.slice(0, 10)) }]; })); const photosByJob = groupRows(signedPhotos, ([jobId]) => jobId); return rows.map((row) => mapJob(row, lookups, recurrenceByJob.get(row.id), assignmentsByJob.get(row.id) || [], profileById, (photosByJob.get(row.id) || []).map(([, photo]) => photo))); }
-export async function listInvoices(context: BusinessContext, recordId?: string): Promise<Invoice[]> { if (context.role === "technician") return []; const supabase = await createClient(); const invoicesQuery = recordId ? supabase.from("invoices").select(INVOICE_SELECT).eq("business_id", context.businessId).eq("id", recordId) : supabase.from("invoices").select(INVOICE_SELECT).eq("business_id", context.businessId); const itemsQuery = recordId ? supabase.from("invoice_line_items").select("invoice_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId).eq("invoice_id", recordId) : supabase.from("invoice_line_items").select("invoice_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId); const [rowsResult, itemsResult, lookups] = await Promise.all([invoicesQuery.order("issue_date", { ascending: false }), itemsQuery.order("position"), loadLookupMaps(context)]); if (rowsResult.error) throw new Error(rowsResult.error.message); if (itemsResult.error) throw new Error(itemsResult.error.message); const rows = z.array(invoiceRowSchema).parse(rowsResult.data || []); const items = z.array(invoiceItemRowSchema).parse(itemsResult.data || []); const grouped = groupByParent(items, (item) => item.invoice_id); return rows.map((row) => mapInvoice(row, lookups, grouped.get(row.id) || [])); }
+export async function listInvoices(context: BusinessContext, recordId?: string): Promise<Invoice[]> {
+  if (context.role === "technician") return [];
+  const supabase = await createClient();
+  const invoicesQuery = recordId
+    ? supabase.from("invoices").select(INVOICE_SELECT).eq("business_id", context.businessId).eq("id", recordId)
+    : supabase.from("invoices").select(INVOICE_SELECT).eq("business_id", context.businessId);
+  const itemsQuery = recordId
+    ? supabase.from("invoice_line_items").select("invoice_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId).eq("invoice_id", recordId)
+    : supabase.from("invoice_line_items").select("invoice_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId);
+  const extrasQuery = recordId
+    ? supabase.from("invoice_service_addresses").select("invoice_id, client_address_id").eq("business_id", context.businessId).eq("invoice_id", recordId)
+    : supabase.from("invoice_service_addresses").select("invoice_id, client_address_id").eq("business_id", context.businessId);
+  const [rowsResult, itemsResult, extrasResult, lookups] = await Promise.all([
+    invoicesQuery.order("issue_date", { ascending: false }),
+    itemsQuery.order("position"),
+    extrasQuery,
+    loadLookupMaps(context),
+  ]);
+  if (rowsResult.error) throw new Error(rowsResult.error.message);
+  if (itemsResult.error) throw new Error(itemsResult.error.message);
+  const extras = extrasResult.error
+    ? []
+    : z.array(z.object({ invoice_id: z.uuid(), client_address_id: z.uuid() })).parse(extrasResult.data || []);
+  const rows = z.array(invoiceRowSchema).parse(rowsResult.data || []);
+  const items = z.array(invoiceItemRowSchema).parse(itemsResult.data || []);
+  const grouped = groupByParent(items, (item) => item.invoice_id);
+  const extrasByInvoice = groupRows(extras, (row) => row.invoice_id);
+  return rows.map((row) =>
+    mapInvoice(
+      row,
+      lookups,
+      grouped.get(row.id) || [],
+      (extrasByInvoice.get(row.id) || []).map((item) => item.client_address_id),
+    ),
+  );
+}
 
 async function getRequestTarget(context: BusinessContext, requestId: string) { const supabase = await createClient(); const { data, error } = await supabase.from("job_requests").select("id, client_id, service_address_id, title, description").eq("business_id", context.businessId).eq("id", requestId).single(); if (error) throw new Error(`Unable to load job request: ${error.message}`); const row = z.object({ id: z.uuid(), client_id: z.uuid().nullable(), service_address_id: z.uuid().nullable(), title: z.string(), description: z.string().nullable() }).parse(data); if (!row.client_id || !row.service_address_id) throw new Error("The job request needs a client and service property first."); return row; }
 
 export async function createQuote(context: BusinessContext, input: QuoteDraftInput): Promise<Quote> { const target = await getRequestTarget(context, input.jobRequestId); const supabase = await createClient(); const issueDate = new Date().toISOString().slice(0, 10); const validUntil = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10); const { data, error } = await supabase.from("quotes").insert({ business_id: context.businessId, client_id: target.client_id, service_address_id: target.service_address_id, job_request_id: target.id, status: "draft", title: input.scope, issue_date: issueDate, valid_until: validUntil, customer_message: input.clientNotes || null, internal_notes: input.internalNotes || null, created_by: context.actorId }).select("id").single(); if (error) throw new Error(error.message); const quoteId = z.object({ id: z.uuid() }).parse(data).id; const { error: itemsError } = await supabase.from("quote_line_items").insert(input.items.map((item, position) => ({ business_id: context.businessId, quote_id: quoteId, position, label: item.label || null, description: item.description, quantity: item.quantity, unit_label: item.unitLabel || "item", unit_price: item.rate, tax_rate: 0 }))); if (itemsError) throw new Error(itemsError.message); return getQuote(context, quoteId); }
+export async function updateQuote(context: BusinessContext, input: QuoteDraftInput): Promise<Quote> {
+  if (!input.id) throw new Error("Quote identifier is required.");
+  const current = await getQuote(context, input.id);
+  assertQuoteCanBeEdited(current);
+  const target = await getRequestTarget(context, input.jobRequestId);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("quotes")
+    .update({
+      client_id: target.client_id,
+      service_address_id: target.service_address_id,
+      job_request_id: target.id,
+      title: input.scope,
+      customer_message: input.clientNotes || null,
+      internal_notes: input.internalNotes || null,
+    })
+    .eq("business_id", context.businessId)
+    .eq("id", input.id);
+  if (error) throw new Error(error.message);
+  const { error: deleteError } = await supabase
+    .from("quote_line_items")
+    .delete()
+    .eq("business_id", context.businessId)
+    .eq("quote_id", input.id);
+  if (deleteError) throw new Error(deleteError.message);
+  const { error: itemsError } = await supabase.from("quote_line_items").insert(
+    input.items.map((item, position) => ({
+      business_id: context.businessId,
+      quote_id: input.id,
+      position,
+      label: item.label || null,
+      description: item.description,
+      quantity: item.quantity,
+      unit_label: item.unitLabel || "item",
+      unit_price: item.rate,
+      tax_rate: 0,
+    })),
+  );
+  if (itemsError) throw new Error(itemsError.message);
+  return getQuote(context, input.id);
+}
 export async function updateQuoteStatus(context: BusinessContext, id: string, status: Quote["status"]): Promise<Quote> { const dbStatus = status === "Accepted" ? "approved" : status === "Declined" ? "declined" : status.toLowerCase(); const supabase = await createClient(); const { error } = await supabase.from("quotes").update({ status: dbStatus }).eq("business_id", context.businessId).eq("id", id); if (error) throw new Error(error.message); return getQuote(context, id); }
 export async function deleteQuote(context: BusinessContext, id: string): Promise<string> { const supabase = await createClient(); const { data, error } = await supabase.from("quotes").delete().eq("business_id", context.businessId).eq("id", id).select("id").single(); if (error) throw new Error(error.message); return z.object({ id: z.uuid() }).parse(data).id; }
 
@@ -154,7 +232,7 @@ export async function deleteJob(context: BusinessContext, id: string): Promise<s
   return z.object({ id: z.uuid() }).parse(data).id;
 }
 
-export async function listTeamMembers(context: BusinessContext): Promise<TeamMember[]> { const supabase = await createClient(); const { data, error } = await supabase.from("profiles").select("id, display_name, email, role").eq("business_id", context.businessId).eq("is_active", true).order("display_name"); if (error) throw new Error(error.message); return z.array(profileRowSchema).parse(data || []).map((row) => ({ id: row.id, name: row.display_name || row.email || "Team member", email: row.email || "", role: row.role === "co_owner" ? "Co-owner" : row.role === "technician" ? "Technician" : "Owner", isActive: true })); }
+export async function listTeamMembers(context: BusinessContext): Promise<TeamMember[]> { const supabase = await createClient(); const { data, error } = await supabase.from("profiles").select("id, display_name, email, role").eq("business_id", context.businessId).eq("is_active", true).order("display_name"); if (error) throw new Error(error.message); return z.array(profileRowSchema).parse(data || []).map((row) => ({ id: row.id, name: row.display_name || row.email || "Team member", email: row.email || "", role: row.role === "co_owner" ? "Co-owner" : row.role === "technician" ? "Worker" : "Owner", isActive: true })); }
 
 export async function updateJobAssignments(context: BusinessContext, input: JobAssignmentsInput): Promise<Job> { const supabase = await createClient(); const uniqueIds = [...new Set(input.profileIds)]; if (uniqueIds.length) { const { data: members, error: memberError } = await supabase.from("profiles").select("id").eq("business_id", context.businessId).eq("is_active", true).in("id", uniqueIds); if (memberError) throw new Error(memberError.message); if ((members || []).length !== uniqueIds.length) throw new Error("One or more selected team members are unavailable."); } const { error: clearLeadError } = await supabase.from("job_assignments").update({ is_lead: false }).eq("business_id", context.businessId).eq("job_id", input.jobId); if (clearLeadError) throw new Error(clearLeadError.message); if (uniqueIds.length) { const { error: upsertError } = await supabase.from("job_assignments").upsert(uniqueIds.map((profileId) => ({ business_id: context.businessId, job_id: input.jobId, profile_id: profileId, is_lead: false, assigned_by: context.actorId })), { onConflict: "job_id,profile_id" }); if (upsertError) throw new Error(upsertError.message); const { error: leadError } = await supabase.from("job_assignments").update({ is_lead: true }).eq("business_id", context.businessId).eq("job_id", input.jobId).eq("profile_id", uniqueIds[0]); if (leadError) throw new Error(leadError.message); } let deleteQuery = supabase.from("job_assignments").delete().eq("business_id", context.businessId).eq("job_id", input.jobId); if (uniqueIds.length) deleteQuery = deleteQuery.not("profile_id", "in", `(${uniqueIds.join(",")})`); const { error: deleteError } = await deleteQuery; if (deleteError) throw new Error(deleteError.message); return getJob(context, input.jobId); }
 
@@ -176,6 +254,107 @@ export async function createInvoice(context: BusinessContext, input: InvoiceDraf
     if (linkError) throw new Error(linkError.message);
   }
   return getInvoice(context, invoiceId);
+}
+
+export async function updateInvoice(context: BusinessContext, input: InvoiceDraftInput): Promise<Invoice> {
+  if (!input.id) throw new Error("Invoice identifier is required.");
+  const current = await getInvoice(context, input.id);
+  assertInvoiceCanBeEdited(current);
+  const supabase = await createClient();
+  const { data: existing, error: existingError } = await supabase
+    .from("invoices")
+    .select("issue_date, document_status")
+    .eq("business_id", context.businessId)
+    .eq("id", input.id)
+    .single();
+  if (existingError) throw new Error(existingError.message);
+  const row = z
+    .object({
+      issue_date: z.string(),
+      document_status: z.string(),
+    })
+    .parse(existing);
+  assertInvoiceCanBeEdited({
+    documentStatus: row.document_status === "draft" ? "Draft" : "Issued",
+  });
+
+  const extras = [...new Set((input.extraPropertyIds ?? []).filter((id) => id !== input.propertyId))];
+  const addressIds = [input.propertyId, ...extras];
+  const { data: addresses, error: addressError } = await supabase
+    .from("client_addresses")
+    .select("id")
+    .eq("business_id", context.businessId)
+    .eq("client_id", input.clientId)
+    .in("id", addressIds);
+  if (addressError) throw new Error(addressError.message);
+  if ((addresses || []).length !== addressIds.length) {
+    throw new Error("One or more selected invoice properties are no longer available.");
+  }
+
+  const issueDate = row.issue_date.slice(0, 10);
+  const [year, month, day] = issueDate.split("-").map(Number);
+  const due = new Date(Date.UTC(year, month - 1, day + Math.max(input.dueDays, 0)));
+  const dueDate = due.toISOString().slice(0, 10);
+
+  const { error } = await supabase
+    .from("invoices")
+    .update({
+      client_id: input.clientId,
+      billing_address_id: input.propertyId,
+      job_id: input.jobId ?? null,
+      quote_id: input.quoteId ?? current.quoteId ?? null,
+      due_date: dueDate,
+      payment_instructions: input.notes || null,
+    })
+    .eq("business_id", context.businessId)
+    .eq("id", input.id);
+  if (error) throw new Error(error.message);
+
+  const { error: deleteItemsError } = await supabase
+    .from("invoice_line_items")
+    .delete()
+    .eq("business_id", context.businessId)
+    .eq("invoice_id", input.id);
+  if (deleteItemsError) throw new Error(deleteItemsError.message);
+  const { error: itemsError } = await supabase.from("invoice_line_items").insert(
+    input.items.map((item, position) => ({
+      business_id: context.businessId,
+      invoice_id: input.id,
+      position,
+      label: item.label || null,
+      description: item.description,
+      quantity: item.quantity,
+      unit_label: item.unitLabel || "item",
+      unit_price: item.rate,
+      tax_rate: 0,
+    })),
+  );
+  if (itemsError) throw new Error(itemsError.message);
+
+  const { error: deleteExtrasError } = await supabase
+    .from("invoice_service_addresses")
+    .delete()
+    .eq("business_id", context.businessId)
+    .eq("invoice_id", input.id);
+  if (
+    deleteExtrasError &&
+    !/invoice_service_addresses|schema cache|does not exist/i.test(deleteExtrasError.message)
+  ) {
+    throw new Error(deleteExtrasError.message);
+  }
+  if (!deleteExtrasError) {
+    const { error: extrasError } = await supabase.from("invoice_service_addresses").insert(
+      addressIds.map((addressId, position) => ({
+        business_id: context.businessId,
+        invoice_id: input.id,
+        client_address_id: addressId,
+        position,
+      })),
+    );
+    if (extrasError) throw new Error(extrasError.message);
+  }
+
+  return getInvoice(context, input.id);
 }
 
 export async function updateInvoicePayment(context: BusinessContext, id: string, status: Invoice["paymentStatus"]): Promise<Invoice> {

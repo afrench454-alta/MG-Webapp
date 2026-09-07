@@ -70,6 +70,7 @@ export type Quote = {
   status: "Draft" | "Sent" | "Accepted" | "Declined" | "Expired" | "Void";
   scope: string;
   clientNotes: string;
+  internalNotes?: string;
   discount?: number;
   taxRate?: number;
   items: LineItem[];
@@ -90,6 +91,7 @@ export type Invoice = {
   documentStatus: "Draft" | "Issued" | "Sent" | "Overdue" | "Void";
   paymentStatus: "Unpaid" | "Part paid" | "Paid" | "Refunded";
   scope?: string[];
+  extraPropertyIds?: string[];
   notes: string;
   discount?: number;
   taxRate?: number;
@@ -148,14 +150,14 @@ export type TeamMember = {
   id: string;
   name: string;
   email: string;
-  role: "Owner" | "Co-owner" | "Technician";
+  role: "Owner" | "Co-owner" | "Worker";
   isActive: boolean;
 };
 
 export type TeamInvitation = {
   id: string;
   email: string;
-  role: "Co-owner" | "Technician";
+  role: "Co-owner" | "Worker";
   status: "Pending" | "Accepted" | "Revoked" | "Expired";
   created: string;
   expires: string;
@@ -326,7 +328,7 @@ export const questionnaireSubmissionsSeed: QuestionnaireSubmission[] = [
 
 export const teamMembersSeed: TeamMember[] = [
   { id: "member-1", name: "Jodie", email: "team@mowglowpropertyservices.com.au", role: "Owner", isActive: true },
-  { id: "member-2", name: "Alex", email: "alex@mowglowpropertyservices.com.au", role: "Technician", isActive: true },
+  { id: "member-2", name: "Alex", email: "alex@mowglowpropertyservices.com.au", role: "Worker", isActive: true },
 ];
 
 export const initialJobRequests: JobRequest[] = [

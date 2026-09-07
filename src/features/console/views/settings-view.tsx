@@ -40,8 +40,8 @@ export function SettingsView({
 }) {
   const [details, setDetails] = useState(profile);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"Co-owner" | "Technician">(
-    "Technician",
+  const [inviteRole, setInviteRole] = useState<"Co-owner" | "Worker">(
+    "Worker",
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -62,7 +62,7 @@ export function SettingsView({
 
   const updateMember = async (input: {
     profileId: string;
-    role?: "Co-owner" | "Technician";
+    role?: "Co-owner" | "Worker";
     isActive?: boolean;
   }) => {
     if (!onUpdateMember) return;
@@ -254,7 +254,7 @@ export function SettingsView({
                   <strong>{member.name}</strong>
                   <span>{member.email || "No email"}</span>
                 </div>
-                <Badge tone={member.role === "Technician" ? "olive" : "forest"}>
+                <Badge tone={member.role === "Worker" ? "olive" : "forest"}>
                   {member.role}
                 </Badge>
                 {canManage && member.role !== "Owner" ? (
@@ -265,12 +265,12 @@ export function SettingsView({
                       onChange={(event) =>
                         void updateMember({
                           profileId: member.id,
-                          role: event.target.value as "Co-owner" | "Technician",
+                          role: event.target.value as "Co-owner" | "Worker",
                         })
                       }
                     >
                       <option>Co-owner</option>
-                      <option>Technician</option>
+                      <option>Worker</option>
                     </select>
                     <Button
                       variant="secondary"
@@ -313,7 +313,7 @@ export function SettingsView({
                     onChange={(event) => setInviteEmail(event.target.value)}
                     required
                     disabled={pending}
-                    placeholder="tech@example.com"
+                    placeholder="worker@example.com"
                   />
                 </Field>
                 <Field label="Role">
@@ -321,19 +321,19 @@ export function SettingsView({
                     value={inviteRole}
                     onChange={(event) =>
                       setInviteRole(
-                        event.target.value as "Co-owner" | "Technician",
+                        event.target.value as "Co-owner" | "Worker",
                       )
                     }
                     disabled={pending}
                   >
-                    <option>Technician</option>
+                    <option>Worker</option>
                     <option>Co-owner</option>
                   </select>
                 </Field>
               </div>
               <p className="muted-copy">
-                Technicians run assigned jobs. Co-owners can also quote, invoice,
-                and manage the roster.
+                Workers see assigned jobs, mark them complete, and upload photos.
+                Co-owners can also quote, invoice, and manage the roster.
               </p>
               <Button icon={UserPlus} type="submit" disabled={pending}>
                 {pending ? "Creating invite…" : "Create invite link"}

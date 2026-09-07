@@ -4,12 +4,12 @@ import type { BusinessProfile, TeamInvitation, TeamMember } from "../domain";
 
 export const teamInviteSchema = z.object({
   email: z.email().max(320),
-  role: z.enum(["Co-owner", "Technician"]),
+  role: z.enum(["Co-owner", "Worker"]),
 });
 
 export const teamMemberUpdateSchema = z.object({
   profileId: z.uuid(),
-  role: z.enum(["Co-owner", "Technician"]).optional(),
+  role: z.enum(["Co-owner", "Worker"]).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -24,11 +24,34 @@ export const businessProfileUpdateSchema = z.object({
   accountNumber: z.string().trim().max(20).optional().default(""),
 });
 
+export const joinWithPasswordSchema = z
+  .object({
+    token: z.string().min(32).max(512),
+    password: z
+      .string()
+      .min(8, "Use at least 8 characters.")
+      .max(72, "Password is too long."),
+    confirm: z.string().min(1, "Confirm your password.").max(72),
+  })
+  .refine((value) => value.password === value.confirm, {
+    message: "Passwords do not match.",
+    path: ["confirm"],
+  });
+
 export type TeamInviteInput = z.infer<typeof teamInviteSchema>;
 export type TeamMemberUpdateInput = z.infer<typeof teamMemberUpdateSchema>;
 export type BusinessProfileUpdateInput = z.infer<
   typeof businessProfileUpdateSchema
 >;
+export type JoinWithPasswordInput = z.infer<typeof joinWithPasswordSchema>;
+
+export type TeamInvitePreview = Readonly<{
+  email: string;
+  businessName: string;
+  role: "Co-owner" | "Worker";
+  expiresAt: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+}>;
 
 type ActionFailure = Readonly<{ ok: false; message: string }>;
 

@@ -5,8 +5,10 @@ import type { Invoice, Job } from "../../src/features/console/domain";
 import type { InvoiceDraftInput } from "../../src/features/console/data/operations-contract";
 import {
   assertInvoiceCanBeDeleted,
+  assertInvoiceCanBeEdited,
   assertJobCanBeDeleted,
   assertPaymentCanUpdate,
+  assertQuoteCanBeEdited,
   invoiceCreateRpcArgs,
 } from "../../src/features/console/data/operations-rules";
 
@@ -61,6 +63,19 @@ test("assertInvoiceCanBeDeleted allows drafts only", () => {
   assert.throws(
     () => assertInvoiceCanBeDeleted(draftInvoice({ documentStatus: "Void" })),
     /void them instead/i,
+  );
+});
+
+test("assertInvoiceCanBeEdited and assertQuoteCanBeEdited allow drafts only", () => {
+  assert.doesNotThrow(() => assertInvoiceCanBeEdited(draftInvoice()));
+  assert.throws(
+    () => assertInvoiceCanBeEdited(draftInvoice({ documentStatus: "Issued" })),
+    /only draft invoices can be edited/i,
+  );
+  assert.doesNotThrow(() => assertQuoteCanBeEdited({ status: "Draft" }));
+  assert.throws(
+    () => assertQuoteCanBeEdited({ status: "Sent" }),
+    /only draft quotes can be edited/i,
   );
 });
 

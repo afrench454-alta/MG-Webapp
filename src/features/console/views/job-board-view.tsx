@@ -7,7 +7,7 @@ import {
   displayServiceCategory,
   displayServiceDetail,
 } from "../data/service-catalog";
-import { formatSiteTitle } from "../data/work-identity";
+import { formatSiteTitle, formatWhen } from "../data/work-identity";
 import {
   Badge,
   FilterGroup,
@@ -168,10 +168,12 @@ export function JobBoardView({
                         <Badge tone="sage">
                           {displayServiceCategory(job.category)}
                         </Badge>
-                        <small>{job.date}</small>
                       </span>
-                      <strong>{formatSiteTitle(job)}</strong>
+                      <strong>{job.client}</strong>
                       <span className="job-card__property">{job.address}</span>
+                      <span className="job-card__when">
+                        {formatWhen(job) || job.date || "Unscheduled"}
+                      </span>
                       {serviceType ? (
                         <span className="job-card__detail">{serviceType}</span>
                       ) : null}

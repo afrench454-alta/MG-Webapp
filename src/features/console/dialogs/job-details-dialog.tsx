@@ -78,7 +78,10 @@ export function JobDetailsDialog({
         </div>
         <div>
           <p className="eyebrow">Scheduled</p>
-          <span>{job.date}</span>
+          <span>
+            {job.date}
+            {job.time ? ` · ${job.time}` : ""}
+          </span>
         </div>
         <div>
           <p className="eyebrow">Service</p>

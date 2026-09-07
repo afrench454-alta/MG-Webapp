@@ -1548,6 +1548,15 @@ textarea {
 .job-card__property {
   color: var(--muted);
   font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.job-card__when {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .job-card__detail {
@@ -1638,10 +1647,13 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   margin: 0;
   color: var(--ink);
   font-size: 21px;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .dialog__body {
@@ -2723,11 +2735,23 @@ textarea {
 }
 
 @media (max-width: 980px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
   .workspace { padding: 34px 26px calc(88px + env(safe-area-inset-bottom)); }
   .dashboard-grid { grid-template-columns: 1fr; }
   .dashboard-grid .panel {
     height: auto;
     min-height: 0;
+  }
+  .panel,
+  .record-row,
+  .job-card,
+  .dialog,
+  .workspace {
+    min-width: 0;
   }
   .panel { min-height: 0; }
   .client-grid { grid-template-columns: 1fr; }
@@ -2736,6 +2760,46 @@ textarea {
   .page-header { flex-wrap: wrap; gap: 10px; }
   .page-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; padding-top: 4px; }
   .calendar-day { min-height: 110px; }
+  .form-grid--two,
+  .form-grid--three,
+  .job-facts,
+  .assignment-options,
+  .photo-grid,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .field--span-two,
+  .job-facts__scope { grid-column: auto; }
+  .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  .button {
+    min-height: 44px;
+  }
+  .property-editor-labels,
+  .line-item-labels { display: none; }
+  .property-editor,
+  .line-item-row {
+    grid-template-columns: 1fr 1fr 44px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+  }
+  .property-editor input:nth-child(1),
+  .property-editor input:nth-child(2),
+  .line-item-row__description { grid-column: 1 / -1; }
+  .property-editor input:nth-child(3) { grid-column: 1 / span 2; }
+  .line-item-qty { grid-column: 1 / span 2; }
+  .line-item-row output { grid-column: 1 / span 2; justify-content: flex-start; }
+  .line-item-row .icon-button,
+  .property-editor .icon-button { grid-column: 3; grid-row: 2; }
+  .dialog-actions {
+    flex-wrap: wrap;
+  }
+  .team-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DollarSign, Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { DollarSign, Eye, Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { money, quoteTotals, type Invoice, type Quote } from "../domain";
 import {
   countMatching,
@@ -30,6 +30,7 @@ export function QuotesView({
   invoices,
   onNew,
   onView,
+  onEdit,
   onEstimate,
   onCreateInvoice,
   onViewInvoice,
@@ -39,6 +40,7 @@ export function QuotesView({
   invoices: Invoice[];
   onNew: () => void;
   onView: (quote: Quote) => void;
+  onEdit: (quote: Quote) => void;
   onEstimate: () => void;
   onCreateInvoice: (quote: Quote) => void;
   onViewInvoice: (invoice: Invoice) => void;
@@ -133,6 +135,15 @@ export function QuotesView({
                 >
                   View
                 </Button>
+                {quote.status === "Draft" ? (
+                  <Button
+                    variant="secondary"
+                    icon={Pencil}
+                    onClick={() => onEdit(quote)}
+                  >
+                    Edit
+                  </Button>
+                ) : null}
                 {existingInvoice ? (
                   <Button
                     variant="secondary"

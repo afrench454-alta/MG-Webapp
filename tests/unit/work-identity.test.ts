@@ -9,6 +9,7 @@ import {
   formatJobDisplayName,
   formatSiteTitle,
   formatSubmissionScope,
+  formatWhen,
   formatWorkLabel,
 } from "../../src/features/console/data/work-identity";
 
@@ -44,6 +45,37 @@ test("formatWorkLabel uses client and address so two same-service properties sta
     "Northside Studio · 4 Railway Terrace, Kingaroy · Cleaning Services",
   );
   assert.notEqual(residence, studio);
+});
+
+test("formatWorkLabel includes the date so same-site visits stay distinct", () => {
+  const monday = formatWorkLabel({
+    client: "Northside Studio",
+    address: "7 McCauley Drive, Booie",
+    category: "Cleaning Services · General Clean",
+    date: "10 Aug 2026",
+  });
+  const tuesday = formatWorkLabel({
+    client: "Northside Studio",
+    address: "7 McCauley Drive, Booie",
+    category: "Cleaning Services · General Clean",
+    date: "11 Aug 2026",
+  });
+  assert.equal(
+    monday,
+    "Northside Studio · 7 McCauley Drive, Booie · 10 Aug 2026 · Cleaning Services",
+  );
+  assert.equal(
+    tuesday,
+    "Northside Studio · 7 McCauley Drive, Booie · 11 Aug 2026 · Cleaning Services",
+  );
+  assert.notEqual(monday, tuesday);
+});
+
+test("formatWhen keeps date and time visible without hover", () => {
+  assert.equal(
+    formatWhen({ client: "Northside Studio", date: "11 Aug 2026", time: "9:00 am" }),
+    "11 Aug 2026 · 9:00 am",
+  );
 });
 
 test("formatWorkLabel does not treat missing address placeholders as a site", () => {

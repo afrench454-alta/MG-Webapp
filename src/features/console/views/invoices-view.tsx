@@ -2,7 +2,7 @@
 
 import { useState, useMemo, memo } from "react";
 import type { ChangeEvent } from "react";
-import { Ban, Check, ChevronDown, Eye, Plus, Search, Send, Trash2, FileCheck2 } from "lucide-react";
+import { Ban, Check, ChevronDown, Eye, Pencil, Plus, Search, Send, Trash2, FileCheck2 } from "lucide-react";
 import { money, quoteTotals, type Invoice } from "../domain";
 import {
   allowedPaymentStatuses,
@@ -35,6 +35,7 @@ const InvoiceRow = memo(function InvoiceRow({
   record,
   pending,
   onView,
+  onEdit,
   onPaymentStatusChange,
   onFinalize,
   onMarkSent,
@@ -44,6 +45,7 @@ const InvoiceRow = memo(function InvoiceRow({
   record: Invoice;
   pending: boolean;
   onView: (record: Invoice) => void;
+  onEdit: (record: Invoice) => void;
   onPaymentStatusChange: (id: string, status: Invoice["paymentStatus"]) => void;
   onFinalize: (record: Invoice) => void;
   onMarkSent: (record: Invoice) => void;
@@ -103,6 +105,16 @@ const InvoiceRow = memo(function InvoiceRow({
         <Button variant="secondary" icon={Eye} onClick={() => onView(record)} disabled={pending}>
           View
         </Button>
+        {canDeleteInvoice(record) ? (
+          <Button
+            variant="secondary"
+            icon={Pencil}
+            onClick={() => onEdit(record)}
+            disabled={pending}
+          >
+            Edit
+          </Button>
+        ) : null}
         {canMarkPaid(record) ? (
           <Button
             variant="primary"
@@ -147,6 +159,7 @@ export function InvoicesView({
   pending = false,
   onNew,
   onView,
+  onEdit,
   onPaymentStatusChange,
   onFinalize,
   onMarkSent,
@@ -157,6 +170,7 @@ export function InvoicesView({
   pending?: boolean;
   onNew: () => void;
   onView: (record: Invoice) => void;
+  onEdit: (record: Invoice) => void;
   onPaymentStatusChange: (
     invoiceId: string,
     status: Invoice["paymentStatus"],
@@ -262,6 +276,7 @@ export function InvoicesView({
             record={record}
             pending={pending}
             onView={onView}
+            onEdit={onEdit}
             onPaymentStatusChange={onPaymentStatusChange}
             onFinalize={onFinalize}
             onMarkSent={onMarkSent}

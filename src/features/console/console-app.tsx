@@ -107,6 +107,7 @@ import {
 import {
   canCreateInvoiceFromQuote,
   draftInvoiceFromQuote,
+  draftInvoiceFromRecord,
   liveInvoiceForQuote,
 } from "./data/quote-invoice";
 import { formatServiceTitle, isServiceCategory, parseServiceTitle } from "./data/service-catalog";
@@ -121,7 +122,7 @@ export type DialogState =
   | { type: "delete-job"; job: Job }
   | { type: "delete-invoice"; record: Invoice }
   | { type: "quote-form"; prefill?: Partial<QuoteDraft> }
-  | { type: "invoice-form"; quote?: Quote }
+  | { type: "invoice-form"; quote?: Quote; invoice?: Invoice }
   | { type: "send-questionnaire"; questionnaireId?: string }
   | { type: "public-questionnaire"; questionnaire: Questionnaire }
   | { type: "submission"; submission: QuestionnaireSubmission }
@@ -931,6 +932,20 @@ export function ConsoleApp({
   const persistQuote = async (draft: QuoteDraft) => {
     if (dataMode === "demo") {
       setQuotes((current) => {
+        if (draft.id) {
+          return current.map((quote) =>
+            quote.id === draft.id
+              ? {
+                  ...quote,
+                  jobRequestId: draft.jobRequestId,
+                  scope: draft.scope,
+                  items: draft.items,
+                  clientNotes: draft.clientNotes,
+                  internalNotes: draft.internalNotes,
+                }
+              : quote,
+          );
+        }
         const demoDocId = `QT-2026-${1000 + current.length + 1}`;
         return [
           {
@@ -951,7 +966,7 @@ export function ConsoleApp({
       });
       setDialog(null);
       setActive("quotes");
-      showToast("Quote saved as draft.");
+      showToast(draft.id ? "Draft quote updated." : "Quote saved as draft.");
       return;
     }
     if (!onSaveQuote) {
@@ -972,10 +987,17 @@ export function ConsoleApp({
       setOperationMutationError(result.message);
       return;
     }
-    setQuotes((current) => [result.quote, ...current]);
+    setQuotes((current) => {
+      const exists = current.some((quote) => quote.id === result.quote.id);
+      return exists
+        ? current.map((quote) =>
+            quote.id === result.quote.id ? result.quote : quote,
+          )
+        : [result.quote, ...current];
+    });
     setDialog(null);
     setActive("quotes");
-    showToast("Quote saved as draft.");
+    showToast(draft.id ? "Draft quote updated." : "Quote saved as draft.");
   };
 
   const persistInvoice = async (draft: InvoiceDraft) => {
@@ -996,6 +1018,24 @@ export function ConsoleApp({
       const formatIso = (value: Date) =>
         new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Brisbane" }).format(value);
       setInvoiceRecords((current) => {
+        if (draft.id) {
+          return current.map((record) =>
+            record.id === draft.id
+              ? {
+                  ...record,
+                  clientId: draft.clientId,
+                  serviceAddressId: draft.propertyId,
+                  extraPropertyIds: draft.extraPropertyIds,
+                  jobId: draft.jobId,
+                  quoteId: draft.quoteId,
+                  client: client?.name || record.client,
+                  address: property?.address || record.address,
+                  notes: draft.notes,
+                  items: draft.items,
+                }
+              : record,
+          );
+        }
         const demoDocId = `INV-2026-${2000 + current.length + 1}`;
         return [
           {
@@ -1003,6 +1043,7 @@ export function ConsoleApp({
             documentNumber: demoDocId,
             clientId: draft.clientId,
             serviceAddressId: draft.propertyId,
+            extraPropertyIds: draft.extraPropertyIds,
             jobId: draft.jobId,
             quoteId: draft.quoteId,
             client: client?.name || "Client",
@@ -1022,7 +1063,7 @@ export function ConsoleApp({
       });
       setDialog(null);
       setActive("invoices");
-      showToast("Invoice saved as draft.");
+      showToast(draft.id ? "Draft invoice updated." : "Invoice saved as draft.");
       return;
     }
     if (!onSaveInvoice) {
@@ -1044,10 +1085,17 @@ export function ConsoleApp({
       setOperationMutationError(result.message);
       return;
     }
-    setInvoiceRecords((current) => [result.invoice, ...current]);
+    setInvoiceRecords((current) => {
+      const exists = current.some((record) => record.id === result.invoice.id);
+      return exists
+        ? current.map((record) =>
+            record.id === result.invoice.id ? result.invoice : record,
+          )
+        : [result.invoice, ...current];
+    });
     setDialog(null);
     setActive("invoices");
-    showToast("Invoice saved as draft.");
+    showToast(draft.id ? "Draft invoice updated." : "Invoice saved as draft.");
   };
 
   const persistScheduledJob = async (draft: {
@@ -1360,6 +1408,19 @@ export function ConsoleApp({
             invoices={invoiceRecords}
             onNew={() => setDialog({ type: "quote-form" })}
             onView={(quote) => setDialog({ type: "quote-document", quote })}
+            onEdit={(quote) =>
+              setDialog({
+                type: "quote-form",
+                prefill: {
+                  id: quote.id,
+                  jobRequestId: quote.jobRequestId || "",
+                  scope: quote.scope,
+                  items: quote.items,
+                  clientNotes: quote.clientNotes,
+                  internalNotes: quote.internalNotes || "",
+                },
+              })
+            }
             onEstimate={() => setDialog({ type: "estimator" })}
             onCreateInvoice={(quote) => setDialog({ type: "invoice-form", quote })}
             onViewInvoice={(record) => setDialog({ type: "invoice-document", record })}
@@ -1396,6 +1457,9 @@ export function ConsoleApp({
             onNew={() => setDialog({ type: "invoice-form" })}
             onView={(record) =>
               setDialog({ type: "invoice-document", record })
+            }
+            onEdit={(record) =>
+              setDialog({ type: "invoice-form", invoice: record })
             }
             onPaymentStatusChange={updateInvoicePaymentStatus}
             onFinalize={finalizeInvoice}
@@ -1708,13 +1772,18 @@ export function ConsoleApp({
       ) : null}
 
       {dialog?.type === "quote-form" ? (
-        <Dialog title="New Quote" onClose={closeDialog} wide>
+        <Dialog
+          title={dialog.prefill?.id ? "Edit Quote" : "New Quote"}
+          onClose={closeDialog}
+          wide
+        >
           <QuoteFormDialog
-            key={dialog.prefill?.jobRequestId || dialog.prefill?.scope || "new-quote"}
+            key={dialog.prefill?.id || dialog.prefill?.jobRequestId || "new-quote"}
             requests={jobRequests}
             prefill={dialog.prefill}
             onClose={closeDialog}
             onSave={persistQuote}
+            onEstimate={onEstimateJob}
             pending={operationMutationPending}
             error={operationMutationError}
           />
@@ -1723,18 +1792,26 @@ export function ConsoleApp({
 
       {dialog?.type === "invoice-form" ? (
         <Dialog
-          title={dialog.quote ? "Invoice from quote" : "New Invoice"}
+          title={
+            dialog.invoice
+              ? "Edit Invoice"
+              : dialog.quote
+                ? "Invoice from quote"
+                : "New Invoice"
+          }
           onClose={closeDialog}
           wide
         >
           <InvoiceFormDialog
-            key={dialog.quote?.id || "new-invoice"}
+            key={dialog.invoice?.id || dialog.quote?.id || "new-invoice"}
             clients={clients}
             jobs={jobs}
             prefill={
-              dialog.quote
-                ? draftInvoiceFromQuote(dialog.quote, clients, jobs)
-                : undefined
+              dialog.invoice
+                ? draftInvoiceFromRecord(dialog.invoice)
+                : dialog.quote
+                  ? draftInvoiceFromQuote(dialog.quote, clients, jobs)
+                  : undefined
             }
             sourceQuote={dialog.quote}
             onClose={closeDialog}
@@ -1834,6 +1911,22 @@ export function ConsoleApp({
                   }
                 : undefined
             }
+            onEdit={
+              dialog.quote.status === "Draft"
+                ? () =>
+                    setDialog({
+                      type: "quote-form",
+                      prefill: {
+                        id: dialog.quote.id,
+                        jobRequestId: dialog.quote.jobRequestId || "",
+                        scope: dialog.quote.scope,
+                        items: dialog.quote.items,
+                        clientNotes: dialog.quote.clientNotes,
+                        internalNotes: dialog.quote.internalNotes || "",
+                      },
+                    })
+                : undefined
+            }
           />
         </Dialog>
       ) : null}
@@ -1859,6 +1952,15 @@ export function ConsoleApp({
             onFinalize={() => void finalizeInvoice(dialog.record)}
             onMarkSent={() => void markInvoiceSentRecord(dialog.record)}
             onVoid={() => void voidIssuedInvoiceRecord(dialog.record)}
+            onEdit={
+              dialog.record.documentStatus === "Draft"
+                ? () =>
+                    setDialog({
+                      type: "invoice-form",
+                      invoice: dialog.record,
+                    })
+                : undefined
+            }
           />
         </Dialog>
       ) : null}

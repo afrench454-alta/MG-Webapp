@@ -159,8 +159,11 @@ export function ScheduleView({
       <div className="mobile-agenda">
         {visibleJobs.map((job) => (
           <button key={job.id} onClick={() => onJob(job)}>
-            <span>{job.date}</span>
-            <strong>{formatSiteTitle(job)}</strong>
+            <span>
+              {job.date}
+              {job.time ? ` · ${job.time}` : ""}
+            </span>
+            <strong>{job.client}</strong>
             <small>{job.address}</small>
           </button>
         ))}

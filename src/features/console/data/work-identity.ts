@@ -5,6 +5,8 @@ export type WorkIdentityInput = {
   address?: string | null;
   property?: string | null;
   category?: string | null;
+  date?: string | null;
+  time?: string | null;
 };
 
 const MISSING_ADDRESS = /^(no service address|no billing address|service property)$/i;
@@ -38,6 +40,12 @@ function sitePlace(input: WorkIdentityInput): string {
   );
 }
 
+function workDate(input: WorkIdentityInput): string {
+  const date = input.date?.trim();
+  if (!date || date === "Unscheduled") return "";
+  return date;
+}
+
 /**
  * The operational identity of a job: client + property.
  * Service type is a tag, not the identifier — one client can have two
@@ -49,28 +57,29 @@ export function formatSiteTitle(input: WorkIdentityInput): string {
 }
 
 /**
- * Identifies a job/request by client and property address, then service.
- * Address comes before service so two properties with the same ongoing
- * clean for one client stay distinguishable in dropdowns and calendars.
+ * Identifies a job by client, property, date, then service.
+ * Date is always in the label (not hover-only) so two visits at the same
+ * site stay distinct on phones as well as desktops.
  */
 export function formatWorkLabel(input: WorkIdentityInput): string {
   const service = input.category
     ? displayServiceCategory(input.category)
     : "";
-  return uniqueParts([formatSiteTitle(input), service]).join(" · ");
+  return uniqueParts([formatSiteTitle(input), workDate(input), service]).join(
+    " · ",
+  );
 }
 
-export function formatJobDisplayName(
-  input: WorkIdentityInput & { date?: string | null },
-): string {
-  const label = formatWorkLabel(input);
-  const date = input.date?.trim();
-  if (!date || date === "Unscheduled") return label;
-  return `${label} · ${date}`;
+export function formatJobDisplayName(input: WorkIdentityInput): string {
+  return formatWorkLabel(input);
+}
+
+export function formatWhen(input: WorkIdentityInput): string {
+  return uniqueParts([workDate(input), input.time?.trim()]).join(" · ");
 }
 
 export function formatCalendarEvent(
-  input: WorkIdentityInput & { time?: string | null },
+  input: WorkIdentityInput,
 ): { primary: string; secondary: string } {
   const place = sitePlace(input) || "Property";
   const time = input.time?.trim();

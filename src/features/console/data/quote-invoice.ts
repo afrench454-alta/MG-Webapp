@@ -46,3 +46,17 @@ export function draftInvoiceFromQuote(
     notes: `${invoiceTerms}\nQuoted as ${quoteNumber}.`,
   };
 }
+
+export function draftInvoiceFromRecord(invoice: Invoice): InvoiceDraft {
+  return {
+    id: invoice.id,
+    clientId: invoice.clientId || "",
+    propertyId: invoice.serviceAddressId || "",
+    extraPropertyIds: invoice.extraPropertyIds || [],
+    jobId: invoice.jobId || undefined,
+    quoteId: invoice.quoteId || undefined,
+    items: invoice.items.map((item) => ({ ...item })),
+    dueDays: "7",
+    notes: invoice.notes,
+  };
+}

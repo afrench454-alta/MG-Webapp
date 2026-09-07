@@ -29,9 +29,11 @@ import {
   finalizeInvoice,
   markInvoiceAsSent,
   scheduleJob,
+  updateInvoice,
   updateInvoicePayment,
   updateJob,
   updateJobAssignments,
+  updateQuote,
   updateQuoteStatus,
   uploadJobPhoto,
   voidIssuedInvoice,
@@ -60,7 +62,10 @@ export async function saveQuoteAction(input: unknown): Promise<QuoteActionResult
   const parsed = quoteDraftSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: failure(parsed.error, "Quote details are invalid.") };
   try {
-    const quote = await createQuote(await manager(), parsed.data);
+    const context = await manager();
+    const quote = parsed.data.id
+      ? await updateQuote(context, parsed.data)
+      : await createQuote(context, parsed.data);
     revalidatePath("/");
     return { ok: true, quote };
   } catch (error) {
@@ -182,7 +187,10 @@ export async function saveInvoiceAction(input: unknown): Promise<InvoiceActionRe
   const parsed = invoiceDraftSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: failure(parsed.error, "Invoice details are invalid.") };
   try {
-    const invoice = await createInvoice(await manager(), parsed.data);
+    const context = await manager();
+    const invoice = parsed.data.id
+      ? await updateInvoice(context, parsed.data)
+      : await createInvoice(context, parsed.data);
     revalidatePath("/");
     return { ok: true, invoice };
   } catch (error) {

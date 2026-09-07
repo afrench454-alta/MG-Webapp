@@ -9,6 +9,7 @@ import { Button, Field } from "../components/ui-elements";
 import { LineItemEditor, Totals } from "../components/line-item-editor";
 
 export type InvoiceDraft = {
+  id?: string;
   clientId: string;
   propertyId: string;
   extraPropertyIds?: string[];
@@ -38,6 +39,7 @@ export function InvoiceFormDialog({
   pending?: boolean;
   error?: string;
 }) {
+  const editing = Boolean(prefill?.id);
   const [clientId, setClientId] = useState(prefill?.clientId || "");
   const selectedClient = clients.find((client) => client.id === clientId);
   const [propertyId, setPropertyId] = useState(prefill?.propertyId || "");
@@ -61,6 +63,7 @@ export function InvoiceFormDialog({
     if (!clientId || !propertyId || items.some((item) => !item.description))
       return;
     void onSave({
+      id: prefill?.id,
       clientId,
       propertyId,
       extraPropertyIds: extraPropertyIds.filter((id) => id !== propertyId),
@@ -193,6 +196,7 @@ export function InvoiceFormDialog({
             min="0"
             value={dueDays}
             onChange={(event) => setDueDays(event.target.value)}
+            disabled={pending}
           />
         </Field>
         <Field label="Tax rate">
@@ -204,6 +208,7 @@ export function InvoiceFormDialog({
           rows={4}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
+          disabled={pending}
         />
       </Field>
       {error ? (
@@ -221,7 +226,7 @@ export function InvoiceFormDialog({
           Cancel
         </Button>
         <Button icon={Save} type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save Invoice"}
+          {pending ? "Saving…" : editing ? "Save changes" : "Save Invoice"}
         </Button>
       </div>
     </form>

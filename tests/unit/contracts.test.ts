@@ -7,6 +7,7 @@ import {
   invoiceDraftSchema,
   scheduleJobSchema,
 } from "../../src/features/console/data/operations-contract";
+import { joinWithPasswordSchema } from "../../src/features/console/data/team-contract";
 import { getSafeReturnPath, isAuthOnlyPath, isPublicPath } from "../../src/lib/supabase/routing";
 
 const VALID_UUID = "123e4567-e89b-12d3-a456-426614174000";
@@ -21,6 +22,7 @@ test("routing: isAuthOnlyPath correctly identifies protected auth endpoints", ()
 
 test("routing: isPublicPath correctly identifies public endpoints", () => {
   assert.equal(isPublicPath("/questionnaire/sample-token"), true);
+  assert.equal(isPublicPath("/join/invite-token-value"), true);
   assert.equal(isPublicPath("/"), false);
   assert.equal(isPublicPath("/sign-in"), false);
 });
@@ -31,6 +33,35 @@ test("routing: getSafeReturnPath prevents open redirect attacks", () => {
   assert.equal(getSafeReturnPath("javascript:alert(1)"), "/");
   assert.equal(getSafeReturnPath("/clients?status=Active"), "/clients?status=Active");
   assert.equal(getSafeReturnPath("/sign-in"), "/");
+  assert.equal(getSafeReturnPath("/join/invite-token-value"), "/join/invite-token-value");
+});
+
+test("contracts: joinWithPasswordSchema requires a matching password", () => {
+  const token = "a".repeat(32);
+  assert.equal(
+    joinWithPasswordSchema.safeParse({
+      token,
+      password: "secret123",
+      confirm: "secret123",
+    }).success,
+    true,
+  );
+  assert.equal(
+    joinWithPasswordSchema.safeParse({
+      token,
+      password: "short",
+      confirm: "short",
+    }).success,
+    false,
+  );
+  assert.equal(
+    joinWithPasswordSchema.safeParse({
+      token,
+      password: "secret123",
+      confirm: "different",
+    }).success,
+    false,
+  );
 });
 
 test("contracts: clientMutationSchema validates required fields", () => {
@@ -109,6 +140,12 @@ test("contracts: quoteDraftSchema validates quote payload", () => {
   const parsed = quoteDraftSchema.safeParse(validQuote);
   assert.equal(parsed.success, true);
 
+  const withId = quoteDraftSchema.safeParse({
+    ...validQuote,
+    id: VALID_UUID,
+  });
+  assert.equal(withId.success, true);
+
   const invalidUuid = { ...validQuote, jobRequestId: "not-a-uuid" };
   assert.equal(quoteDraftSchema.safeParse(invalidUuid).success, false);
 
@@ -135,6 +172,12 @@ test("contracts: invoiceDraftSchema validates single and multi-property invoices
     quoteId: VALID_UUID,
   });
   assert.equal(fromQuote.success, true);
+
+  const editableDraft = invoiceDraftSchema.safeParse({
+    ...validInvoice,
+    id: VALID_UUID,
+  });
+  assert.equal(editableDraft.success, true);
 });
 
 test("contracts: scheduleJobSchema validates job schedule inputs", () => {

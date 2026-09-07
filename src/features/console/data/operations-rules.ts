@@ -1,4 +1,4 @@
-import type { Invoice, Job } from "../domain";
+import type { Invoice, Job, Quote } from "../domain";
 import type { InvoiceDraftInput } from "./operations-contract";
 
 export class OperationsRuleError extends Error {
@@ -10,6 +10,10 @@ export class OperationsRuleError extends Error {
 
 const INVOICE_DELETE_BLOCKED =
   "Issued invoices cannot be deleted. Void them instead.";
+const INVOICE_EDIT_BLOCKED =
+  "Only draft invoices can be edited. Issued invoices must be voided and created again.";
+const QUOTE_EDIT_BLOCKED =
+  "Only draft quotes can be edited. Sent quotes can be voided instead.";
 const JOB_DELETE_BLOCKED =
   "This job has operational history. It must be cancelled or edited instead of deleted.";
 const VOID_PAYMENT_BLOCKED = "A voided invoice cannot have its payment status changed.";
@@ -19,6 +23,22 @@ export function assertInvoiceCanBeDeleted(
 ): void {
   if (invoice.documentStatus !== "Draft") {
     throw new OperationsRuleError(INVOICE_DELETE_BLOCKED);
+  }
+}
+
+export function assertInvoiceCanBeEdited(
+  invoice: Pick<Invoice, "documentStatus">,
+): void {
+  if (invoice.documentStatus !== "Draft") {
+    throw new OperationsRuleError(INVOICE_EDIT_BLOCKED);
+  }
+}
+
+export function assertQuoteCanBeEdited(
+  quote: Pick<Quote, "status">,
+): void {
+  if (quote.status !== "Draft") {
+    throw new OperationsRuleError(QUOTE_EDIT_BLOCKED);
   }
 }
 

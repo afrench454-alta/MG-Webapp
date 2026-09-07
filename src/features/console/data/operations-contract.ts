@@ -11,6 +11,7 @@ const lineItemSchema = z.object({
 });
 
 export const quoteDraftSchema = z.object({
+  id: z.uuid().optional(),
   jobRequestId: z.uuid(),
   scope: z.string().trim().min(1).max(20_000),
   items: z.array(lineItemSchema).min(1).max(100),
@@ -19,6 +20,7 @@ export const quoteDraftSchema = z.object({
 });
 
 export const invoiceDraftSchema = z.object({
+  id: z.uuid().optional(),
   clientId: z.uuid(),
   propertyId: z.uuid(),
   extraPropertyIds: z.array(z.uuid()).max(20).optional(),
