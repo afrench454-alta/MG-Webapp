@@ -9,6 +9,7 @@ import { listJobRequests } from "@/features/console/data/job-request-repository"
 import { deleteInvoiceAction, deleteJobAction, deleteJobPhotoAction, deleteQuoteAction, finalizeInvoiceAction, markInvoiceSentAction, saveInvoiceAction, saveQuoteAction, scheduleJobAction, updateInvoicePaymentAction, updateJobAction, updateJobAssignmentsAction, updateQuoteStatusAction, uploadJobPhotoAction, voidInvoiceAction } from "@/features/console/data/operations-actions";
 import { listInvoices, listJobs, listQuotes } from "@/features/console/data/operations-repository";
 import { estimateJobAction } from "@/features/console/data/estimator-actions";
+import { askJosephAction } from "@/features/console/data/joseph-actions";
 import { sendQuestionnaireAction } from "@/features/console/data/questionnaire-actions";
 import { listQuestionnaires, listQuestionnaireSubmissions } from "@/features/console/data/questionnaire-repository";
 import {
@@ -87,6 +88,7 @@ export default async function Home() {
       onDeleteInvoice={deleteInvoiceAction}
       onSendQuestionnaire={sendQuestionnaireAction}
       onEstimateJob={estimateJobAction}
+      onAskJoseph={askJosephAction}
       onInviteTeamMember={inviteTeamMemberAction}
       onRevokeTeamInvite={revokeTeamInviteAction}
       onUpdateTeamMember={updateTeamMemberAction}
