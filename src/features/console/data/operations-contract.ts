@@ -60,7 +60,9 @@ export type JobAssignmentsInput = z.infer<typeof jobAssignmentsSchema>;
 
 type ActionFailure = Readonly<{ ok: false; message: string }>;
 export type QuoteActionResult = Readonly<{ ok: true; quote: Quote }> | ActionFailure;
-export type JobActionResult = Readonly<{ ok: true; job: Job }> | ActionFailure;
+export type JobActionResult =
+  | Readonly<{ ok: true; job: Job; nextJob?: Job }>
+  | ActionFailure;
 export type InvoiceActionResult = Readonly<{ ok: true; invoice: Invoice }> | ActionFailure;
 export type DeleteActionResult = Readonly<{ ok: true; id: string }> | ActionFailure;
 export type JobPhotoActionResult = Readonly<{ ok: true; photo: JobPhoto }> | ActionFailure;

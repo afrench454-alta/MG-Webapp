@@ -115,9 +115,9 @@ export async function updateJobAction(input: unknown): Promise<JobActionResult> 
   const parsed = jobUpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: failure(parsed.error, "Job details are invalid.") };
   try {
-    const job = await updateJob(await requireBusinessContext(), parsed.data);
+    const { job, nextJob } = await updateJob(await requireBusinessContext(), parsed.data);
     revalidatePath("/");
-    return { ok: true, job };
+    return { ok: true, job, nextJob };
   } catch (error) {
     return { ok: false, message: failure(error, "The job could not be updated.") };
   }

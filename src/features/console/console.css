@@ -2591,6 +2591,75 @@ textarea {
   font-weight: 600;
 }
 
+.joseph-view {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+}
+
+.joseph-thread {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 280px;
+  max-height: min(58vh, 560px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.joseph-empty,
+.joseph-pending {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.joseph-bubble {
+  max-width: min(72ch, 92%);
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.joseph-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.joseph-bubble--user {
+  justify-self: end;
+  color: #fff;
+  background: var(--brand);
+}
+
+.joseph-bubble--assistant {
+  justify-self: start;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+}
+
+.joseph-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.joseph-composer textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 13px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 10px;
+  background: #fff;
+  resize: vertical;
+}
+
 .mobile-scrim {
   display: none;
 }

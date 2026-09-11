@@ -303,7 +303,7 @@ export async function executeJosephTool(
       const jobs = await listJobs(context, parsed.jobId);
       const job = jobs[0];
       if (!job) throw new Error("Job not found.");
-      const updated = await updateJob(context, {
+      const { job: updated } = await updateJob(context, {
         id: job.id,
         status: parsed.status as JobStatus,
         notes: parsed.notes ?? job.notes,
@@ -383,7 +383,7 @@ export async function executeJosephTool(
           }),
         };
       }
-      const updated = await updateJob(context, {
+      const { job: updated } = await updateJob(context, {
         id: job.id,
         status: "completed",
         notes: job.notes,

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --test tests/unit/domain.test.ts tests/unit/contracts.test.ts tests/unit/brand.test.ts tests/unit/operations-rules.test.ts tests/unit/operations-map.test.ts tests/unit/invoice-lifecycle.test.ts tests/unit/list-filters.test.ts tests/unit/quote-invoice.test.ts tests/unit/service-catalog.test.ts tests/unit/work-identity.test.ts tests/unit/estimator-contract.test.ts tests/unit/estimator-providers.test.ts tests/unit/schedule-planning.test.ts tests/unit/joseph-tools.test.ts",
+    "test:unit": "tsx --test tests/unit/domain.test.ts tests/unit/contracts.test.ts tests/unit/brand.test.ts tests/unit/operations-rules.test.ts tests/unit/operations-map.test.ts tests/unit/invoice-lifecycle.test.ts tests/unit/list-filters.test.ts tests/unit/quote-invoice.test.ts tests/unit/service-catalog.test.ts tests/unit/work-identity.test.ts tests/unit/estimator-contract.test.ts tests/unit/estimator-providers.test.ts tests/unit/schedule-planning.test.ts tests/unit/joseph-tools.test.ts tests/unit/job-recurrence.test.ts",
     "test": "npm run test:unit",
     "check:migrations": "node scripts/verify-migrations.mjs",
     "check": "npm run lint && npm run typecheck && npm run test:unit && npm run check:migrations",

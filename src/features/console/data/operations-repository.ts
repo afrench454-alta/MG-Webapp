@@ -9,6 +9,11 @@ import { createClient } from "@/lib/supabase/server";
 import type { Invoice, Job, JobPhoto, Quote, TeamMember } from "../domain";
 import type { InvoiceDraftInput, JobAssignmentsInput, JobUpdateInput, QuoteDraftInput, ScheduleJobInput } from "./operations-contract";
 import {
+  isRepeatingRecurrence,
+  nextScheduledIso,
+  recurrenceToDb,
+} from "./job-recurrence";
+import {
   mapInvoiceDocumentStatus,
   mapInvoicePaymentStatus,
   mapJobStatus,
@@ -219,8 +224,264 @@ export async function updateQuote(context: BusinessContext, input: QuoteDraftInp
 export async function updateQuoteStatus(context: BusinessContext, id: string, status: Quote["status"]): Promise<Quote> { const dbStatus = status === "Accepted" ? "approved" : status === "Declined" ? "declined" : status.toLowerCase(); const supabase = await createClient(); const { error } = await supabase.from("quotes").update({ status: dbStatus }).eq("business_id", context.businessId).eq("id", id); if (error) throw new Error(error.message); return getQuote(context, id); }
 export async function deleteQuote(context: BusinessContext, id: string): Promise<string> { const supabase = await createClient(); const { data, error } = await supabase.from("quotes").delete().eq("business_id", context.businessId).eq("id", id).select("id").single(); if (error) throw new Error(error.message); return z.object({ id: z.uuid() }).parse(data).id; }
 
-export async function scheduleJob(context: BusinessContext, input: ScheduleJobInput): Promise<Job> { const target = await getRequestTarget(context, input.jobRequestId); const start = new Date(input.scheduledStart); const end = new Date(start.getTime() + 60 * 60 * 1000); const supabase = await createClient(); const { data, error } = await supabase.from("jobs").insert({ business_id: context.businessId, client_id: target.client_id, service_address_id: target.service_address_id, job_request_id: target.id, status: "scheduled", title: target.title, scope_of_work: target.description, scheduled_start: start.toISOString(), scheduled_end: end.toISOString(), created_by: context.actorId }).select("id").single(); if (error) throw new Error(error.message); const jobId = z.object({ id: z.uuid() }).parse(data).id; if (input.profileIds?.length) { return updateJobAssignments(context, { jobId, profileIds: input.profileIds }); } return getJob(context, jobId); }
-export async function updateJob(context: BusinessContext, input: JobUpdateInput): Promise<Job> { await assertTechnicianAssigned(context, input.id); const supabase = await createClient(); const dbStatus = input.status === "in-progress" ? "in_progress" : input.status === "on-hold" ? "paused" : input.status; const { data: row, error } = await supabase.from("jobs").update({ status: dbStatus, internal_instructions: input.notes || null }).eq("business_id", context.businessId).eq("id", input.id).select("scheduled_start").single(); if (error) throw new Error(error.message); if (context.role !== "technician") { if (input.recurrence === "One-off") { await supabase.from("job_recurrences").delete().eq("business_id", context.businessId).eq("job_id", input.id); } else { const frequency = input.recurrence === "Monthly" ? "monthly" : "weekly"; const interval = input.recurrence === "Fortnightly" ? 2 : input.recurrence === "Four-weekly" ? 4 : 1; const startDate = z.object({ scheduled_start: z.string().nullable() }).parse(row).scheduled_start?.slice(0, 10) || new Date().toISOString().slice(0, 10); const { error: recurrenceError } = await supabase.from("job_recurrences").upsert({ job_id: input.id, business_id: context.businessId, frequency, interval_count: interval, starts_on: startDate }, { onConflict: "job_id" }); if (recurrenceError) throw new Error(recurrenceError.message); } } return getJob(context, input.id); }
+export async function scheduleJob(context: BusinessContext, input: ScheduleJobInput): Promise<Job> {
+  const target = await getRequestTarget(context, input.jobRequestId);
+  const start = new Date(input.scheduledStart);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("jobs")
+    .insert({
+      business_id: context.businessId,
+      client_id: target.client_id,
+      service_address_id: target.service_address_id,
+      job_request_id: target.id,
+      status: "scheduled",
+      title: target.title,
+      scope_of_work: target.description,
+      scheduled_start: start.toISOString(),
+      scheduled_end: end.toISOString(),
+      created_by: context.actorId,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  const jobId = z.object({ id: z.uuid() }).parse(data).id;
+  if (input.profileIds?.length) {
+    return updateJobAssignments(context, { jobId, profileIds: input.profileIds });
+  }
+  return getJob(context, jobId);
+}
+
+async function findChildOccurrence(context: BusinessContext, parentJobId: string): Promise<Job | undefined> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("id")
+    .eq("business_id", context.businessId)
+    .eq("recurrence_parent_job_id", parentJobId)
+    .order("scheduled_start", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return undefined;
+  const id = z.object({ id: z.uuid() }).parse(data).id;
+  return getJob(context, id);
+}
+
+async function spawnNextRecurringJob(
+  context: BusinessContext,
+  jobId: string,
+): Promise<Job | undefined> {
+  const existing = await findChildOccurrence(context, jobId);
+  if (existing) return existing;
+
+  const supabase = await createClient();
+  const { data: rpcId, error: rpcError } = await supabase.rpc("spawn_next_recurring_job", {
+    p_job_id: jobId,
+  });
+  if (rpcError) {
+    const missing = /could not find the function|schema cache|does not exist/i.test(
+      rpcError.message,
+    );
+    if (!missing) throw new Error(rpcError.message);
+  } else {
+    const spawnedId = z.uuid().nullable().optional().parse(rpcId);
+    if (spawnedId) return getJob(context, spawnedId);
+    return findChildOccurrence(context, jobId);
+  }
+
+  if (context.role === "technician") return undefined;
+
+  const { data: row, error: loadError } = await supabase
+    .from("jobs")
+    .select(
+      "id, client_id, client_contact_id, service_address_id, job_request_id, title, scope_of_work, internal_instructions, scheduled_start, scheduled_end, schedule_timezone, created_by, status",
+    )
+    .eq("business_id", context.businessId)
+    .eq("id", jobId)
+    .single();
+  if (loadError) throw new Error(loadError.message);
+  const job = z
+    .object({
+      id: z.uuid(),
+      client_id: z.uuid(),
+      client_contact_id: z.uuid().nullable(),
+      service_address_id: z.uuid().nullable(),
+      job_request_id: z.uuid().nullable(),
+      title: z.string(),
+      scope_of_work: z.string().nullable(),
+      internal_instructions: z.string().nullable(),
+      scheduled_start: z.string().nullable(),
+      scheduled_end: z.string().nullable(),
+      schedule_timezone: z.string().nullable(),
+      created_by: z.uuid().nullable(),
+      status: z.string(),
+    })
+    .parse(row);
+  if (job.status !== "completed" || !job.scheduled_start) return undefined;
+
+  const { data: recRow, error: recError } = await supabase
+    .from("job_recurrences")
+    .select("frequency, interval_count, by_weekday, by_month_day, custom_rrule, ends_on, max_occurrences")
+    .eq("business_id", context.businessId)
+    .eq("job_id", jobId)
+    .maybeSingle();
+  if (recError) throw new Error(recError.message);
+  if (!recRow) return undefined;
+  const rec = z
+    .object({
+      frequency: z.enum(["daily", "weekly", "monthly", "yearly", "custom"]),
+      interval_count: z.number(),
+      by_weekday: z.array(z.number()).nullable().optional(),
+      by_month_day: z.number().nullable().optional(),
+      custom_rrule: z.string().nullable().optional(),
+      ends_on: z.string().nullable().optional(),
+      max_occurrences: z.number().nullable().optional(),
+    })
+    .parse(recRow);
+
+  const label =
+    rec.frequency === "monthly"
+      ? "Monthly"
+      : rec.interval_count === 2
+        ? "Fortnightly"
+        : rec.interval_count === 4
+          ? "Four-weekly"
+          : "Weekly";
+  const nextStart = nextScheduledIso(job.scheduled_start, label);
+  if (!nextStart) return undefined;
+  const durationMs = job.scheduled_end
+    ? Math.max(new Date(job.scheduled_end).getTime() - new Date(job.scheduled_start).getTime(), 60 * 60 * 1000)
+    : 60 * 60 * 1000;
+  const nextEnd = new Date(new Date(nextStart).getTime() + durationMs).toISOString();
+  const nextDate = nextStart.slice(0, 10);
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("jobs")
+    .insert({
+      business_id: context.businessId,
+      client_id: job.client_id,
+      client_contact_id: job.client_contact_id,
+      service_address_id: job.service_address_id,
+      job_request_id: job.job_request_id,
+      recurrence_parent_job_id: job.id,
+      recurrence_instance_date: nextDate,
+      status: "scheduled",
+      title: job.title,
+      scope_of_work: job.scope_of_work,
+      internal_instructions: job.internal_instructions,
+      scheduled_start: nextStart,
+      scheduled_end: nextEnd,
+      schedule_timezone: job.schedule_timezone || "Australia/Brisbane",
+      created_by: job.created_by || context.actorId,
+    })
+    .select("id")
+    .single();
+  if (insertError) {
+    if (/duplicate|unique/i.test(insertError.message)) {
+      return findChildOccurrence(context, jobId);
+    }
+    throw new Error(insertError.message);
+  }
+  const nextId = z.object({ id: z.uuid() }).parse(inserted).id;
+  const { data: assignments, error: assignmentError } = await supabase
+    .from("job_assignments")
+    .select("profile_id, is_lead, assigned_by")
+    .eq("business_id", context.businessId)
+    .eq("job_id", jobId);
+  if (assignmentError) throw new Error(assignmentError.message);
+  const copied = z
+    .array(
+      z.object({
+        profile_id: z.uuid(),
+        is_lead: z.boolean(),
+        assigned_by: z.uuid().nullable().optional(),
+      }),
+    )
+    .parse(assignments || []);
+  if (copied.length) {
+    const { error: copyError } = await supabase.from("job_assignments").insert(
+      copied.map((assignment) => ({
+        business_id: context.businessId,
+        job_id: nextId,
+        profile_id: assignment.profile_id,
+        is_lead: assignment.is_lead,
+        assigned_by: assignment.assigned_by || context.actorId,
+      })),
+    );
+    if (copyError) throw new Error(copyError.message);
+  }
+  const mapped = recurrenceToDb(label);
+  const { error: nextRecError } = await supabase.from("job_recurrences").upsert(
+    {
+      job_id: nextId,
+      business_id: context.businessId,
+      frequency: mapped.frequency,
+      interval_count: mapped.intervalCount,
+      starts_on: nextDate,
+      ends_on: rec.ends_on || null,
+      max_occurrences: rec.max_occurrences || null,
+    },
+    { onConflict: "job_id" },
+  );
+  if (nextRecError) throw new Error(nextRecError.message);
+  return getJob(context, nextId);
+}
+
+export async function updateJob(
+  context: BusinessContext,
+  input: JobUpdateInput,
+): Promise<{ job: Job; nextJob?: Job }> {
+  await assertTechnicianAssigned(context, input.id);
+  const supabase = await createClient();
+  const dbStatus =
+    input.status === "in-progress"
+      ? "in_progress"
+      : input.status === "on-hold"
+        ? "paused"
+        : input.status;
+  const { data: row, error } = await supabase
+    .from("jobs")
+    .update({ status: dbStatus, internal_instructions: input.notes || null })
+    .eq("business_id", context.businessId)
+    .eq("id", input.id)
+    .select("scheduled_start")
+    .single();
+  if (error) throw new Error(error.message);
+  if (context.role !== "technician") {
+    if (input.recurrence === "One-off") {
+      await supabase
+        .from("job_recurrences")
+        .delete()
+        .eq("business_id", context.businessId)
+        .eq("job_id", input.id);
+    } else {
+      const mapped = recurrenceToDb(input.recurrence);
+      const startDate =
+        z.object({ scheduled_start: z.string().nullable() }).parse(row).scheduled_start?.slice(0, 10) ||
+        new Date().toISOString().slice(0, 10);
+      const { error: recurrenceError } = await supabase.from("job_recurrences").upsert(
+        {
+          job_id: input.id,
+          business_id: context.businessId,
+          frequency: mapped.frequency,
+          interval_count: mapped.intervalCount,
+          starts_on: startDate,
+        },
+        { onConflict: "job_id" },
+      );
+      if (recurrenceError) throw new Error(recurrenceError.message);
+    }
+  }
+  const job = await getJob(context, input.id);
+  if (job.status !== "completed" || !isRepeatingRecurrence(job.recurrence || input.recurrence)) {
+    return { job };
+  }
+  const nextJob = await spawnNextRecurringJob(context, input.id);
+  return { job, nextJob };
+}
+
 export async function deleteJob(context: BusinessContext, id: string): Promise<string> {
   const job = await getJob(context, id);
   assertJobCanBeDeleted(job);

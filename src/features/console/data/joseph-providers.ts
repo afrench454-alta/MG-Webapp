@@ -134,7 +134,9 @@ export function parseToolArguments(raw: string): Record<string, unknown> {
   }
 }
 
-export function resolveJosephConfig(env: NodeJS.ProcessEnv = process.env): {
+export function resolveJosephConfig(
+  env: Record<string, string | undefined> = process.env,
+): {
   apiKey: string;
   model: string;
 } | null {
