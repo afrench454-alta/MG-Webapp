@@ -9,6 +9,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   ReceiptText,
   Settings,
   Sparkles,
@@ -23,6 +24,7 @@ import { InstallAppButton } from "./install-app";
 
 export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "joseph", label: "Joseph", icon: MessageCircle },
   { id: "clients", label: "Clients", icon: Users },
   { id: "requests", label: "Job Requests", icon: ClipboardList },
   { id: "questionnaires", label: "Intake forms", icon: FileText },
@@ -35,6 +37,7 @@ export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon
 
 const fieldRoutes: ConsoleRoute[] = [
   "dashboard",
+  "joseph",
   "requests",
   "schedule",
   "jobs",
