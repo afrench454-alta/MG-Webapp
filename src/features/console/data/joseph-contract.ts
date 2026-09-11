@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const JOSEPH_WAKE_NAME = "Joseph";
+
 export const josephRoleSchema = z.enum(["user", "assistant"]);
 
 export const josephMessageSchema = z.object({
@@ -19,3 +21,10 @@ export type AskJosephResult =
   | Readonly<{ ok: false; message: string }>;
 
 export type AskJosephAction = (input: AskJosephRequest) => Promise<AskJosephResult>;
+
+export function stripJosephWake(raw: string): string {
+  return raw
+    .replace(/^\s*(hey|ok|okay|hi|g'?day)?\s*joseph[,:\-.]?\s+/i, "")
+    .replace(/^\s*joseph[,:\-.]?\s*/i, "")
+    .trim();
+}
