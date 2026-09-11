@@ -224,3 +224,57 @@ export type JobRequestDraft = {
   scope: string;
   questionnaireResponseId?: string;
 };
+
+export const clientsSeed: Client[] = [];
+export const questionnaires: Questionnaire[] = [];
+export const questionnaireSubmissionsSeed: QuestionnaireSubmission[] = [];
+export const teamMembersSeed: TeamMember[] = [
+  { id: "member-1", name: "Jodie", email: "team@mowglowpropertyservices.com.au", role: "Owner", isActive: true },
+  { id: "member-2", name: "Ashton", email: "ashtonfrench454@gmail.com", role: "Co-owner", isActive: true },
+];
+export const initialJobRequests: JobRequest[] = [];
+export const initialJobs: Job[] = [];
+export const initialQuotes: Quote[] = [];
+export const invoiceSeed: Invoice = {
+  id: "INV-2026-2001",
+  clientId: "client-1",
+  serviceAddressId: "client-1-property-1",
+  client: "Harper & Co",
+  address: "1 Paperbark Street, Toowoomba",
+  issued: "04 Aug 2026",
+  due: "18 Aug 2026",
+  dueDate: "2026-08-18",
+  documentStatus: "Draft",
+  paymentStatus: "Unpaid",
+  scope: ["Deep clean 3BR", "Window cleaning"],
+  notes: "Invoices are due upon completion with a 7-day grace period.",
+  discount: 0,
+  taxRate: 0,
+  items: [
+    { description: "Deep clean 3BR", quantity: 1, rate: 250 },
+    { description: "Windows", quantity: 2, rate: 40 },
+  ],
+};
+
+export const statusColumns: Array<{ id: JobStatus; label: string }> = [
+  { id: "unscheduled", label: "Unscheduled" },
+  { id: "scheduled", label: "Scheduled" },
+  { id: "in-progress", label: "In Progress" },
+  { id: "on-hold", label: "On Hold" },
+  { id: "completed", label: "Completed" },
+  { id: "cancelled", label: "Cancelled" },
+];
+
+export function money(value: number): string {
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(value);
+}
+
+export function quoteTotals(items: LineItem[], discount = 0, taxRate = 0) {
+  const subtotal = items.reduce(
+    (sum, item) => sum + Number(item.quantity || 0) * Number(item.rate || 0),
+    0,
+  );
+  const discountedSubtotal = Math.max(0, subtotal - Math.max(0, discount));
+  const tax = discountedSubtotal * Math.max(0, taxRate);
+  return { subtotal, discount: Math.max(0, discount), taxRate: Math.max(0, taxRate), tax, total: discountedSubtotal + tax };
+}
