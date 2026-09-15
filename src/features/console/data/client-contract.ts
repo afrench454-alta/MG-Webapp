@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Client } from "../domain";
+import type { ClientImportPlan } from "./client-import";
 
 const propertySchema = z.object({
   id: z.uuid().optional(),
@@ -40,3 +41,28 @@ export type SaveClientAction = (
 export type ArchiveClientAction = (
   clientId: string,
 ) => Promise<ClientArchiveResult>;
+
+export const clientImportTextSchema = z.object({
+  jsonText: z.string().trim().min(2).max(400_000),
+});
+
+export type ClientImportPreviewResult =
+  | Readonly<{ ok: true; plan: ClientImportPlan }>
+  | Readonly<{ ok: false; message: string }>;
+
+export type ClientImportCommitResult =
+  | Readonly<{
+      ok: true;
+      created: Client[];
+      skipped: number;
+      failed: Array<{ name: string; message: string }>;
+    }>
+  | Readonly<{ ok: false; message: string }>;
+
+export type PreviewClientImportAction = (
+  input: { jsonText: string },
+) => Promise<ClientImportPreviewResult>;
+
+export type CommitClientImportAction = (
+  input: { jsonText: string },
+) => Promise<ClientImportCommitResult>;

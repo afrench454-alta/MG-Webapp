@@ -34,6 +34,8 @@ import type {
 } from "./domain";
 import type {
   ArchiveClientAction,
+  CommitClientImportAction,
+  PreviewClientImportAction,
   SaveClientAction,
 } from "./data/client-contract";
 import type {
@@ -61,6 +63,7 @@ import type { SendQuestionnaireAction } from "./data/questionnaire-contract";
 import type { EstimateJobAction } from "./data/estimator-contract";
 import type { AskJosephAction } from "./data/joseph-contract";
 import { asJobRecurrence, buildNextDemoJob, clearJobSchedule, applyJobSchedule, describeJobUpdate, scheduledStartPayload, formatBrisbaneSchedule } from "./data/job-recurrence";
+import { parseClientImportText, planClientImport } from "./data/client-import";
 import type {
   InviteTeamAction,
   RevokeTeamInviteAction,
@@ -155,6 +158,8 @@ export type ConsoleAppProps = {
   canManageRequests?: boolean;
   onSaveClient?: SaveClientAction;
   onArchiveClient?: ArchiveClientAction;
+  onPreviewClientImport?: PreviewClientImportAction;
+  onCommitClientImport?: CommitClientImportAction;
   onSaveJobRequest?: SaveJobRequestAction;
   onDeleteJobRequest?: DeleteJobRequestAction;
   onSaveQuote?: SaveQuoteAction;
@@ -201,6 +206,8 @@ export function ConsoleApp({
   canManageRequests = true,
   onSaveClient,
   onArchiveClient,
+  onPreviewClientImport,
+  onCommitClientImport,
   onSaveJobRequest,
   onDeleteJobRequest,
   onSaveQuote,
@@ -1624,6 +1631,50 @@ export function ConsoleApp({
                 ),
               );
               return { ok: true, member: updated };
+            }}
+            onPreviewClientImport={async (input) => {
+              if (onPreviewClientImport) return onPreviewClientImport(input);
+              const extracted = parseClientImportText(input.jsonText);
+              if (!extracted.ok) return extracted;
+              return { ok: true, plan: planClientImport(extracted.records, clients) };
+            }}
+            onCommitClientImport={async (input) => {
+              if (onCommitClientImport) {
+                const imported = await onCommitClientImport(input);
+                if (imported.ok && imported.created.length) {
+                  setClients((current) => [...imported.created, ...current]);
+                  showToast(
+                    `Imported ${imported.created.length} client${imported.created.length === 1 ? "" : "s"}.`,
+                  );
+                }
+                return imported;
+              }
+              const extracted = parseClientImportText(input.jsonText);
+              if (!extracted.ok) return extracted;
+              const plan = planClientImport(extracted.records, clients);
+              const created = plan.rows.flatMap((row) => {
+                if (row.decision !== "create" || !row.payload) return [];
+                const payload = row.payload;
+                return [
+                  {
+                    id: `client-${Date.now()}-${row.index}`,
+                    name: payload.name,
+                    status: payload.status,
+                    phone: payload.phone,
+                    email: payload.email,
+                    preferred: payload.preferred,
+                    properties: payload.properties,
+                    notes: payload.notes,
+                  },
+                ];
+              });
+              if (created.length) {
+                setClients((current) => [...created, ...current]);
+                showToast(
+                  `Imported ${created.length} client${created.length === 1 ? "" : "s"}.`,
+                );
+              }
+              return { ok: true, created, skipped: plan.skipCount, failed: [] };
             }}
           />
         );

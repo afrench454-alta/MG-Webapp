@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { signOutAction } from "@/app/actions/auth";
 import { ConsoleApp } from "@/features/console/console-app";
-import { archiveClientAction, saveClientAction } from "@/features/console/data/client-actions";
+import { archiveClientAction, commitClientImportAction, previewClientImportAction, saveClientAction } from "@/features/console/data/client-actions";
 import { listClients } from "@/features/console/data/client-repository";
 import { deleteJobRequestAction, saveJobRequestAction } from "@/features/console/data/job-request-actions";
 import { listJobRequests } from "@/features/console/data/job-request-repository";
@@ -69,6 +69,8 @@ export default async function Home() {
       canManageRequests={context.role !== "technician"}
       onSaveClient={saveClientAction}
       onArchiveClient={archiveClientAction}
+      onPreviewClientImport={previewClientImportAction}
+      onCommitClientImport={commitClientImportAction}
       onSaveJobRequest={saveJobRequestAction}
       onDeleteJobRequest={deleteJobRequestAction}
       onSaveQuote={saveQuoteAction}

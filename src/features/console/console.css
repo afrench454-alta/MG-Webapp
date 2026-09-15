@@ -3440,6 +3440,98 @@ html[data-theme="dark"] .document-view {
   gap: 22px;
 }
 
+.client-import-panel {
+  margin-top: 22px;
+}
+
+.client-import-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0 16px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--panel-soft);
+}
+
+.client-import-drop div {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 180px;
+}
+
+.client-import-drop span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.client-import-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.client-import-table-wrap {
+  overflow-x: auto;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.client-import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.client-import-table th,
+.client-import-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.client-import-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.client-import-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.client-import-tag--create {
+  background: color-mix(in srgb, var(--forest, #3f6b4b) 16%, white);
+  color: var(--ink);
+}
+
+.client-import-tag--skip {
+  background: var(--panel-soft);
+  color: var(--muted);
+}
+
+.client-import-tag--invalid {
+  background: color-mix(in srgb, #b42318 12%, white);
+  color: #8a1f16;
+}
+
 .team-list,
 .invite-list {
   display: grid;

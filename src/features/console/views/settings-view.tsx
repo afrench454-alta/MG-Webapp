@@ -9,6 +9,10 @@ import type {
   UpdateBusinessProfileAction,
   UpdateTeamMemberAction,
 } from "../data/team-contract";
+import type {
+  CommitClientImportAction,
+  PreviewClientImportAction,
+} from "../data/client-contract";
 import {
   Badge,
   Button,
@@ -16,6 +20,7 @@ import {
   Field,
   PageHeader,
 } from "../components/ui-elements";
+import { ClientImportPanel } from "./client-import-panel";
 
 export function SettingsView({
   profile,
@@ -27,6 +32,8 @@ export function SettingsView({
   onInvite,
   onRevoke,
   onUpdateMember,
+  onPreviewClientImport,
+  onCommitClientImport,
 }: {
   profile: BusinessProfile;
   teamMembers: TeamMember[];
@@ -37,6 +44,8 @@ export function SettingsView({
   onInvite?: InviteTeamAction;
   onRevoke?: RevokeTeamInviteAction;
   onUpdateMember?: UpdateTeamMemberAction;
+  onPreviewClientImport?: PreviewClientImportAction;
+  onCommitClientImport?: CommitClientImportAction;
 }) {
   const [details, setDetails] = useState(profile);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -411,6 +420,13 @@ export function SettingsView({
           ) : null}
         </article>
       </section>
+      {onPreviewClientImport && onCommitClientImport ? (
+        <ClientImportPanel
+          canManage={canManage}
+          onPreview={onPreviewClientImport}
+          onCommit={onCommitClientImport}
+        />
+      ) : null}
       {error ? (
         <p className="form-error" role="alert">
           {error}
