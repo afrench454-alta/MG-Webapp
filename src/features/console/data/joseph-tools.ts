@@ -1,11 +1,19 @@
 import { z } from "zod";
 
 import type { BusinessContext } from "@/lib/supabase/business";
-import { invoiceTerms, money, quoteTotals, type JobStatus } from "../domain";
+import { invoiceTerms, money, quoteTotals, type Job, type JobStatus } from "../domain";
 import { listClients } from "./client-repository";
 import { invoiceDisplayStatus } from "./invoice-lifecycle";
 import { isLiveInvoice } from "./list-filters";
 import { draftEstimateFromProvider } from "./estimator-providers";
+import {
+  brisbaneToday,
+  formatJosephSnapshot,
+  jobOnIsoDate,
+  lastAcceptedQuoteBrief,
+  pendingWrite,
+  type JosephToolResult,
+} from "./joseph-ops";
 import {
   createInvoice,
   createQuote,
@@ -21,6 +29,11 @@ import { parseToolArguments } from "./joseph-providers";
 const confirmSchema = z.object({
   confirm: z.boolean().optional(),
 });
+
+const isoDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
 const jobStatusSchema = z.enum([
   "unscheduled",
@@ -59,6 +72,36 @@ function jobRecurrence(value: string): JobRecurrence {
   return recurrenceValues.find((item) => item === value) ?? "One-off";
 }
 
+export type { JosephToolResult } from "./joseph-ops";
+export { josephSystemPrompt } from "./joseph-ops";
+
+function jobsVisibleTo(context: BusinessContext, jobs: Job[]): Job[] {
+  if (context.role === "technician") {
+    return jobs.filter((job) => job.assigneeIds.includes(context.actorId));
+  }
+  return jobs;
+}
+
+export async function buildJosephSnapshot(context: BusinessContext): Promise<string> {
+  const today = brisbaneToday();
+  const jobs = jobsVisibleTo(context, await listJobs(context)).filter(
+    (job) => jobOnIsoDate(job, today) && job.status !== "cancelled",
+  );
+  let overdueCount: number | null = null;
+  if (canManage(context)) {
+    const invoices = await listInvoices(context);
+    overdueCount = invoices.filter((invoice) => {
+      if (!isLiveInvoice(invoice)) return false;
+      return invoiceDisplayStatus(invoice) === "Overdue";
+    }).length;
+  }
+  return formatJosephSnapshot({
+    today,
+    jobs: jobs.slice(0, 12),
+    overdueCount,
+  });
+}
+
 export const JOSEPH_TOOL_DEFINITIONS: OpenRouterTool[] = [
   {
     type: "function",
@@ -76,11 +119,12 @@ export const JOSEPH_TOOL_DEFINITIONS: OpenRouterTool[] = [
     type: "function",
     function: {
       name: "list_jobs",
-      description: "List jobs, optionally filtered by client text or status.",
+      description: "List jobs, optionally filtered by client text, status, or calendar date (YYYY-MM-DD, Australia/Brisbane).",
       parameters: {
         type: "object",
         properties: {
           query: { type: "string" },
+          date: { type: "string", description: "YYYY-MM-DD in Australia/Brisbane" },
           status: {
             type: "string",
             enum: [
@@ -94,6 +138,15 @@ export const JOSEPH_TOOL_DEFINITIONS: OpenRouterTool[] = [
           },
         },
       },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "today_board",
+      description:
+        "Read-only run sheet for today (Australia/Brisbane): today's jobs for this user, plus overdue invoice count for owners.",
+      parameters: { type: "object", properties: {} },
     },
   },
   {
@@ -212,11 +265,25 @@ export const JOSEPH_TOOL_DEFINITIONS: OpenRouterTool[] = [
   },
 ];
 
+function serializeJobs(jobs: Job[]) {
+  return jobs.slice(0, 12).map((job) => ({
+    id: job.id,
+    client: job.client,
+    address: job.address,
+    status: job.status,
+    date: job.date,
+    time: job.time,
+    category: job.category,
+    scope: job.scope,
+    notes: job.notes,
+  }));
+}
+
 export async function executeJosephTool(
   context: BusinessContext,
   name: string,
   rawArgs: string,
-): Promise<{ text: string; action?: string }> {
+): Promise<JosephToolResult> {
   const args = parseToolArguments(rawArgs);
   switch (name) {
     case "search_clients": {
@@ -253,13 +320,11 @@ export async function executeJosephTool(
     case "list_jobs": {
       const query = z.string().trim().max(200).optional().parse(args.query);
       const status = jobStatusSchema.optional().parse(args.status);
-      const jobs = await listJobs(context);
-      const visible =
-        context.role === "technician"
-          ? jobs.filter((job) => job.assigneeIds.includes(context.actorId))
-          : jobs;
-      const matches = visible.filter((job) => {
+      const date = isoDateSchema.optional().parse(args.date);
+      const jobs = jobsVisibleTo(context, await listJobs(context));
+      const matches = jobs.filter((job) => {
         if (status && job.status !== status) return false;
+        if (date && !jobOnIsoDate(job, date)) return false;
         if (!query) return true;
         return (
           includesQuery(job.client, query) ||
@@ -268,20 +333,28 @@ export async function executeJosephTool(
           includesQuery(job.category, query)
         );
       });
+      return { text: JSON.stringify(serializeJobs(matches)) };
+    }
+    case "today_board": {
+      const today = brisbaneToday();
+      const jobs = jobsVisibleTo(context, await listJobs(context)).filter(
+        (job) => jobOnIsoDate(job, today) && job.status !== "cancelled",
+      );
+      let overdueCount: number | null = null;
+      if (canManage(context)) {
+        const invoices = await listInvoices(context);
+        overdueCount = invoices.filter((invoice) => {
+          if (!isLiveInvoice(invoice)) return false;
+          return invoiceDisplayStatus(invoice) === "Overdue";
+        }).length;
+      }
       return {
-        text: JSON.stringify(
-          matches.slice(0, 12).map((job) => ({
-            id: job.id,
-            client: job.client,
-            address: job.address,
-            status: job.status,
-            date: job.date,
-            time: job.time,
-            category: job.category,
-            scope: job.scope,
-            notes: job.notes,
-          })),
-        ),
+        text: JSON.stringify({
+          today,
+          timezone: "Australia/Brisbane",
+          jobs: serializeJobs(jobs),
+          overdueInvoices: overdueCount,
+        }),
       };
     }
     case "update_job_status": {
@@ -293,12 +366,7 @@ export async function executeJosephTool(
         })
         .parse(args);
       if (!parsed.confirm) {
-        return {
-          text: JSON.stringify({
-            needsConfirm: true,
-            preview: `Set job ${parsed.jobId} to ${parsed.status}.`,
-          }),
-        };
+        return pendingWrite("update_job_status", parsed, `Set job ${parsed.jobId} to ${parsed.status}.`);
       }
       const jobs = await listJobs(context, parsed.jobId);
       const job = jobs[0];
@@ -351,14 +419,20 @@ export async function executeJosephTool(
       if (!job.clientId || !job.serviceAddressId) {
         throw new Error("This job is missing a client or property, so an invoice cannot be drafted.");
       }
-      const quotes = job.jobRequestId
-        ? (await listQuotes(context)).filter(
+      const quotes = await listQuotes(context);
+      const requestQuotes = job.jobRequestId
+        ? quotes.filter(
             (quote) => quote.jobRequestId === job.jobRequestId && quote.status === "Accepted",
           )
         : [];
+      const propertyQuote = lastAcceptedQuoteBrief(quotes, {
+        propertyId: job.serviceAddressId,
+        clientId: job.clientId,
+        address: job.address,
+      });
       const sourceItems =
-        quotes[0]?.items && quotes[0].items.length > 0
-          ? quotes[0].items
+        requestQuotes[0]?.items && requestQuotes[0].items.length > 0
+          ? requestQuotes[0].items
           : [
               {
                 description: job.scope || job.category || "Completed works",
@@ -370,18 +444,18 @@ export async function executeJosephTool(
       if (sourceItems.every((item) => Number(item.rate) <= 0) && parsed.rate == null) {
         return {
           text: JSON.stringify({
-            needsConfirm: true,
+            needsRate: true,
             preview: `Need a rate to invoice ${job.client} for ${job.category}.`,
+            lastAcceptedQuote: propertyQuote,
           }),
         };
       }
       if (!parsed.confirm) {
-        return {
-          text: JSON.stringify({
-            needsConfirm: true,
-            preview: `Complete ${job.client} at ${job.address} and draft an invoice.`,
-          }),
-        };
+        return pendingWrite(
+          "complete_job_and_draft_invoice",
+          parsed,
+          `Complete ${job.client} at ${job.address} and draft an invoice.`,
+        );
       }
       const { job: updated } = await updateJob(context, {
         id: job.id,
@@ -390,7 +464,7 @@ export async function executeJosephTool(
         recurrence: jobRecurrence(job.recurrence),
       });
       const items =
-        parsed.rate != null && (!quotes[0] || quotes[0].items.length === 0)
+        parsed.rate != null && (!requestQuotes[0] || requestQuotes[0].items.length === 0)
           ? [{ description: job.scope || job.category, quantity: 1, rate: parsed.rate }]
           : sourceItems.map((item) => ({
               description: item.description,
@@ -402,7 +476,7 @@ export async function executeJosephTool(
         clientId: job.clientId,
         propertyId: job.serviceAddressId,
         jobId: job.id,
-        quoteId: quotes[0]?.id,
+        quoteId: requestQuotes[0]?.id,
         items,
         dueDays: 7,
         notes: invoiceTerms,
@@ -422,10 +496,18 @@ export async function executeJosephTool(
       if (!canManage(context)) return { text: JSON.stringify({ error: "Owners only." }) };
       const brief = z.string().trim().min(8).max(8_000).parse(args.brief);
       const address = z.string().trim().max(400).optional().parse(args.address);
+      const quotes = await listQuotes(context);
+      const prior = lastAcceptedQuoteBrief(quotes, { address });
       const estimate = await draftEstimateFromProvider(
-        [`Scope:\n${brief}`, address ? `Property: ${address}` : "Property: not supplied"].join("\n"),
+        [
+          `Scope:\n${brief}`,
+          address ? `Property: ${address}` : "Property: not supplied",
+          prior ? `\nUse these rates unless the brief clearly changes them:\n${prior}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
       );
-      return { text: JSON.stringify(estimate) };
+      return { text: JSON.stringify({ estimate, lastAcceptedQuote: prior }) };
     }
     case "create_quote_from_request": {
       if (!canManage(context)) return { text: JSON.stringify({ error: "Owners only." }) };
@@ -450,12 +532,11 @@ export async function executeJosephTool(
       const request = requests.find((item) => item.id === parsed.jobRequestId);
       if (!request) throw new Error("Job request not found.");
       if (!parsed.confirm) {
-        return {
-          text: JSON.stringify({
-            needsConfirm: true,
-            preview: `Save draft quote for ${request.client}: ${parsed.scope}`,
-          }),
-        };
+        return pendingWrite(
+          "create_quote_from_request",
+          parsed,
+          `Save draft quote for ${request.client}: ${parsed.scope}`,
+        );
       }
       const quote = await createQuote(context, {
         jobRequestId: parsed.jobRequestId,
@@ -505,26 +586,4 @@ export async function executeJosephTool(
     default:
       return { text: JSON.stringify({ error: `Unknown tool ${name}` }) };
   }
-}
-
-export function josephSystemPrompt(role: BusinessContext["role"]): string {
-  return `You are Joseph, the in-van operations assistant for Mow & Glow Property Services (Kingaroy / Darling Downs).
-Speak briefly, like a crew mate. Use Australian English. Currency is AUD. The business is not registered for GST.
-
-The signed-in role is ${role}.
-- Owners and co-owners can quote, invoice, and see money.
-- Technicians can look up assigned jobs and change those job statuses only.
-
-Van phrases you must handle:
-1. Job complete, draft invoice for [job/client]
-2. Help draft a quote for [input]
-3. Mark job as [status]
-4. What invoices are outstanding?
-5. Send a message to [client] — draft only, never claim you sent it.
-
-Rules:
-- Call tools for live data. Do not invent jobs, totals, or phone numbers.
-- Destructive or write tools need confirm=true. If a tool returns needsConfirm, ask the user to confirm in one short question, then call again with confirm=true.
-- If several jobs match, list them and ask which one.
-- Keep replies under 80 words unless listing invoices.`;
 }

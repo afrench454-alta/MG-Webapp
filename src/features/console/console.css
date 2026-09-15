@@ -2935,6 +2935,75 @@ html[data-theme="dark"] .document-view {
   opacity: 0.4;
 }
 
+.joseph-mic {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  background: var(--panel-soft);
+}
+
+.joseph-mic:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.joseph-mic--hot {
+  color: var(--on-brand);
+  background: var(--brand);
+}
+
+.joseph-actions {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.joseph-actions li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.joseph-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.joseph-confirm-yes,
+.joseph-confirm-no {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.joseph-confirm-yes {
+  border: 0;
+  color: var(--on-brand);
+  background: var(--brand);
+}
+
+.joseph-confirm-no {
+  border: 1px solid var(--border);
+  color: var(--ink);
+  background: var(--panel);
+}
+
 .joseph-hint {
   margin: 8px 4px 0;
   color: var(--micro);
