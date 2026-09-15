@@ -2,12 +2,22 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { AlertTriangle, Camera, CheckCircle2, PauseCircle, PlayCircle, RotateCcw, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarOff,
+  Camera,
+  CheckCircle2,
+  PauseCircle,
+  PlayCircle,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import type { Job, JobPhoto, JobStatus, TeamMember } from "../domain";
 import {
   displayServiceCategory,
   displayServiceDetail,
 } from "../data/service-catalog";
+import { applyJobSchedule, clearJobSchedule } from "../data/job-recurrence";
 import { findAssignmentConflicts } from "../data/schedule-planning";
 import { formatSiteTitle } from "../data/work-identity";
 import { Button, Field, IconButton } from "../components/ui-elements";
@@ -45,8 +55,27 @@ export function JobDetailsDialog({
   const [recurrence, setRecurrence] = useState(job.recurrence || "One-off");
   const [assigneeIds, setAssigneeIds] = useState(job.assigneeIds || []);
 
+  const canReschedule =
+    canAssign && job.status !== "completed" && job.status !== "cancelled";
+
+  const snapshot = { ...job, notes, recurrence };
+
   const updateStatus = (status: JobStatus) =>
-    onUpdate({ ...job, status, notes, recurrence });
+    onUpdate(
+      status === "unscheduled"
+        ? clearJobSchedule({ ...snapshot, status: "unscheduled" })
+        : { ...snapshot, status },
+    );
+
+  const persistSchedule = (dateKey: string) => {
+    if (!dateKey) {
+      onUpdate(clearJobSchedule(snapshot));
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateKey)) return;
+    if (dateKey === job.dateKey && job.status !== "unscheduled") return;
+    onUpdate(applyJobSchedule(snapshot, dateKey));
+  };
 
   const toggleAssignee = (profileId: string) => {
     const next = assigneeIds.includes(profileId)
@@ -76,13 +105,15 @@ export function JobDetailsDialog({
           <p className="eyebrow">Address</p>
           <span>{job.address}</span>
         </div>
-        <div>
-          <p className="eyebrow">Scheduled</p>
-          <span>
-            {job.date}
-            {job.time ? ` · ${job.time}` : ""}
-          </span>
-        </div>
+        {canReschedule ? null : (
+          <div>
+            <p className="eyebrow">Scheduled</p>
+            <span>
+              {job.date}
+              {job.time ? ` · ${job.time}` : ""}
+            </span>
+          </div>
+        )}
         <div>
           <p className="eyebrow">Service</p>
           <span>
@@ -95,6 +126,34 @@ export function JobDetailsDialog({
           <span>{job.scope}</span>
         </div>
       </div>
+      {canReschedule ? (
+        <div className="job-schedule">
+          <div className="job-schedule__controls">
+            <Field
+              label="Date & time"
+              hint="Move the visit to another day without deleting the job."
+            >
+              <input
+                type="datetime-local"
+                value={job.dateKey}
+                onChange={(event) => persistSchedule(event.target.value)}
+                disabled={pending}
+              />
+            </Field>
+            {job.dateKey ? (
+              <Button
+                variant="secondary"
+                type="button"
+                icon={CalendarOff}
+                onClick={() => onUpdate(clearJobSchedule(snapshot))}
+                disabled={pending}
+              >
+                Clear from calendar
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <div className="status-actions">
         <Button icon={PlayCircle} onClick={() => updateStatus("in-progress")}>
           Start

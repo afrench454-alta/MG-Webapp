@@ -59,7 +59,7 @@ import type {
 import type { SendQuestionnaireAction } from "./data/questionnaire-contract";
 import type { EstimateJobAction } from "./data/estimator-contract";
 import type { AskJosephAction } from "./data/joseph-contract";
-import { asJobRecurrence, buildNextDemoJob } from "./data/job-recurrence";
+import { asJobRecurrence, buildNextDemoJob, clearJobSchedule, applyJobSchedule, describeJobUpdate, scheduledStartPayload, formatBrisbaneSchedule } from "./data/job-recurrence";
 import type {
   InviteTeamAction,
   RevokeTeamInviteAction,
@@ -114,7 +114,7 @@ import {
   liveInvoiceForQuote,
 } from "./data/quote-invoice";
 import { formatServiceTitle, isServiceCategory, parseServiceTitle } from "./data/service-catalog";
-import { formatJobDisplayName, formatSiteTitle, formatSubmissionScope } from "./data/work-identity";
+import { formatJobDisplayName, formatSiteTitle, formatSubmissionScope, defaultDateTimeLocal } from "./data/work-identity";
 
 export type DialogState =
   | { type: "estimator"; jobRequestId?: string }
@@ -647,6 +647,7 @@ export function ConsoleApp({
   };
 
   const updateJob = async (updated: Job) => {
+    const previous = jobs.find((job) => job.id === updated.id);
     if (dataMode === "live") {
       if (!onUpdateJob) {
         setOperationMutationError("Live job updates are not available.");
@@ -660,6 +661,7 @@ export function ConsoleApp({
         status: updated.status,
         notes: updated.notes,
         recurrence: asJobRecurrence(updated.recurrence),
+        scheduledStart: scheduledStartPayload(updated),
       });
       } catch {
         setOperationMutationError("A network error occurred. Please try again.");
@@ -683,11 +685,10 @@ export function ConsoleApp({
       showToast(
         result.nextJob
           ? `Job completed. Next ${updated.recurrence.toLowerCase()} visit booked for ${result.nextJob.date}.`
-          : `Job moved to ${updated.status.replace("-", " ")}.`,
+          : describeJobUpdate(previous, updated),
       );
       return;
     }
-    const previous = jobs.find((job) => job.id === updated.id);
     const becameComplete =
       updated.status === "completed" && previous?.status !== "completed";
     const nextJob = becameComplete
@@ -704,7 +705,7 @@ export function ConsoleApp({
     showToast(
       nextJob
         ? `Job completed. Next ${updated.recurrence.toLowerCase()} visit booked for ${nextJob.date}.`
-        : `Job moved to ${updated.status.replace("-", " ")}.`,
+        : describeJobUpdate(previous, updated),
     );
   };
 
@@ -836,14 +837,22 @@ export function ConsoleApp({
 
   const moveJob = (id: string, status: JobStatus) => {
     const target = jobs.find((job) => job.id === id);
-    if (target) {
-      void updateJob({ ...target, status });
+    if (!target) {
+      setJobs((current) =>
+        current.map((job) => (job.id === id ? { ...job, status } : job)),
+      );
+      showToast(`Job moved to ${status.replace("-", " ")}.`);
       return;
     }
-    setJobs((current) =>
-      current.map((job) => (job.id === id ? { ...job, status } : job)),
-    );
-    showToast(`Job moved to ${status.replace("-", " ")}.`);
+    if (status === "unscheduled") {
+      void updateJob(clearJobSchedule({ ...target, status: "unscheduled" }));
+      return;
+    }
+    if (status === "scheduled" && !target.dateKey) {
+      void updateJob(applyJobSchedule(target, defaultDateTimeLocal(), "scheduled"));
+      return;
+    }
+    void updateJob({ ...target, status });
   };
 
   const updateQuoteStatus = async (
@@ -1134,18 +1143,7 @@ export function ConsoleApp({
     if (dataMode === "demo") {
       const request = jobRequests.find((item) => item.id === draft.jobRequestId);
       if (request) {
-        const start = new Date(draft.scheduledStart);
-        const date = new Intl.DateTimeFormat("en-AU", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          timeZone: "Australia/Brisbane",
-        }).format(start);
-        const time = new Intl.DateTimeFormat("en-AU", {
-          hour: "numeric",
-          minute: "2-digit",
-          timeZone: "Australia/Brisbane",
-        }).format(start);
+        const schedule = formatBrisbaneSchedule(draft.scheduledStart);
         const assigned = (draft.profileIds || []).map((id) => {
           const member = teamMembers.find((item) => item.id === id);
           return member?.name || "Team member";
@@ -1156,16 +1154,16 @@ export function ConsoleApp({
             client: request.client,
             address: request.address,
             category: request.category,
-            date,
+            date: schedule.date,
           }),
           client: request.client,
           property: request.address,
           address: request.address,
           category: request.category,
           scope: request.scope,
-          date,
-          time,
-          dateKey: draft.scheduledStart.slice(0, 16),
+          date: schedule.date,
+          time: schedule.time,
+          dateKey: schedule.dateKey,
           clientId: request.clientId,
           serviceAddressId: request.propertyId,
           jobRequestId: request.id,

@@ -5,6 +5,7 @@ import { jobRequestDraftSchema } from "../../src/features/console/data/job-reque
 import {
   quoteDraftSchema,
   invoiceDraftSchema,
+  jobUpdateSchema,
   scheduleJobSchema,
 } from "../../src/features/console/data/operations-contract";
 import { joinWithPasswordSchema, teamMemberUpdateSchema } from "../../src/features/console/data/team-contract";
@@ -224,6 +225,38 @@ test("contracts: scheduleJobSchema validates job schedule inputs", () => {
     scheduledStart: "invalid-date",
   };
   assert.equal(scheduleJobSchema.safeParse(invalidDate).success, false);
+});
+
+test("contracts: jobUpdateSchema accepts a new start or a cleared start", () => {
+  const base = {
+    id: VALID_UUID,
+    status: "scheduled",
+    notes: "",
+    recurrence: "One-off",
+  };
+  assert.equal(jobUpdateSchema.safeParse(base).success, true);
+  assert.equal(
+    jobUpdateSchema.safeParse({
+      ...base,
+      scheduledStart: "2026-09-16T09:00:00+10:00",
+    }).success,
+    true,
+  );
+  assert.equal(
+    jobUpdateSchema.safeParse({
+      ...base,
+      status: "unscheduled",
+      scheduledStart: null,
+    }).success,
+    true,
+  );
+  assert.equal(
+    jobUpdateSchema.safeParse({
+      ...base,
+      scheduledStart: "16 Sep 2026",
+    }).success,
+    false,
+  );
 });
 
 import { publicQuestionnaireSchema } from "../../src/features/console/data/questionnaire-contract";

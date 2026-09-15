@@ -126,7 +126,52 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   test("toggles dark mode from the sidebar", async ({ page }) => {
     await page.getByRole("button", { name: "Switch to dark mode" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.getByRole("button", { name: "Clients" }).click();
+    const filterBg = await page.locator(".list-filters").evaluate((el) => {
+      const color = getComputedStyle(el).backgroundColor;
+      const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (!match) return 255;
+      return (Number(match[1]) + Number(match[2]) + Number(match[3])) / 3;
+    });
+    expect(filterBg).toBeLessThan(80);
     await page.getByRole("button", { name: "Switch to light mode" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  });
+
+  test("reschedules a job and can clear it from the calendar", async ({ page }) => {
+    await page.getByRole("button", { name: "Clients" }).click();
+    await page.getByRole("button", { name: "New Client" }).click();
+    await page.locator(".field", { hasText: "Name" }).locator("input").fill("Reschedule Client");
+    await page.locator(".field", { hasText: "Phone" }).locator("input").fill("0400 000 001");
+    await page.getByLabel("Property 1 name").fill("Warehouse");
+    await page.getByLabel("Property 1 address").fill("9 Test Street, Toowoomba");
+    await page.getByRole("button", { name: "Save Client" }).click();
+    await expect(page.getByText("Client saved.")).toBeVisible();
+
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Job Requests" }).click();
+    await page.getByRole("button", { name: "New Request" }).click();
+    await page.getByLabel(/^Client/).selectOption({ label: "Reschedule Client" });
+    await page.getByLabel(/^Property/).selectOption({ label: "9 Test Street, Toowoomba" });
+    await page.getByLabel(/^Scope summary/).fill("Mow and edge the front lawn");
+    await page.getByRole("button", { name: "Save Request" }).click();
+    await expect(page.getByText("Job request created.")).toBeVisible();
+
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Schedule" }).click();
+    await page.getByRole("button", { name: "Schedule a job" }).click();
+    await page.getByLabel(/^Job request/).selectOption({ index: 1 });
+    await page.getByLabel(/^Date & time/).fill("2026-09-20T10:00");
+    await page.getByLabel("Schedule Job").getByRole("button", { name: "Schedule", exact: true }).click();
+    await expect(page.getByText("Job scheduled.")).toBeVisible();
+
+    await page.getByRole("button", { name: "Job Board" }).click();
+    await page.locator(".job-card__open").filter({ hasText: "Reschedule Client" }).click();
+    const when = page.getByLabel(/Date & time/);
+    await expect(when).toBeVisible();
+    await when.fill("2026-09-22T14:00");
+    await expect(page.getByText(/Job moved to 22 Sep/)).toBeVisible();
+    await page.getByRole("button", { name: "Clear from calendar" }).click();
+    await expect(page.getByText("Job cleared from the calendar.")).toBeVisible();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(page.locator(".job-column--unscheduled").getByText("Reschedule Client")).toBeVisible();
   });
 });
