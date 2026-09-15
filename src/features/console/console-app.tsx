@@ -1661,7 +1661,7 @@ export function ConsoleApp({
             <strong>Console</strong>
           </div>
         </header>
-        <main className="workspace">
+        <main className={currentRoute === "joseph" ? "workspace workspace--chat" : "workspace"}>
           {operationMutationError ? (
             <div className="workspace-alert" role="alert">
               <p>{operationMutationError}</p>

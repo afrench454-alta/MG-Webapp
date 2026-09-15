@@ -21,6 +21,7 @@ import { productBrand } from "@/lib/brand";
 import type { ConsoleRoute } from "../domain";
 import { IconButton } from "./ui-elements";
 import { InstallAppButton } from "./install-app";
+import { ThemeToggle } from "./theme-toggle";
 
 export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -116,6 +117,7 @@ export function Sidebar({
             <span>AI Estimator</span>
           </button>
         ) : null}
+        <ThemeToggle />
         <InstallAppButton />
         <div className="signed-in">
           <p className="eyebrow">Signed in</p>

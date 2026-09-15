@@ -2,6 +2,12 @@ import { z } from "zod";
 
 export const JOSEPH_WAKE_NAME = "Joseph";
 
+export const JOSEPH_SUGGESTIONS = [
+  { label: "What's on today?", prompt: "Which jobs are scheduled today?" },
+  { label: "Outstanding invoices", prompt: "What invoices are outstanding?" },
+  { label: "Who's on the board?", prompt: "Summarise the job board for me." },
+] as const;
+
 export const josephRoleSchema = z.enum(["user", "assistant"]);
 
 export const josephMessageSchema = z.object({

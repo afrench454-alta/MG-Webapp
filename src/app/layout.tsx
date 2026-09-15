@@ -11,6 +11,7 @@ import "@fontsource/work-sans/600.css";
 import "@fontsource/work-sans/700.css";
 import "@fontsource/work-sans/800.css";
 import { PwaRegister } from "@/features/console/components/pwa-register";
+import { ThemeScript } from "@/features/console/components/theme-script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -52,8 +53,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en-AU">
+    <html lang="en-AU" suppressHydrationWarning>
       <body>
+        <ThemeScript />
         {children}
         <PwaRegister />
         <SpeedInsights />

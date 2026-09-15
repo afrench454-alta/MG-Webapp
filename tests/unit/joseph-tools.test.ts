@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { stripJosephWake } from "../../src/features/console/data/joseph-contract";
+import { JOSEPH_SUGGESTIONS, stripJosephWake } from "../../src/features/console/data/joseph-contract";
 import {
   parseToolArguments,
   resolveJosephConfig,
@@ -35,3 +35,13 @@ test("stripJosephWake: drops Hey Joseph and bare Joseph", () => {
   assert.equal(stripJosephWake("Joseph mark job as completed"), "mark job as completed");
   assert.equal(stripJosephWake("What invoices are outstanding?"), "What invoices are outstanding?");
 });
+
+test("Joseph suggestions send a real prompt, not the short label", () => {
+  assert.equal(JOSEPH_SUGGESTIONS.length, 3);
+  for (const item of JOSEPH_SUGGESTIONS) {
+    assert.ok(item.label.length > 0);
+    assert.ok(item.prompt.length > item.label.length - 4);
+    assert.notEqual(item.prompt, item.label);
+  }
+});
+
