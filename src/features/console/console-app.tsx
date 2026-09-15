@@ -58,6 +58,8 @@ import type {
 } from "./data/operations-contract";
 import type { SendQuestionnaireAction } from "./data/questionnaire-contract";
 import type { EstimateJobAction } from "./data/estimator-contract";
+import type { AskJosephAction } from "./data/joseph-contract";
+import { asJobRecurrence, buildNextDemoJob } from "./data/job-recurrence";
 import type {
   InviteTeamAction,
   RevokeTeamInviteAction,
@@ -75,6 +77,7 @@ import { QuestionnairesView } from "./views/questionnaires-view";
 import { QuotesView } from "./views/quotes-view";
 import { ScheduleView } from "./views/schedule-view";
 import { JobBoardView } from "./views/job-board-view";
+import { JosephView } from "./views/joseph-view";
 import { InvoicesView } from "./views/invoices-view";
 import { SettingsView } from "./views/settings-view";
 
@@ -170,6 +173,7 @@ export type ConsoleAppProps = {
   onDeleteInvoice?: DeleteInvoiceAction;
   onSendQuestionnaire?: SendQuestionnaireAction;
   onEstimateJob?: EstimateJobAction;
+  onAskJoseph?: AskJosephAction;
   onInviteTeamMember?: InviteTeamAction;
   onRevokeTeamInvite?: RevokeTeamInviteAction;
   onUpdateTeamMember?: UpdateTeamMemberAction;
@@ -215,6 +219,7 @@ export function ConsoleApp({
   onDeleteInvoice,
   onSendQuestionnaire,
   onEstimateJob,
+  onAskJoseph,
   onInviteTeamMember,
   onRevokeTeamInvite,
   onUpdateTeamMember,
@@ -654,12 +659,7 @@ export function ConsoleApp({
         id: updated.id,
         status: updated.status,
         notes: updated.notes,
-        recurrence: updated.recurrence as
-          | "One-off"
-          | "Weekly"
-          | "Fortnightly"
-          | "Four-weekly"
-          | "Monthly",
+        recurrence: asJobRecurrence(updated.recurrence),
       });
       } catch {
         setOperationMutationError("A network error occurred. Please try again.");
@@ -672,12 +672,40 @@ export function ConsoleApp({
         return;
       }
       updated = result.job;
+      setJobs((current) => {
+        const replaced = current.map((job) => (job.id === updated.id ? updated : job));
+        if (result.nextJob && !replaced.some((job) => job.id === result.nextJob?.id)) {
+          return [...replaced, result.nextJob];
+        }
+        return replaced;
+      });
+      setDialog({ type: "job", job: updated });
+      showToast(
+        result.nextJob
+          ? `Job completed. Next ${updated.recurrence.toLowerCase()} visit booked for ${result.nextJob.date}.`
+          : `Job moved to ${updated.status.replace("-", " ")}.`,
+      );
+      return;
     }
-    setJobs((current) =>
-      current.map((job) => (job.id === updated.id ? updated : job)),
-    );
+    const previous = jobs.find((job) => job.id === updated.id);
+    const becameComplete =
+      updated.status === "completed" && previous?.status !== "completed";
+    const nextJob = becameComplete
+      ? buildNextDemoJob(updated, `job-${Date.now()}`)
+      : null;
+    setJobs((current) => {
+      const replaced = current.map((job) => (job.id === updated.id ? updated : job));
+      if (nextJob && !replaced.some((job) => job.id === nextJob.id)) {
+        return [...replaced, nextJob];
+      }
+      return replaced;
+    });
     setDialog({ type: "job", job: updated });
-    showToast(`Job moved to ${updated.status.replace("-", " ")}.`);
+    showToast(
+      nextJob
+        ? `Job completed. Next ${updated.recurrence.toLowerCase()} visit booked for ${nextJob.date}.`
+        : `Job moved to ${updated.status.replace("-", " ")}.`,
+    );
   };
 
   const assignJob = async (job: Job, profileIds: string[]) => {
@@ -1449,6 +1477,8 @@ export function ConsoleApp({
             onDelete={(job) => setDialog({ type: "delete-job", job })}
           />
         );
+      case "joseph":
+        return <JosephView onAskJoseph={onAskJoseph} />;
       case "invoices":
         return (
           <InvoicesView
@@ -1631,7 +1661,7 @@ export function ConsoleApp({
             <strong>Console</strong>
           </div>
         </header>
-        <main className="workspace">
+        <main className={currentRoute === "joseph" ? "workspace workspace--chat" : "workspace"}>
           {operationMutationError ? (
             <div className="workspace-alert" role="alert">
               <p>{operationMutationError}</p>

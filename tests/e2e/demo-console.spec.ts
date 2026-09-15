@@ -112,4 +112,21 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("heading", { name: "New Client" })).not.toBeVisible();
   });
+
+  test("opens Joseph with a composer and suggestion chips", async ({ page }) => {
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Joseph" }).click();
+    await expect(page.getByRole("heading", { name: "How can I help?" })).toBeVisible();
+    const composer = page.getByLabel("Message Joseph");
+    await expect(composer).toBeVisible();
+    await page.getByRole("button", { name: "What's on today?" }).click();
+    await expect(composer).toHaveValue("Which jobs are scheduled today?");
+    await expect(page.getByText("Joseph is not connected on this deployment yet.")).toBeVisible();
+  });
+
+  test("toggles dark mode from the sidebar", async ({ page }) => {
+    await page.getByRole("button", { name: "Switch to dark mode" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.getByRole("button", { name: "Switch to light mode" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  });
 });
