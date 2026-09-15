@@ -21,6 +21,8 @@
   --shadow: 0 1px 6px rgba(34, 52, 39, 0.07);
   --shadow-dialog: 0 18px 60px rgba(21, 31, 25, 0.24);
   --sidebar-width: 256px;
+  --surface-soft: #eef1ea;
+  --lime: #c5d89a;
   color: var(--ink);
   background: var(--surface);
   color-scheme: light;
@@ -41,6 +43,8 @@ html[data-theme="dark"] {
   --border-strong: #425148;
   --shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
   --shadow-dialog: 0 18px 60px rgba(0, 0, 0, 0.55);
+  --surface-soft: #161d19;
+  --lime: #9caf88;
   color: var(--ink);
   background: var(--surface);
 }
@@ -144,9 +148,9 @@ textarea {
   gap: 12px;
   margin: 0 0 16px;
   padding: 12px 14px;
-  border: 1px solid #e8c4bc;
+  border: 1px solid color-mix(in srgb, var(--red) 35%, var(--border));
   border-radius: 12px;
-  background: #fdf2ef;
+  background: color-mix(in srgb, var(--red) 12%, var(--panel));
   color: var(--red);
 }
 
@@ -963,7 +967,7 @@ textarea {
   border: 1px dashed var(--border-strong);
   border-radius: 12px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
   text-align: center;
 }
 
@@ -1219,7 +1223,7 @@ textarea {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: #f8faf7;
+  background: var(--panel-soft);
 }
 
 .list-filters .search-field {
@@ -1293,7 +1297,7 @@ textarea {
 }
 
 .calendar-day--empty {
-  background: rgba(242, 245, 239, 0.58);
+  background: color-mix(in srgb, var(--ink) 5%, var(--surface));
 }
 
 .calendar-day__open {
@@ -1804,6 +1808,7 @@ textarea {
   color: var(--ink);
   background: var(--panel);
   box-shadow: 0 1px 4px rgba(37, 52, 42, 0.06);
+  color-scheme: inherit;
 }
 
 .field textarea {
@@ -1940,14 +1945,14 @@ textarea {
   gap: 12px;
   padding: 14px;
   border-radius: 8px;
-  color: var(--brand-dark);
+  color: var(--ink);
   background: var(--panel-soft);
 }
 
 .conflict-note--warn {
   align-items: flex-start;
-  color: #7a3b12;
-  background: color-mix(in srgb, var(--amber) 22%, var(--surface));
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 18%, var(--panel));
 }
 
 .conflict-note--warn p {
@@ -2015,6 +2020,26 @@ textarea {
 
 .job-facts__scope {
   grid-column: 1 / -1;
+}
+
+.job-schedule {
+  display: grid;
+  gap: 8px;
+}
+
+.job-schedule__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.job-schedule__controls .field {
+  margin: 0;
+}
+
+.job-schedule__controls .button {
+  white-space: nowrap;
 }
 
 .job-detail {
@@ -2492,7 +2517,7 @@ html[data-theme="dark"] .document-view {
   place-items: center;
   border-radius: 50%;
   color: var(--red);
-  background: #faecea;
+  background: color-mix(in srgb, var(--red) 14%, var(--panel));
 }
 
 .confirm-delete h3,
@@ -3223,6 +3248,11 @@ html[data-theme="dark"] .document-view {
   .form-grid--two,
   .form-grid--three,
   .job-facts { grid-template-columns: 1fr; }
+  .job-schedule__controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .job-schedule__controls .button { width: 100%; }
   .field--span-two,
   .job-facts__scope { grid-column: auto; }
   .property-editor-labels,

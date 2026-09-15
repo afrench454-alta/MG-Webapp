@@ -12,6 +12,7 @@ export const JOB_RECURRENCE_VALUES = [
 export type JobRecurrence = (typeof JOB_RECURRENCE_VALUES)[number];
 
 const BRISBANE_OFFSET = "+10:00";
+const DEFAULT_DURATION_MS = 60 * 60 * 1000;
 
 export function asJobRecurrence(value: string): JobRecurrence {
   return JOB_RECURRENCE_VALUES.find((item) => item === value) ?? "One-off";
@@ -89,6 +90,85 @@ export function nextScheduledIso(
   else if (label === "Four-weekly") next.setUTCDate(next.getUTCDate() + 28);
   else next.setUTCMonth(next.getUTCMonth() + 1);
   return next.toISOString();
+}
+
+function withDisplayName(job: Job): Job {
+  return {
+    ...job,
+    displayName: formatJobDisplayName({
+      client: job.client,
+      address: job.address,
+      property: job.property,
+      category: job.category,
+      date: job.date,
+    }),
+  };
+}
+
+/** Park the job on the board without deleting it or its notes/team. */
+export function clearJobSchedule(job: Job): Job {
+  const parked =
+    job.status === "completed" || job.status === "cancelled"
+      ? job.status
+      : "unscheduled";
+  return withDisplayName({
+    ...job,
+    date: "Unscheduled",
+    time: "",
+    dateKey: "",
+    status: parked,
+  });
+}
+
+export function applyJobSchedule(
+  job: Job,
+  dateKey: string,
+  status?: Job["status"],
+): Job {
+  const iso = dateKeyToIso(dateKey);
+  if (!iso) return clearJobSchedule(job);
+  const schedule = formatBrisbaneSchedule(iso);
+  const nextStatus =
+    status ?? (job.status === "unscheduled" ? "scheduled" : job.status);
+  return withDisplayName({
+    ...job,
+    ...schedule,
+    status: nextStatus,
+  });
+}
+
+export function scheduledStartPayload(
+  job: Pick<Job, "status" | "dateKey">,
+): string | null {
+  if (job.status === "unscheduled") return null;
+  return dateKeyToIso(job.dateKey);
+}
+
+export function scheduleWindow(iso: string): {
+  scheduledStart: string;
+  scheduledEnd: string;
+} {
+  const start = new Date(iso);
+  return {
+    scheduledStart: start.toISOString(),
+    scheduledEnd: new Date(start.getTime() + DEFAULT_DURATION_MS).toISOString(),
+  };
+}
+
+export function describeJobUpdate(previous: Job | undefined, next: Job): string {
+  if (!previous) {
+    return `Job moved to ${next.status.replace("-", " ")}.`;
+  }
+  if (next.status === "unscheduled" && previous.status !== "unscheduled") {
+    return "Job cleared from the calendar.";
+  }
+  if (previous.dateKey !== next.dateKey && next.dateKey) {
+    return `Job moved to ${next.date}${next.time ? ` · ${next.time}` : ""}.`;
+  }
+  if (previous.status !== next.status) {
+    return `Job moved to ${next.status.replace("-", " ")}.`;
+  }
+  return "Job saved.";
 }
 
 export function buildNextDemoJob(job: Job, nextId: string): Job | null {

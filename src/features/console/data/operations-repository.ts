@@ -12,6 +12,7 @@ import {
   isRepeatingRecurrence,
   nextScheduledIso,
   recurrenceToDb,
+  scheduleWindow,
 } from "./job-recurrence";
 import {
   mapInvoiceDocumentStatus,
@@ -441,9 +442,31 @@ export async function updateJob(
       : input.status === "on-hold"
         ? "paused"
         : input.status;
+  const patch: {
+    status: string;
+    internal_instructions: string | null;
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+  } = {
+    status: dbStatus,
+    internal_instructions: input.notes || null,
+  };
+  if (input.status === "unscheduled") {
+    patch.scheduled_start = null;
+    patch.scheduled_end = null;
+  } else if (context.role !== "technician" && input.scheduledStart !== undefined) {
+    if (input.scheduledStart === null) {
+      patch.scheduled_start = null;
+      patch.scheduled_end = null;
+    } else {
+      const window = scheduleWindow(input.scheduledStart);
+      patch.scheduled_start = window.scheduledStart;
+      patch.scheduled_end = window.scheduledEnd;
+    }
+  }
   const { data: row, error } = await supabase
     .from("jobs")
-    .update({ status: dbStatus, internal_instructions: input.notes || null })
+    .update(patch)
     .eq("business_id", context.businessId)
     .eq("id", input.id)
     .select("scheduled_start")

@@ -42,6 +42,7 @@ export const jobUpdateSchema = z.object({
   status: z.enum(["unscheduled", "scheduled", "in-progress", "on-hold", "completed", "cancelled"]),
   notes: z.string().trim().max(20_000),
   recurrence: z.enum(["One-off", "Weekly", "Fortnightly", "Four-weekly", "Monthly"]),
+  scheduledStart: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
 export const jobAssignmentsSchema = z.object({
