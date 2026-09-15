@@ -1,0 +1,335 @@
+[
+  {
+    "name": "Chelsie APM",
+    "status": "Lead",
+    "phone": "0493884659",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "APM Kingaroy",
+        "address": "99 Youngman St Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Commercial. APM employment agency — waste removal."
+  },
+  {
+    "name": "Bloom Early Learning",
+    "status": "Lead",
+    "phone": "0419789420",
+    "email": "anna@bloomearlylearning.com.au",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "Bloom — 101 Alford St",
+        "address": "101 Alford St Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Commercial. Yard + cleaning. After hours.\nContacts: Anna Atherton 0419 789 420 anna@bloomearlylearning.com.au · Annie 0447 024 034."
+  },
+  {
+    "name": "Faye",
+    "status": "Lead",
+    "phone": "0741622294",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "13 Bella Vista St",
+        "address": "13 Bella Vista St Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Yard."
+  },
+  {
+    "name": "Diane Doak",
+    "status": "Lead",
+    "phone": "0411614653",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "28 Earl St",
+        "address": "28 Earl St Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Yard. Wellways government funding contact."
+  },
+  {
+    "name": "Claudia DiMarco",
+    "status": "Lead",
+    "phone": "0412560442",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "34B Bottlebrush Ave",
+        "address": "34B Bottlebrush Ave",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Yard.\nTenants also: Claudia, Adrian 0498 110 010, Daniel 0457 079 006."
+  },
+  {
+    "name": "Ben",
+    "status": "Lead",
+    "phone": "0407748819",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "22 Harris Rd",
+        "address": "22 Harris Rd Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Yard. Handyman work passed on to Nick Newman."
+  },
+  {
+    "name": "Bev",
+    "status": "Lead",
+    "phone": "0417711288",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "17 Hillview Pde granny flat",
+        "address": "17 Hillview Pde",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Cleaning. Granny flat tenant."
+  },
+  {
+    "name": "Finoula & Robert",
+    "status": "Active",
+    "phone": "0439975246",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "129 Watchbox Rd",
+        "address": "129 Watchbox Rd Boonara",
+        "cadence": "Monthly"
+      }
+    ],
+    "notes": "Residential. 30 rose bushes and weeding. Initial visit plus ongoing monthly maintenance. Given Tom's number."
+  },
+  {
+    "name": "Geoff Kirkup",
+    "status": "Lead",
+    "phone": "0484195192",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "1 Power St",
+        "address": "1 Power St Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential tenant. Bond clean via Freemans. Agency already logged separately as Freemans."
+  },
+  {
+    "name": "Glenda Bishop",
+    "status": "Lead",
+    "phone": "0439747498",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "19 Hillview Pde",
+        "address": "19 Hillview Pde Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Bathroom clean."
+  },
+  {
+    "name": "Jen / Love2live",
+    "status": "Lead",
+    "phone": "0497794326",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "18 Casuarina",
+        "address": "18 Casuarina",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Past tenant — bond clean and mow. NDIS contact."
+  },
+  {
+    "name": "Justin O",
+    "status": "Lead",
+    "phone": "0499237862",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "29 Wieden St",
+        "address": "29 Wieden St",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential owner. Also linked to 25 Jarrah."
+  },
+  {
+    "name": "Karen Crouch",
+    "status": "Lead",
+    "phone": "0409482501",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "25-33 Logan Rd",
+        "address": "25-33 Logan Rd",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Bathroom clean — led to bond clean."
+  },
+  {
+    "name": "Libby",
+    "status": "Lead",
+    "phone": "0439767391",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "Referred by Nick Newman",
+        "address": "Address TBC — Nick Newman referral",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential cleans. Contact from Nick Newman. Confirm street address before first job."
+  },
+  {
+    "name": "Lyn McNamara",
+    "status": "Lead",
+    "phone": "0427250548",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "448 Kunioon St",
+        "address": "448 Kunioon St Nanango",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. House and garden refresh. Yard + cleaning."
+  },
+  {
+    "name": "Mark",
+    "status": "Lead",
+    "phone": "0408568536",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "8 Darryl Cr",
+        "address": "8 Darryl Cr Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. One-off hedges."
+  },
+  {
+    "name": "Kingaroy Mall",
+    "status": "Lead",
+    "phone": "0417197159",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "Kingaroy Mall",
+        "address": "Kingaroy Mall",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Commercial. Quote request for ongoing maintenance.\nContact: Brock, Operations Manager, 0417 197 159."
+  },
+  {
+    "name": "Terri",
+    "status": "Lead",
+    "phone": "0403029507",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "Wondai sale property",
+        "address": "Wondai (street TBC)",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential. Yard tidy for sale property. Confirm full street address."
+  },
+  {
+    "name": "Mia Tietjens",
+    "status": "Lead",
+    "phone": "0498596383",
+    "email": "mia@adventfm.com.au",
+    "preferred": "Email",
+    "properties": [
+      {
+        "name": "Repco Kingaroy",
+        "address": "Repco Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Commercial / Advent FM. Handyman — fix door seal."
+  },
+  {
+    "name": "Pete SSV Telstra",
+    "status": "Lead",
+    "phone": "0477100886",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "Telstra boxes Kingaroy–Yarraman",
+        "address": "Kingaroy to Yarraman",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Commercial. Handyman and clean Telstra phone boxes, new signage."
+  },
+  {
+    "name": "Guatam",
+    "status": "Lead",
+    "phone": "0490048965",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [
+      {
+        "name": "51 Edward St",
+        "address": "51 Edward St Kingaroy",
+        "cadence": "One-off"
+      }
+    ],
+    "notes": "Residential owner.\nAccess: Rachel (tenant) 0488 137 363."
+  },
+  {
+    "name": "LJ Hooker Kingaroy",
+    "status": "Lead",
+    "phone": "0403485224",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [],
+    "notes": "Real estate agency. Add rental properties as they come in — do not log each PM as a separate client.\nContacts:\n· Courtney (PM) 0403 485 224\n· Sharon (PM) 0400 520 875\n· Kim (owner) 0419 733 066"
+  },
+  {
+    "name": "Raine & Horne Kingaroy",
+    "status": "Lead",
+    "phone": "0741622144",
+    "email": "",
+    "preferred": "Phone",
+    "properties": [],
+    "notes": "Real estate agency. Add rental properties as they come in — do not log each PM as a separate client.\nOffice 07 4162 2144.\nContacts:\n· Kaitlyn Fairbrother (PM) 0458 777 436\n· Keeley Schloss (PM) 0437 182 653"
+  }
+]
