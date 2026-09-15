@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireBusinessContext } from "@/lib/supabase/business";
 
 import {
+  argumentsWithConfirm,
   askJosephRequestSchema,
   type AskJosephResult,
   type JosephMessage,
@@ -21,6 +22,7 @@ import {
 } from "./joseph-providers";
 import {
   JOSEPH_TOOL_DEFINITIONS,
+  buildJosephSnapshot,
   executeJosephTool,
   josephSystemPrompt,
 } from "./joseph-tools";
@@ -40,13 +42,52 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
     return { ok: false, message: "Sign in to talk to Joseph." };
   }
 
+  if (parsed.data.confirmedTool) {
+    try {
+      const executed = await executeJosephTool(
+        context,
+        parsed.data.confirmedTool.name,
+        argumentsWithConfirm(parsed.data.confirmedTool.arguments),
+      );
+      if (executed.needsConfirm) {
+        return {
+          ok: true,
+          reply: executed.needsConfirm.preview,
+          actions: [],
+          confirm: executed.needsConfirm,
+        };
+      }
+      if (executed.action) revalidatePath("/");
+      return {
+        ok: true,
+        reply: executed.action ?? "Done.",
+        actions: executed.action ? [executed.action] : [],
+      };
+    } catch (error) {
+      const message =
+        error instanceof z.ZodError
+          ? "Those details were not valid."
+          : error instanceof Error
+            ? error.message
+            : "The action failed.";
+      return { ok: false, message };
+    }
+  }
+
   const config = resolveJosephConfig();
   if (!config) {
     return { ok: false, message: JOSEPH_NOT_CONNECTED };
   }
 
+  let snapshot = "";
+  try {
+    snapshot = await buildJosephSnapshot(context);
+  } catch (error) {
+    console.error("Joseph snapshot failed", error);
+  }
+
   const history: OpenRouterMessage[] = [
-    { role: "system", content: josephSystemPrompt(context.role) },
+    { role: "system", content: josephSystemPrompt(context.role, snapshot) },
     ...parsed.data.messages.map((message: JosephMessage) => ({
       role: message.role,
       content: message.content,
@@ -96,6 +137,14 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
             call.function.name,
             call.function.arguments,
           );
+          if (executed.needsConfirm) {
+            return {
+              ok: true,
+              reply: executed.needsConfirm.preview,
+              actions,
+              confirm: executed.needsConfirm,
+            };
+          }
           if (executed.action) {
             actions.push(executed.action);
             mutated = true;
