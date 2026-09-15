@@ -7,6 +7,8 @@ import {
   businessProfile,
   quoteTerms,
   invoiceTerms,
+  markRequestScheduled,
+  type JobRequest,
   type LineItem,
 } from "../../src/features/console/domain";
 
@@ -82,6 +84,22 @@ test("money: formats currency correctly in AUD", () => {
 
   const zeroFormatted = money(0);
   assert.match(zeroFormatted, /\$0\.00/);
+});
+
+test("markRequestScheduled flips a request to Scheduled", () => {
+  const request: JobRequest = {
+    id: "req-1",
+    client: "Northside",
+    address: "1 Test St",
+    category: "Lawn Care",
+    scope: "Mow",
+    status: "New",
+    created: "15 Sep 2026",
+  };
+  const scheduled = markRequestScheduled(request, "20 Sep 2026");
+  assert.equal(scheduled.status, "Scheduled");
+  assert.equal(scheduled.scheduled, "20 Sep 2026");
+  assert.equal(request.status, "New");
 });
 
 test("businessProfile & terms integrity", () => {

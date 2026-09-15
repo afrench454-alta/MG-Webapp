@@ -163,6 +163,15 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await page.getByLabel("Schedule Job").getByRole("button", { name: "Schedule", exact: true }).click();
     await expect(page.getByText("Job scheduled.")).toBeVisible();
 
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Job Requests" }).click();
+    await page.getByRole("radio", { name: /^Open/ }).click();
+    await expect(page.getByRole("heading", { name: /Reschedule Client/ })).toHaveCount(0);
+    await page.getByRole("radio", { name: /^Scheduled/ }).click();
+    await expect(page.getByRole("heading", { name: /Reschedule Client/ })).toBeVisible();
+    await expect(
+      page.locator(".request-card").filter({ hasText: "Reschedule Client" }).getByText("Scheduled", { exact: true }),
+    ).toBeVisible();
+
     await page.getByRole("button", { name: "Job Board" }).click();
     await page.locator(".job-card__open").filter({ hasText: "Reschedule Client" }).click();
     const when = page.getByLabel(/Date & time/);

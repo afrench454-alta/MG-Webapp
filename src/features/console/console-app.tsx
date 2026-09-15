@@ -10,6 +10,7 @@ import {
   initialJobs,
   initialQuotes,
   invoiceSeed as invoice,
+  markRequestScheduled,
   questionnaires,
   questionnaireSubmissionsSeed,
   teamMembersSeed,
@@ -1175,6 +1176,13 @@ export function ConsoleApp({
           photos: [],
         };
         setJobs((current) => [...current, job]);
+        setJobRequests((current) =>
+          current.map((item) =>
+            item.id === request.id
+              ? markRequestScheduled(item, schedule.date)
+              : item,
+          ),
+        );
       }
       setDialog(null);
       showToast("Job scheduled.");
@@ -1199,6 +1207,16 @@ export function ConsoleApp({
       return;
     }
     setJobs((current) => [...current, result.job]);
+    setJobRequests((current) =>
+      current.map((item) =>
+        item.id === draft.jobRequestId
+          ? markRequestScheduled(
+              item,
+              formatBrisbaneSchedule(draft.scheduledStart).date,
+            )
+          : item,
+      ),
+    );
     setDialog(null);
     showToast("Job scheduled.");
   };

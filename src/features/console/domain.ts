@@ -216,6 +216,17 @@ export type JobRequest = {
   visit?: string;
 };
 
+export function markRequestScheduled(
+  request: JobRequest,
+  scheduled?: string,
+): JobRequest {
+  return {
+    ...request,
+    status: "Scheduled",
+    scheduled: scheduled || request.scheduled,
+  };
+}
+
 export type JobRequestDraft = {
   clientId: string;
   propertyId: string;

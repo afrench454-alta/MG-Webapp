@@ -248,6 +248,12 @@ export async function scheduleJob(context: BusinessContext, input: ScheduleJobIn
     .single();
   if (error) throw new Error(error.message);
   const jobId = z.object({ id: z.uuid() }).parse(data).id;
+  const { error: requestError } = await supabase
+    .from("job_requests")
+    .update({ status: "scheduled" })
+    .eq("business_id", context.businessId)
+    .eq("id", target.id);
+  if (requestError) throw new Error(requestError.message);
   if (input.profileIds?.length) {
     return updateJobAssignments(context, { jobId, profileIds: input.profileIds });
   }
