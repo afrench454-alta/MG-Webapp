@@ -1,28 +1,75 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { SendHorizonal } from "lucide-react";
 import {
-  JOSEPH_SUGGESTIONS,
   type AskJosephAction,
   type JosephMessage,
+  type RunJosephNextStopAction,
   stripJosephWake,
 } from "../data/joseph-contract";
+import {
+  JOSEPH_DRAFT_INVOICE_CONFIRM,
+  NEXT_STOP_ACTION_CHIPS,
+  buildNextStopBrief,
+  canConfirmDraftInvoice,
+  localMessageDraft,
+  nextStopOpsStatus,
+  nextStopOpsTone,
+  overlayForChip,
+  type NextStopChipId,
+  type NextStopOpsOverlay,
+} from "../data/joseph-next-stop";
+import type { Client, Invoice, Job, Quote } from "../domain";
+import { Badge } from "../components/ui-elements";
 
 type ChatLine = JosephMessage & { id: string };
 
 export function JosephView({
   onAskJoseph,
+  onRunNextStop,
+  jobs = [],
+  clients = [],
+  invoices = [],
+  quotes = [],
+  actorId,
+  actorRole,
 }: {
   onAskJoseph?: AskJosephAction;
+  onRunNextStop?: RunJosephNextStopAction;
+  jobs?: Job[];
+  clients?: Client[];
+  invoices?: Invoice[];
+  quotes?: Quote[];
+  actorId?: string;
+  actorRole?: "owner" | "co_owner" | "technician";
 }) {
   const [messages, setMessages] = useState<ChatLine[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [invoiceConfirm, setInvoiceConfirm] = useState(false);
+  const [opsOverlay, setOpsOverlay] = useState<NextStopOpsOverlay | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const idRef = useRef(0);
+
+  const brief = useMemo(
+    () =>
+      buildNextStopBrief({
+        jobs,
+        clients,
+        invoices,
+        quotes,
+        actorId,
+        actorRole,
+        overlay: opsOverlay,
+      }),
+    [jobs, clients, invoices, quotes, actorId, actorRole, opsOverlay],
+  );
+  const opsStatus = brief
+    ? nextStopOpsStatus(brief.jobStatus, opsOverlay)
+    : null;
 
   const nextLineId = (role: JosephMessage["role"]) => {
     idRef.current += 1;
@@ -31,7 +78,7 @@ export function JosephView({
 
   useEffect(() => {
     listRef.current?.lastElementChild?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [messages, pending]);
+  }, [messages, pending, invoiceConfirm]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -39,6 +86,19 @@ export function JosephView({
     el.style.height = "auto";
     el.style.height = `${Math.min(Math.max(el.scrollHeight, 44), 160)}px`;
   }, [draft]);
+
+  useEffect(() => {
+    setOpsOverlay(null);
+    setInvoiceConfirm(false);
+  }, [brief?.jobId]);
+
+  const appendExchange = (userText: string, reply: string) => {
+    setMessages((current) => [
+      ...current,
+      { id: nextLineId("user"), role: "user", content: userText },
+      { id: nextLineId("assistant"), role: "assistant", content: reply },
+    ]);
+  };
 
   const submitPrompt = async (raw: string) => {
     const content = stripJosephWake(raw);
@@ -85,12 +145,74 @@ export function JosephView({
     }
   };
 
+  const runChip = async (chip: NextStopChipId, confirm = false) => {
+    if (pending) return;
+    if (!brief) {
+      setError("No next stop to act on.");
+      return;
+    }
+
+    const chipLabel =
+      NEXT_STOP_ACTION_CHIPS.find((item) => item.id === chip)?.label ?? chip;
+
+    if (chip === "done-draft-invoice" && !confirm) {
+      if (!canConfirmDraftInvoice(brief)) {
+        setInvoiceConfirm(false);
+        setError("This stop has no accepted quote to invoice from.");
+        appendExchange(
+          chipLabel,
+          "This job has no linked accepted quote, so I cannot draft an invoice from the quote.",
+        );
+        return;
+      }
+      setError("");
+      setInvoiceConfirm(true);
+      return;
+    }
+
+    setInvoiceConfirm(false);
+    setError("");
+
+    if (!onRunNextStop) {
+      if (chip === "on-my-way" || chip === "running-late") {
+        appendExchange(
+          chipLabel,
+          `${localMessageDraft(chip, brief)}\n\nNot sent.`,
+        );
+        const next = overlayForChip(chip);
+        if (next) setOpsOverlay(next);
+        return;
+      }
+      setError("Joseph is not connected on this deployment yet.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      const result = await onRunNextStop({
+        chip,
+        jobId: brief.jobId,
+        confirm,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      appendExchange(confirm ? JOSEPH_DRAFT_INVOICE_CONFIRM : chipLabel, result.reply);
+      const next = overlayForChip(chip);
+      if (next) setOpsOverlay(next);
+    } catch {
+      setError("Joseph could not finish that action.");
+    } finally {
+      setPending(false);
+      inputRef.current?.focus();
+    }
+  };
+
   const send = async (event: FormEvent) => {
     event.preventDefault();
     await submitPrompt(draft);
   };
-
-  const empty = messages.length === 0 && !pending;
 
   return (
     <section className="joseph-view" aria-labelledby="joseph-title">
@@ -110,6 +232,7 @@ export function JosephView({
               setMessages([]);
               setDraft("");
               setError("");
+              setInvoiceConfirm(false);
               inputRef.current?.focus();
             }}
           >
@@ -118,34 +241,78 @@ export function JosephView({
         ) : null}
       </header>
 
-      <div className="joseph-thread" ref={listRef} role="log" aria-live="polite">
-        {empty ? (
-          <div className="joseph-empty">
-            <span className="joseph-avatar joseph-avatar--lg" aria-hidden="true">
-              J
-            </span>
-            <h2>How can I help?</h2>
-            <p>
-              Type below, or tap a suggestion. Joseph looks things up and waits for
-              you to confirm before changing a job or invoice.
-            </p>
-            <div className="joseph-suggestions">
-              {JOSEPH_SUGGESTIONS.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    void submitPrompt(item.prompt);
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
+      <article className="joseph-brief" aria-live="polite">
+        {brief ? (
+          <>
+            <div className="joseph-brief__header">
+              <p className="eyebrow">Next stop</p>
+              {opsStatus ? (
+                <Badge tone={nextStopOpsTone(opsStatus)}>{opsStatus}</Badge>
+              ) : null}
             </div>
-          </div>
-        ) : null}
+            <h2>{brief.clientName}</h2>
+            <p className="joseph-brief__address">{brief.address}</p>
+            {brief.time || brief.date ? (
+              <p className="joseph-brief__when">
+                {[brief.time, brief.date].filter(Boolean).join(" · ")}
+              </p>
+            ) : null}
+            {brief.notes ? <p className="joseph-brief__notes">{brief.notes}</p> : null}
+            <p className="joseph-brief__balance">
+              Balance {brief.balanceLabel}
+              {brief.outstandingCount > 0
+                ? ` · ${brief.outstandingCount} outstanding`
+                : " · none outstanding"}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="eyebrow">Next stop</p>
+            <h2>No next stop</h2>
+            <p>Nothing is scheduled or in progress right now.</p>
+          </>
+        )}
+      </article>
 
+      <div className="joseph-suggestions joseph-suggestions--actions">
+        {NEXT_STOP_ACTION_CHIPS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            disabled={
+              pending ||
+              !brief ||
+              (item.id === "done-draft-invoice" && opsStatus === "Done")
+            }
+            onClick={() => {
+              void runChip(item.id);
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {invoiceConfirm && brief ? (
+        <div className="joseph-confirm" role="region" aria-label="Confirm draft invoice">
+          <p>
+            Complete {brief.clientName} at {brief.address} and draft the invoice from the
+            linked quote.
+          </p>
+          <button
+            type="button"
+            className="button button--primary"
+            disabled={pending}
+            onClick={() => {
+              void runChip("done-draft-invoice", true);
+            }}
+          >
+            {JOSEPH_DRAFT_INVOICE_CONFIRM}
+          </button>
+        </div>
+      ) : null}
+
+      <div className="joseph-thread" ref={listRef} role="log" aria-live="polite">
         {messages.map((message) => (
           <article
             key={message.id}
