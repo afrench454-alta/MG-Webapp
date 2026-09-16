@@ -1,0 +1,70 @@
+/* Desktop nav proportion fixes for long team@ emails (loaded after console.css). */
+:root {
+  --sidebar-width: 272px;
+}
+
+.sidebar {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.sidebar-nav button {
+  min-height: 40px;
+}
+
+.sidebar-nav button > svg {
+  flex: 0 0 auto;
+}
+
+.sidebar-nav button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-footer {
+  min-width: 0;
+}
+
+.theme-toggle,
+.ai-button {
+  min-height: 40px;
+}
+
+.signed-in {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.signed-in strong {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-nav button,
+  .ai-button,
+  .theme-toggle {
+    min-height: 40px;
+  }
+
+  .signed-in strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
