@@ -17,9 +17,38 @@
 .progressFill { height: 100%; background: #173f35; transition: width 0.3s ease; }
 
 .form { display: flex; flex-direction: column; gap: 32px; padding: 48px; }
-.fieldCard { display: flex; flex-direction: column; gap: 16px; margin: 0; padding: 32px; border: 1px solid #e2e1d7; border-radius: 16px; background: #fff; box-shadow: 0 4px 12px rgba(23, 63, 53, 0.03); transition: border-color 0.2s; }
+.fieldCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 28px 28px 32px;
+  border: 1px solid #e2e1d7;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(23, 63, 53, 0.03);
+  transition: border-color 0.2s;
+  position: relative;
+}
 .fieldError { border-color: #d32f2f; }
-.cardTitle { margin-bottom: 8px; font-size: 18px; font-weight: 700; color: #173f35; line-height: 1.4; padding: 0; }
+/* Keep question titles on the TOP LINE inside the field card (not mid-border float). */
+.cardTitle {
+  float: left;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #173f35;
+  line-height: 1.4;
+  position: relative;
+  top: 0;
+  left: 0;
+}
+.fieldCard > :not(.cardTitle) {
+  clear: both;
+}
 .asterisk { color: #d32f2f; }
 
 .identity { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
@@ -65,7 +94,8 @@
   .brandBar { flex-direction: column; align-items: flex-start; gap: 16px; }
   .progressContainer { padding: 20px; }
   .form { padding: 32px 20px calc(32px + env(safe-area-inset-bottom)); gap: 24px; }
-  .fieldCard { padding: 24px 20px; }
+  .fieldCard { padding: 22px 18px 24px; }
+  .cardTitle { font-size: 17px; }
   .submitBtn { width: 100%; align-self: stretch; min-height: 48px; }
   .success { padding: 60px 20px; }
 }
