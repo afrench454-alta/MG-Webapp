@@ -204,3 +204,38 @@ export async function runJosephNextStopAction(input: unknown): Promise<AskJoseph
     return { ok: false, message };
   }
 }
+
+
+export async function getJosephNextStopBriefAction(): Promise<{
+  ok: true;
+  jobs: Awaited<ReturnType<typeof listJobs>>;
+  clients: Awaited<ReturnType<typeof listClients>>;
+  invoices: Awaited<ReturnType<typeof listInvoices>>;
+  quotes: Awaited<ReturnType<typeof listQuotes>>;
+  actorId: string;
+  actorRole: "owner" | "co_owner" | "technician";
+} | { ok: false; message: string }> {
+  let context;
+  try {
+    context = await requireBusinessContext();
+  } catch {
+    return { ok: false, message: "Sign in to talk to Joseph." };
+  }
+
+  const [jobs, clients, invoices, quotes] = await Promise.all([
+    listJobs(context),
+    listClients(context),
+    listInvoices(context),
+    listQuotes(context),
+  ]);
+
+  return {
+    ok: true,
+    jobs,
+    clients,
+    invoices,
+    quotes,
+    actorId: context.actorId,
+    actorRole: context.role,
+  };
+}
