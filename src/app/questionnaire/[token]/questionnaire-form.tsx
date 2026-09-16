@@ -30,6 +30,7 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
         <div className={styles.successIcon}>✓</div>
         <h1>Responses received</h1>
         <p>{questionnaire.completion_message || "Thanks — the team can now prepare the next step."}</p>
+        <p>Questions? Email team@mowglowpropertyservices.com.au</p>
         <div className={styles.successDetails}>
           <strong>Reference ID:</strong> {token.substring(0, 8).toUpperCase()}
         </div>

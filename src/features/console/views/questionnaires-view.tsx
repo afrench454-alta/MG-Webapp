@@ -26,7 +26,7 @@ export function QuestionnairesView({
     <>
       <PageHeader
         eyebrow="Client intake"
-        title="Intake forms"
+        title="Intake"
         subtitle="Send a form to a new or existing client, then turn the answers into a job request for that property."
       >
         <Button icon={Send} onClick={() => onSend()}>

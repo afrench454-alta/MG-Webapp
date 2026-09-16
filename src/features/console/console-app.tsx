@@ -133,7 +133,7 @@ export type DialogState =
   | { type: "send-questionnaire"; questionnaireId?: string }
   | { type: "public-questionnaire"; questionnaire: Questionnaire }
   | { type: "submission"; submission: QuestionnaireSubmission }
-  | { type: "schedule" }
+  | { type: "schedule"; dateKey?: string }
   | { type: "job"; job: Job }
   | { type: "quote-document"; quote: Quote }
   | { type: "invoice-document"; record: Invoice }
@@ -1483,7 +1483,8 @@ export function ConsoleApp({
           <ScheduleView
             jobs={jobs}
             canSchedule={canOperateOffice}
-            onSchedule={() => setDialog({ type: "schedule" })}
+            organizerEmail={businessDetailsState.email}
+            onSchedule={(dateKey) => setDialog({ type: "schedule", dateKey })}
             onJob={(job) => setDialog({ type: "job", job })}
           />
         );
@@ -1686,6 +1687,7 @@ export function ConsoleApp({
             jobRequests={jobRequests}
             quotes={quotes}
             invoices={invoiceRecords}
+            submissions={questionnaireSubmissions}
             signedInEmail={signedInEmail}
             currentMemberId={actorId}
             teamMembers={teamMembers}
@@ -1945,9 +1947,11 @@ export function ConsoleApp({
       {dialog?.type === "schedule" ? (
         <Dialog title="Schedule Job" onClose={closeDialog}>
           <ScheduleFormDialog
+            key={dialog.dateKey || "schedule-now"}
             requests={jobRequests}
             jobs={jobs}
             teamMembers={teamMembers}
+            initialDate={dialog.dateKey}
             onClose={closeDialog}
             onSchedule={persistScheduledJob}
             pending={operationMutationPending}
