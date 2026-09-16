@@ -52,15 +52,13 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await page.getByRole("button", { name: "Close", exact: true }).click();
   });
 
-  test("navigates to Calendar and daily agenda", async ({ page }) => {
-    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Calendar" }).click();
-    await expect(page.getByRole("heading", { name: "Calendar" })).toBeVisible();
+  test("navigates to Schedule calendar and daily agenda", async ({ page }) => {
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Schedule" }).click();
+    await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
 
     // Month switcher buttons are accessible
     await expect(page.getByRole("button", { name: "Previous month" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Next month" })).toBeVisible();
-    await expect(page.locator(".calendar-weekdays span").first()).toHaveText("Mon");
-    await expect(page.getByRole("button", { name: "Export .ics" })).toBeVisible();
   });
 
   test("navigates to Job Board kanban", async ({ page }) => {
@@ -92,8 +90,8 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("tests questionnaire preview flow", async ({ page }) => {
-    await page.getByRole("button", { name: "Intake" }).click();
-    await expect(page.getByRole("heading", { name: "Intake" })).toBeVisible();
+    await page.getByRole("button", { name: "Intake forms" }).click();
+    await expect(page.getByRole("heading", { name: "Intake forms" })).toBeVisible();
 
     await page.getByRole("button", { name: "Preview" }).first().click();
     
@@ -158,7 +156,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await page.getByRole("button", { name: "Save Request" }).click();
     await expect(page.getByText("Job request created.")).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Calendar" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Schedule" }).click();
     await page.getByRole("button", { name: "Schedule a job" }).click();
     await page.getByLabel(/^Job request/).selectOption({ index: 1 });
     await page.getByLabel(/^Date & time/).fill("2026-09-20T10:00");

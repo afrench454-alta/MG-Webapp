@@ -2,7 +2,6 @@
 
 import type { Client, Questionnaire, QuestionnaireSubmission } from "../domain";
 import { formatSubmissionScope } from "../data/work-identity";
-import { TEAM_INBOX } from "@/lib/brand";
 import { Badge, Button } from "../components/ui-elements";
 
 export function SubmissionDialog({
@@ -30,27 +29,6 @@ export function SubmissionDialog({
     typeof submission.answers._site_address === "string"
       ? submission.answers._site_address
       : "";
-  const scope = formatSubmissionScope(submission.answers, fields);
-  const teamMail = {
-    to: TEAM_INBOX,
-    subject: encodeURIComponent(
-      `New intake: ${submission.respondent} · ${submission.questionnaire}`,
-    ),
-    body: encodeURIComponent(
-      [
-        `Intake form: ${submission.questionnaire}`,
-        `From: ${submission.respondent}`,
-        submission.email ? `Email: ${submission.email}` : "",
-        submission.phone ? `Phone: ${submission.phone}` : "",
-        siteAddress ? `Property: ${siteAddress}` : "",
-        `Submitted: ${submission.submitted}`,
-        "",
-        scope || "No answers stored.",
-      ]
-        .filter((line) => line !== "")
-        .join("\n"),
-    ),
-  };
 
   return (
     <div className="form-stack">
@@ -113,12 +91,6 @@ export function SubmissionDialog({
         <Button variant="secondary" type="button" onClick={onClose}>
           Close
         </Button>
-        <a
-          className="button button--secondary"
-          href={`mailto:${teamMail.to}?subject=${teamMail.subject}&body=${teamMail.body}`}
-        >
-          Email {TEAM_INBOX}
-        </a>
         {!matchingClient && !submission.jobRequestId ? (
           <Button type="button" onClick={onAddClient}>
             Add as client

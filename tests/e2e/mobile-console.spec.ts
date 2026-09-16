@@ -15,14 +15,14 @@ test.describe("Mow & Glow Console - Mobile", () => {
 
     const dock = page.getByRole("navigation", { name: "Quick navigation" });
     await expect(dock.getByRole("button", { name: "Home" })).toBeVisible();
-    await expect(dock.getByRole("button", { name: "Calendar" })).toBeVisible();
+    await expect(dock.getByRole("button", { name: "Schedule" })).toBeVisible();
     await expect(dock.getByRole("button", { name: "Quotes" })).toBeVisible();
     await expect(dock.getByRole("button", { name: "Invoices" })).toBeVisible();
     await expect(dock.getByRole("button", { name: "More" })).toBeVisible();
     await expect(dock.getByRole("button", { name: "Jobs" })).toHaveCount(0);
 
-    await dock.getByRole("button", { name: "Calendar" }).click();
-    await expect(page.getByRole("heading", { name: "Calendar" })).toBeVisible();
+    await dock.getByRole("button", { name: "Schedule" }).click();
+    await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
 
     await dock.getByRole("button", { name: "Quotes" }).click();
     await expect(page.getByRole("heading", { name: "Quotes" })).toBeVisible();

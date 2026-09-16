@@ -5,7 +5,6 @@ import Image from "next/image";
 import {
   AlertTriangle,
   CalendarOff,
-  CalendarPlus,
   Camera,
   CheckCircle2,
   PauseCircle,
@@ -19,7 +18,6 @@ import {
   displayServiceDetail,
 } from "../data/service-catalog";
 import { applyJobSchedule, clearJobSchedule } from "../data/job-recurrence";
-import { downloadIcs, jobsToIcs } from "../data/calendar-ics";
 import { findAssignmentConflicts } from "../data/schedule-planning";
 import { formatSiteTitle } from "../data/work-identity";
 import { Button, Field, IconButton } from "../components/ui-elements";
@@ -143,21 +141,6 @@ export function JobDetailsDialog({
               />
             </Field>
             {job.dateKey ? (
-              <>
-              <Button
-                variant="secondary"
-                type="button"
-                icon={CalendarPlus}
-                onClick={() =>
-                  downloadIcs(
-                    `mow-glow-${job.id.slice(0, 8)}.ics`,
-                    jobsToIcs([job]),
-                  )
-                }
-                disabled={pending}
-              >
-                Add to calendar
-              </Button>
               <Button
                 variant="secondary"
                 type="button"
@@ -167,7 +150,6 @@ export function JobDetailsDialog({
               >
                 Clear from calendar
               </Button>
-              </>
             ) : null}
           </div>
         </div>

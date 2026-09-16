@@ -10,13 +10,11 @@ import {
   productBrand,
   productName,
   signInIntro,
-  TEAM_INBOX,
 } from "../../src/lib/brand";
 
 test("product names are Mow & Glow Console, not FieldCentral", () => {
   assert.equal(productBrand, "Mow & Glow");
   assert.equal(productName, "Mow & Glow Console");
-  assert.equal(TEAM_INBOX, "team@mowglowpropertyservices.com.au");
   assert.equal(
     signInIntro,
     "Sign in to manage clients, field work, quotes, and invoices.",

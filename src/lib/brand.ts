@@ -3,7 +3,6 @@ export const productName = "Mow & Glow Console";
 export const signInIntro =
   "Sign in to manage clients, field work, quotes, and invoices.";
 export const DEFAULT_OWNER_NAME = "Jodie";
-export const TEAM_INBOX = "team@mowglowpropertyservices.com.au";
 
 export const OPERATOR_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   "team@mowglowpropertyservices.com.au": "Jodie",

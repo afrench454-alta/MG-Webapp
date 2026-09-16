@@ -5,7 +5,6 @@ import {
   compactAddress,
   currentMonthStart,
   defaultDateTimeLocal,
-  defaultDateTimeLocalForDay,
   formatCalendarEvent,
   formatJobDisplayName,
   formatSiteTitle,
@@ -154,18 +153,3 @@ test("currentMonthStart uses the Brisbane calendar month", () => {
   assert.equal(month.getMonth(), 8);
   assert.equal(month.getDate(), 1);
 });
-
-test("defaultDateTimeLocalForDay keeps a picked day at 09:00 unless it is today", () => {
-  assert.equal(
-    defaultDateTimeLocalForDay("2026-09-20", new Date("2026-09-16T02:00:00Z")),
-    "2026-09-20T09:00",
-  );
-  assert.equal(
-    defaultDateTimeLocalForDay(
-      "2026-09-16",
-      new Date("2026-09-16T02:10:00Z"),
-    ),
-    defaultDateTimeLocal(new Date("2026-09-16T02:10:00Z")),
-  );
-});
-

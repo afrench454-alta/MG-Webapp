@@ -7,14 +7,13 @@ import {
   findAssignmentConflicts,
   findSiteConflict,
 } from "../data/schedule-planning";
-import { defaultDateTimeLocal, defaultDateTimeLocalForDay, formatWorkLabel } from "../data/work-identity";
+import { defaultDateTimeLocal, formatWorkLabel } from "../data/work-identity";
 import { Button, Field } from "../components/ui-elements";
 
 export function ScheduleFormDialog({
   requests,
   jobs = [],
   teamMembers = [],
-  initialDate,
   onClose,
   onSchedule,
   pending = false,
@@ -23,7 +22,6 @@ export function ScheduleFormDialog({
   requests: JobRequest[];
   jobs?: Job[];
   teamMembers?: TeamMember[];
-  initialDate?: string;
   onClose: () => void;
   onSchedule: (payload: {
     jobRequestId: string;
@@ -34,9 +32,7 @@ export function ScheduleFormDialog({
   error?: string;
 }) {
   const [request, setRequest] = useState("");
-  const [date, setDate] = useState(() =>
-    initialDate ? defaultDateTimeLocalForDay(initialDate) : defaultDateTimeLocal(),
-  );
+  const [date, setDate] = useState(() => defaultDateTimeLocal());
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const selected = useMemo(
     () => requests.find((item) => item.id === request),

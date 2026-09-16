@@ -1,31 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Download, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import type { Job } from "../domain";
-import { downloadIcs, jobsToIcs } from "../data/calendar-ics";
-import { WEEKDAY_LABELS, monthCells, padMonthDay } from "../data/calendar-grid";
 import { displayServiceCategory } from "../data/service-catalog";
-import {
-  brisbaneTodayKey,
-  currentMonthStart,
-  formatCalendarEvent,
-  formatSiteTitle,
-} from "../data/work-identity";
+import { currentMonthStart, formatCalendarEvent, formatSiteTitle } from "../data/work-identity";
 import { Button, EmptyState, IconButton, PageHeader } from "../components/ui-elements";
 import { Dialog } from "../components/dialog";
 
 export function ScheduleView({
   jobs,
   canSchedule = true,
-  organizerEmail,
   onSchedule,
   onJob,
 }: {
   jobs: Job[];
   canSchedule?: boolean;
-  organizerEmail?: string;
-  onSchedule: (dateKey?: string) => void;
+  onSchedule: () => void;
   onJob: (job: Job) => void;
 }) {
   const [month, setMonth] = useState(() => currentMonthStart());
@@ -33,8 +24,13 @@ export function ScheduleView({
 
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
-  const calendarCells = monthCells(year, monthIndex);
-  const todayKey = brisbaneTodayKey();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const leadingDays = new Date(year, monthIndex, 1).getDay();
+  const cellCount = Math.ceil((leadingDays + daysInMonth) / 7) * 7;
+  const calendarCells = Array.from({ length: cellCount }, (_, index) => {
+    const day = index - leadingDays + 1;
+    return day > 0 && day <= daysInMonth ? day : null;
+  });
 
   const monthPrefix = `${year}-${String(monthIndex + 1).padStart(2, "0")}-`;
   const monthLabel = new Intl.DateTimeFormat("en-AU", {
@@ -68,16 +64,9 @@ export function ScheduleView({
       }).format(new Date(`${selectedDateKey}T00:00:00+10:00`))
     : "";
 
-  const exportMonth = () => {
-    downloadIcs(
-      `mow-glow-${monthPrefix.slice(0, 7)}.ics`,
-      jobsToIcs(visibleJobs, organizerEmail),
-    );
-  };
-
   return (
     <>
-      <PageHeader eyebrow="Calendar" title="Calendar">
+      <PageHeader eyebrow="Calendar" title="Schedule">
         <div className="month-switcher">
           <IconButton
             label="Previous month"
@@ -101,39 +90,32 @@ export function ScheduleView({
             }
           />
         </div>
-        <Button
-          variant="secondary"
-          icon={Download}
-          onClick={exportMonth}
-          disabled={!visibleJobs.length}
-        >
-          Export .ics
-        </Button>
         {canSchedule ? (
-          <Button onClick={() => onSchedule()}>Schedule a job</Button>
+          <Button onClick={onSchedule}>Schedule a job</Button>
         ) : null}
       </PageHeader>
       <div className="calendar-wrap">
         <div className="calendar-weekdays">
-          {WEEKDAY_LABELS.map((day) => (
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
             <span key={day}>{day}</span>
           ))}
         </div>
         <div className="calendar-grid">
           {calendarCells.map((day, index) => {
             const dayJobs = day ? jobsByDay.get(day) || [] : [];
-            const dateKey = day ? padMonthDay(year, monthIndex, day) : "";
-            const isToday = Boolean(dateKey) && dateKey === todayKey;
+            const dateKey = day
+              ? `${monthPrefix}${String(day).padStart(2, "0")}`
+              : "";
             return (
               <div
-                className={`calendar-day ${day ? "" : "calendar-day--empty"} ${dayJobs.length ? "calendar-day--busy" : ""} ${isToday ? "calendar-day--today" : ""}`}
+                className={`calendar-day ${day ? "" : "calendar-day--empty"} ${dayJobs.length ? "calendar-day--busy" : ""}`}
                 key={`${monthPrefix}${index}`}
               >
                 {day ? (
                   <button
                     className="calendar-day__open"
                     type="button"
-                    aria-label={`Open ${day} ${monthLabel}${dayJobs.length ? `, ${dayJobs.length} jobs` : ", no jobs"}${isToday ? ", today" : ""}`}
+                    aria-label={`Open ${day} ${monthLabel}${dayJobs.length ? `, ${dayJobs.length} jobs` : ", no jobs"}`}
                     onClick={() => setSelectedDateKey(dateKey)}
                   >
                     <span>{day}</span>
@@ -210,9 +192,8 @@ export function ScheduleView({
               <Button
                 icon={Plus}
                 onClick={() => {
-                  const day = selectedDateKey;
                   setSelectedDateKey(null);
-                  onSchedule(day);
+                  onSchedule();
                 }}
               >
                 Schedule another job
@@ -256,9 +237,8 @@ export function ScheduleView({
                 onAction={
                   canSchedule
                     ? () => {
-                        const day = selectedDateKey;
                         setSelectedDateKey(null);
-                        onSchedule(day);
+                        onSchedule();
                       }
                     : undefined
                 }
