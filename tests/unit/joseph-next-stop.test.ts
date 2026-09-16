@@ -13,6 +13,8 @@ import {
   nextStopOpsStatus,
   nextStopToolCall,
   pickNextStopJob,
+  stripJobOpsSentinel,
+  tagJobOpsNotes,
 } from "../../src/features/console/data/joseph-next-stop";
 
 const CLIENT_ID = "123e4567-e89b-12d3-a456-426614174000";
@@ -126,6 +128,29 @@ test("nextStopOpsStatus picks one label from live job state", () => {
   assert.equal(nextStopOpsStatus("completed", "En route"), "Done");
 });
 
+test("nextStopOpsStatus reads persisted En route and Running late from job notes", () => {
+  assert.equal(
+    nextStopOpsStatus("scheduled", null, "[[joseph-ops:en-route]]\nGate code 4451."),
+    "En route",
+  );
+  assert.equal(
+    nextStopOpsStatus("scheduled", null, "[[joseph-ops:running-late]]"),
+    "Running late",
+  );
+  assert.equal(
+    nextStopOpsStatus("in-progress", null, "[[joseph-ops:en-route]]\nGate code"),
+    "En route",
+  );
+  assert.equal(
+    nextStopOpsStatus("completed", null, "[[joseph-ops:en-route]]"),
+    "Done",
+  );
+  assert.equal(
+    nextStopOpsStatus("scheduled", "Running late", "[[joseph-ops:en-route]]"),
+    "Running late",
+  );
+});
+
 test("pickNextStopJob prefers the current in-progress job", () => {
   const next = pickNextStopJob([
     job({ id: LATER_JOB_ID, dateKey: "2026-08-10T08:00", status: "scheduled" }),
@@ -150,7 +175,7 @@ test("pickNextStopJob returns nothing when the board is clear", () => {
   assert.equal(pickNextStopJob([]), undefined);
 });
 
-test("buildNextStopBrief includes name, address, notes, and outstanding balance", () => {
+test("buildNextStopBrief includes name, address, notes, job scope, and outstanding balance", () => {
   const brief = buildNextStopBrief({
     jobs: [job()],
     clients: [client()],
@@ -167,6 +192,7 @@ test("buildNextStopBrief includes name, address, notes, and outstanding balance"
   assert.ok(brief);
   assert.equal(brief.clientName, "Northside Studio");
   assert.equal(brief.address, "7 McCauley Drive, Booie");
+  assert.equal(brief.scopeLine, "Cleaning Services · Regular studio clean");
   assert.equal(brief.notes, "Gate code 4451. Dog in backyard.");
   assert.equal(brief.balance, 150);
   assert.match(brief.balanceLabel, /150/);
@@ -174,6 +200,37 @@ test("buildNextStopBrief includes name, address, notes, and outstanding balance"
   assert.equal(brief.opsStatus, "Scheduled");
   assert.equal(brief.hasLinkedQuote, true);
   assert.equal(brief.quoteId, QUOTE_ID);
+});
+
+test("buildNextStopBrief reads persisted En route from notes without an overlay", () => {
+  const brief = buildNextStopBrief({
+    jobs: [
+      job({
+        status: "in-progress",
+        notes: "[[joseph-ops:en-route]]\nGate code 4451. Dog in backyard.",
+      }),
+    ],
+    clients: [client()],
+    invoices: [],
+    quotes: [quote()],
+  });
+  assert.ok(brief);
+  assert.equal(brief.opsStatus, "En route");
+  assert.equal(brief.notes, "Gate code 4451. Dog in backyard.");
+  assert.equal(brief.jobNotes, "Gate code 4451. Dog in backyard.");
+  assert.equal(stripJobOpsSentinel(brief.notes).includes("[[joseph-ops"), false);
+});
+
+test("buildNextStopBrief reads persisted Running late from notes without an overlay", () => {
+  const brief = buildNextStopBrief({
+    jobs: [job({ notes: "[[joseph-ops:running-late]]\nGate code 4451. Dog in backyard." })],
+    clients: [client()],
+    invoices: [],
+    quotes: [quote()],
+  });
+  assert.ok(brief);
+  assert.equal(brief.opsStatus, "Running late");
+  assert.equal(brief.notes, "Gate code 4451. Dog in backyard.");
 });
 
 test("technicians only see an assigned next stop", () => {
@@ -224,7 +281,7 @@ test("action chips are On my way, Running late, and Done → Draft invoice", () 
   assert.equal(JOSEPH_DRAFT_INVOICE_CONFIRM, "Draft invoice");
 });
 
-test("On my way and Running late wire to draft_client_message as draft only", () => {
+test("On my way persists En route via update_job_status, not draft-only", () => {
   const brief = buildNextStopBrief({
     jobs: [job()],
     clients: [client()],
@@ -234,16 +291,53 @@ test("On my way and Running late wire to draft_client_message as draft only", ()
   assert.ok(brief);
 
   const onMyWay = nextStopToolCall("on-my-way", brief);
-  assert.equal(onMyWay.name, "draft_client_message");
-  assert.equal(onMyWay.args.query, "Northside Studio");
-  assert.match(String(onMyWay.args.intent), /on my way/i);
-  assert.equal("confirm" in onMyWay.args, false);
+  assert.equal(onMyWay.name, "update_job_status");
+  assert.equal(onMyWay.args.jobId, JOB_ID);
+  assert.equal(onMyWay.args.status, "in-progress");
+  assert.equal(onMyWay.args.confirm, true);
+  assert.equal(String(onMyWay.args.notes), tagJobOpsNotes(brief.jobNotes, "En route"));
+  assert.match(String(onMyWay.args.notes), /\[\[joseph-ops:en-route\]\]/);
+  assert.match(String(onMyWay.args.notes), /Gate code 4451/);
   assert.equal("sent" in onMyWay.args, false);
+});
+
+test("Running late persists Running late via update_job_status and keeps scheduled", () => {
+  const brief = buildNextStopBrief({
+    jobs: [job()],
+    clients: [client()],
+    invoices: [],
+    quotes: [quote()],
+  });
+  assert.ok(brief);
 
   const runningLate = nextStopToolCall("running-late", brief);
-  assert.equal(runningLate.name, "draft_client_message");
-  assert.match(String(runningLate.args.intent), /running a bit late/i);
-  assert.equal("sent" in runningLate.args, false);
+  assert.equal(runningLate.name, "update_job_status");
+  assert.equal(runningLate.args.status, "scheduled");
+  assert.equal(runningLate.args.confirm, true);
+  assert.match(String(runningLate.args.notes), /\[\[joseph-ops:running-late\]\]/);
+  assert.match(String(runningLate.args.notes), /Gate code 4451/);
+});
+
+test("Running late keeps in-progress when the job is already En route", () => {
+  const brief = buildNextStopBrief({
+    jobs: [
+      job({
+        status: "in-progress",
+        notes: "[[joseph-ops:en-route]]\nGate code 4451. Dog in backyard.",
+      }),
+    ],
+    clients: [client()],
+    invoices: [],
+    quotes: [quote()],
+  });
+  assert.ok(brief);
+  assert.equal(brief.opsStatus, "En route");
+
+  const runningLate = nextStopToolCall("running-late", brief);
+  assert.equal(runningLate.name, "update_job_status");
+  assert.equal(runningLate.args.status, "in-progress");
+  assert.match(String(runningLate.args.notes), /\[\[joseph-ops:running-late\]\]/);
+  assert.equal(String(runningLate.args.notes).includes("en-route"), false);
 });
 
 test("Done → Draft invoice wires complete_job_and_draft_invoice from the linked quote", () => {
@@ -292,6 +386,13 @@ test("message tool replies stay drafts and invoice replies mention the quote", (
   );
   assert.match(message, /Not sent/);
   assert.match(message, /on my way/);
+  assert.match(message, /En route/);
+
+  const statusOnly = formatNextStopToolReply(
+    "running-late",
+    JSON.stringify({ id: JOB_ID, client: "Northside Studio", status: "scheduled" }),
+  );
+  assert.match(statusOnly, /Running late/);
 
   const invoiceReply = formatNextStopToolReply(
     "done-draft-invoice",
