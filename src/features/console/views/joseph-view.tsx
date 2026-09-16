@@ -20,7 +20,6 @@ import {
   buildNextStopBrief,
   canConfirmDraftInvoice,
   localMessageDraft,
-  nextStopOpsStatus,
   nextStopOpsTone,
   overlayForChip,
   type NextStopChipId,
@@ -115,9 +114,7 @@ export function JosephView({
       opsOverlay,
     ],
   );
-  const opsStatus = brief
-    ? nextStopOpsStatus(brief.jobStatus, opsOverlay)
-    : null;
+  const opsStatus = brief?.opsStatus ?? null;
 
   const nextLineId = (role: JosephMessage["role"]) => {
     idRef.current += 1;
@@ -146,6 +143,18 @@ export function JosephView({
       { id: nextLineId("user"), role: "user", content: userText },
       { id: nextLineId("assistant"), role: "assistant", content: reply },
     ]);
+  };
+
+  const refreshBrief = async () => {
+    if (jobs.length) return;
+    const result = await getJosephNextStopBriefAction();
+    if (!result.ok) return;
+    setLoadedJobs(result.jobs);
+    setLoadedClients(result.clients);
+    setLoadedInvoices(result.invoices);
+    setLoadedQuotes(result.quotes);
+    setLoadedActorId(result.actorId);
+    setLoadedActorRole(result.actorRole);
   };
 
   const submitPrompt = async (raw: string) => {
@@ -249,11 +258,11 @@ export function JosephView({
       appendExchange(confirm ? JOSEPH_DRAFT_INVOICE_CONFIRM : chipLabel, result.reply);
       const next = overlayForChip(chip);
       if (next) setOpsOverlay(next);
+      await refreshBrief();
     } catch {
       setError("Joseph could not finish that action.");
     } finally {
       setPending(false);
-      inputRef.current?.focus();
     }
   };
 
@@ -300,6 +309,7 @@ export function JosephView({
             </div>
             <h2>{brief.clientName}</h2>
             <p className="joseph-brief__address">{brief.address}</p>
+            {brief.scopeLine ? <p className="joseph-brief__scope">{brief.scopeLine}</p> : null}
             {brief.time || brief.date ? (
               <p className="joseph-brief__when">
                 {[brief.time, brief.date].filter(Boolean).join(" · ")}
