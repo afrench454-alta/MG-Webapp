@@ -129,6 +129,10 @@ function brisbaneYmd(now: Date): string {
   }).format(now);
 }
 
+export function brisbaneTodayKey(now: Date = new Date()): string {
+  return brisbaneYmd(now);
+}
+
 export function currentMonthStart(now: Date = new Date()): Date {
   const [year, month] = brisbaneYmd(now).split("-").map(Number);
   return new Date(year, month - 1, 1);
@@ -151,4 +155,16 @@ export function defaultDateTimeLocal(now: Date = new Date()): string {
   }
   const nextHour = Math.max(hour + 1, 8);
   return `${today}T${String(nextHour).padStart(2, "0")}:00`;
+}
+
+/** datetime-local for a Brisbane calendar day. Today uses the next working hour. */
+export function defaultDateTimeLocalForDay(
+  dayKey: string,
+  now: Date = new Date(),
+): string {
+  const match = dayKey.match(/^(\d{4}-\d{2}-\d{2})/);
+  const day = match?.[1];
+  if (!day) return defaultDateTimeLocal(now);
+  if (day === brisbaneYmd(now)) return defaultDateTimeLocal(now);
+  return `${day}T09:00`;
 }

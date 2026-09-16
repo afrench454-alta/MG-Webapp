@@ -25,6 +25,7 @@ import {
   type JobRequest,
   type Quote,
   type TeamMember,
+  type QuestionnaireSubmission,
 } from "../domain";
 import { invoiceDisplayStatus } from "../data/invoice-lifecycle";
 import { isLiveInvoice, isLiveQuote } from "../data/list-filters";
@@ -38,6 +39,7 @@ export function DashboardView({
   jobRequests,
   quotes,
   invoices,
+  submissions = [],
   signedInEmail,
   currentMemberId,
   teamMembers = [],
@@ -49,6 +51,7 @@ export function DashboardView({
   jobRequests: JobRequest[];
   quotes: Quote[];
   invoices: Invoice[];
+  submissions?: QuestionnaireSubmission[];
   signedInEmail?: string;
   currentMemberId?: string;
   teamMembers?: TeamMember[];
@@ -111,6 +114,9 @@ export function DashboardView({
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+  const pendingIntake = submissions.filter(
+    (item) => !item.jobRequestId,
+  ).length;
   const overdueInvoices = liveInvoices.filter(
     (record) => invoiceDisplayStatus(record) === "Overdue",
   ).length;
@@ -229,7 +235,7 @@ export function DashboardView({
               className="text-link"
               onClick={() => onNavigate("schedule")}
             >
-              Open schedule <ArrowRight aria-hidden="true" size={16} />
+              Open calendar <ArrowRight aria-hidden="true" size={16} />
             </button>
           </div>
           {upcoming ? (
@@ -285,11 +291,7 @@ export function DashboardView({
                       jobs.filter((job) => job.status === "in-progress").length,
                     ],
                     [Clock3, "Site visits due", siteVisitsDue],
-                    [
-                      ReceiptText,
-                      "Quotes to send",
-                      liveQuotes.filter((quote) => quote.status === "Draft").length,
-                    ],
+                    [ClipboardList, "Intake to action", pendingIntake],
                     [DollarSign, "Invoices overdue", overdueInvoices],
                   ]
                 : [
