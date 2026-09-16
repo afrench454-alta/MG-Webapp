@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { signOutAction } from "@/app/actions/auth";
 import { ConsoleApp } from "@/features/console/console-app";
+import "@/features/console/console-desktop-nav.css";
 import { archiveClientAction, commitClientImportAction, previewClientImportAction, saveClientAction } from "@/features/console/data/client-actions";
 import { listClients } from "@/features/console/data/client-repository";
 import { deleteJobRequestAction, saveJobRequestAction } from "@/features/console/data/job-request-actions";
