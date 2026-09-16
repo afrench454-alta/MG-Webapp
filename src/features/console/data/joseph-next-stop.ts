@@ -28,7 +28,9 @@ export type NextStopBrief = {
   clientId: string | null;
   clientName: string;
   address: string;
+  scopeLine: string;
   notes: string;
+  jobNotes: string;
   date: string;
   time: string;
   opsStatus: NextStopOpsStatus;
@@ -43,6 +45,8 @@ export type NextStopToolCall = {
   name: string;
   args: Record<string, unknown>;
 };
+
+const OPS_SENTINEL_RE = /^\s*\[\[joseph-ops:(en-route|running-late)\]\]\s*/;
 
 function isOpenJob(job: Job): boolean {
   return job.status !== "completed" && job.status !== "cancelled";
@@ -72,12 +76,42 @@ export function pickNextStopJob(jobs: Job[]): Job | undefined {
 
 export type NextStopOpsOverlay = Extract<NextStopOpsStatus, "En route" | "Running late" | "Done">;
 
+export function parseJobOpsOverlay(notes: string | null | undefined): Extract<NextStopOpsOverlay, "En route" | "Running late"> | null {
+  const match = (notes || "").match(OPS_SENTINEL_RE);
+  if (!match) return null;
+  return match[1] === "en-route" ? "En route" : "Running late";
+}
+
+export function stripJobOpsSentinel(notes: string | null | undefined): string {
+  return (notes || "").replace(OPS_SENTINEL_RE, "").trim();
+}
+
+export function tagJobOpsNotes(
+  notes: string | null | undefined,
+  overlay: Extract<NextStopOpsOverlay, "En route" | "Running late">,
+): string {
+  const tag = overlay === "En route" ? "en-route" : "running-late";
+  const body = stripJobOpsSentinel(notes);
+  return body ? `[[joseph-ops:${tag}]]\n${body}` : `[[joseph-ops:${tag}]]`;
+}
+
+export function jobScopeLine(job: Pick<Job, "category" | "scope">): string {
+  const category = job.category.trim();
+  const scope = job.scope.trim();
+  if (category && scope && scope !== category) return `${category} · ${scope}`;
+  return scope || category;
+}
+
 export function nextStopOpsStatus(
   jobStatus: Job["status"] | undefined,
   overlay?: NextStopOpsOverlay | null,
+  notes?: string | null,
 ): NextStopOpsStatus {
   if (jobStatus === "completed" || overlay === "Done") return "Done";
-  if (overlay === "En route" || overlay === "Running late") return overlay;
+  const persisted = parseJobOpsOverlay(notes);
+  const effective =
+    overlay === "En route" || overlay === "Running late" ? overlay : persisted;
+  if (effective === "En route" || effective === "Running late") return effective;
   if (jobStatus === "in-progress") return "In progress";
   return "Scheduled";
 }
@@ -127,7 +161,8 @@ export function buildNextStopBrief(input: {
   });
   const balance = outstanding.reduce((sum, invoice) => sum + invoiceBalance(invoice), 0);
   const quote = linkedAcceptedQuote(job, input.quotes);
-  const notes = job.notes.trim() || client?.notes.trim() || "";
+  const jobNotes = stripJobOpsSentinel(job.notes);
+  const notes = jobNotes || client?.notes.trim() || "";
 
   return {
     jobId: job.id,
@@ -135,10 +170,12 @@ export function buildNextStopBrief(input: {
     clientId: job.clientId || client?.id || null,
     clientName: job.client,
     address: job.address,
+    scopeLine: jobScopeLine(job),
     notes,
+    jobNotes,
     date: job.date,
     time: job.time,
-    opsStatus: nextStopOpsStatus(job.status, input.overlay),
+    opsStatus: nextStopOpsStatus(job.status, input.overlay, job.notes),
     balance,
     balanceLabel: money(balance),
     outstandingCount: outstanding.length,
@@ -159,15 +196,22 @@ export function nextStopMessageIntent(
 
 export function nextStopToolCall(
   chip: NextStopChipId,
-  brief: Pick<NextStopBrief, "jobId" | "clientName" | "address" | "hasLinkedQuote">,
+  brief: Pick<
+    NextStopBrief,
+    "jobId" | "clientName" | "address" | "hasLinkedQuote" | "jobStatus" | "jobNotes"
+  >,
   confirm = false,
 ): NextStopToolCall {
   if (chip === "on-my-way" || chip === "running-late") {
+    const overlay = chip === "on-my-way" ? "En route" : "Running late";
+    const status = chip === "on-my-way" ? "in-progress" : brief.jobStatus;
     return {
-      name: "draft_client_message",
+      name: "update_job_status",
       args: {
-        query: brief.clientName,
-        intent: nextStopMessageIntent(chip, brief),
+        jobId: brief.jobId,
+        status,
+        notes: tagJobOpsNotes(brief.jobNotes, overlay),
+        confirm: true,
       },
     };
   }
@@ -210,12 +254,19 @@ export function formatNextStopToolReply(
   if (typeof payload.error === "string") return payload.error;
 
   if (chip === "on-my-way" || chip === "running-late") {
+    const label = chip === "on-my-way" ? "En route" : "Running late";
     const draft = typeof payload.draft === "string" ? payload.draft : "";
+    if (!draft) return action || `${label}.`;
     const preferred = typeof payload.preferred === "string" ? payload.preferred : "Message";
     const phone = typeof payload.phone === "string" ? payload.phone : "";
     const email = typeof payload.email === "string" ? payload.email : "";
     const contact = phone || email;
-    const lines = [draft || "Draft ready.", `${preferred}${contact ? `: ${contact}` : ""}.`, "Not sent."];
+    const lines = [
+      `${label}.`,
+      draft,
+      `${preferred}${contact ? `: ${contact}` : ""}.`,
+      "Not sent.",
+    ];
     return lines.filter(Boolean).join("\n");
   }
 

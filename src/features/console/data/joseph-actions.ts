@@ -29,6 +29,7 @@ import {
   buildNextStopBrief,
   canConfirmDraftInvoice,
   formatNextStopToolReply,
+  nextStopMessageIntent,
   nextStopToolCall,
 } from "./joseph-next-stop";
 import { listClients } from "./client-repository";
@@ -188,12 +189,28 @@ export async function runJosephNextStopAction(input: unknown): Promise<AskJoseph
   const call = nextStopToolCall(parsed.data.chip, brief, parsed.data.confirm === true);
   try {
     const executed = await executeJosephTool(context, call.name, JSON.stringify(call.args));
-    if (executed.action) revalidatePath("/");
-    return {
-      ok: true,
-      reply: formatNextStopToolReply(parsed.data.chip, executed.text, executed.action),
-      actions: executed.action ? [executed.action] : [],
-    };
+    revalidatePath("/");
+    const actions = executed.action ? [executed.action] : [];
+    let reply = formatNextStopToolReply(parsed.data.chip, executed.text, executed.action);
+
+    if (parsed.data.chip === "on-my-way" || parsed.data.chip === "running-late") {
+      try {
+        const drafted = await executeJosephTool(
+          context,
+          "draft_client_message",
+          JSON.stringify({
+            query: brief.clientName,
+            intent: nextStopMessageIntent(parsed.data.chip, brief),
+          }),
+        );
+        reply = formatNextStopToolReply(parsed.data.chip, drafted.text, executed.action);
+        if (drafted.action) actions.push(drafted.action);
+      } catch {
+        // Status already persisted; message draft is optional.
+      }
+    }
+
+    return { ok: true, reply, actions };
   } catch (error) {
     const message =
       error instanceof z.ZodError
@@ -204,7 +221,6 @@ export async function runJosephNextStopAction(input: unknown): Promise<AskJoseph
     return { ok: false, message };
   }
 }
-
 
 export async function getJosephNextStopBriefAction(): Promise<{
   ok: true;
