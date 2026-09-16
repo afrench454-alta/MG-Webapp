@@ -25,7 +25,10 @@ export type QuestionnaireSubmissionList = QuestionnaireSubmission[];
 
 export const formFieldSchema = z.object({
   id: z.string(),
-  label: z.string(),
+  label: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() ? value : "Untitled"),
+    z.string(),
+  ),
   type: z.enum(["text", "textarea", "radio", "checkbox"]),
   required: z.boolean().optional(),
   options: z.array(z.string()).optional()
