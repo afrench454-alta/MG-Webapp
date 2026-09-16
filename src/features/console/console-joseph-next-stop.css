@@ -1,0 +1,75 @@
+.joseph-brief {
+  flex: 0 0 auto;
+  margin: 8px 4px 0;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.joseph-brief__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.joseph-brief h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Work Sans", sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.joseph-brief p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.joseph-brief__address {
+  color: var(--ink) !important;
+  font-weight: 600;
+}
+
+.joseph-brief__notes {
+  white-space: pre-wrap;
+}
+
+.joseph-brief__balance {
+  color: var(--ink) !important;
+  font-weight: 600;
+}
+
+.joseph-suggestions--actions {
+  justify-content: flex-start;
+  margin: 10px 4px 4px;
+}
+
+.joseph-confirm {
+  display: grid;
+  gap: 10px;
+  margin: 4px 4px 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-soft);
+}
+
+.joseph-confirm p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.joseph-confirm .button {
+  justify-self: start;
+  min-height: 44px;
+}
+
