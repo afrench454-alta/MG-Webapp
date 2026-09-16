@@ -9,6 +9,7 @@ import {
   scheduleJobSchema,
 } from "../../src/features/console/data/operations-contract";
 import { joinWithPasswordSchema, teamMemberUpdateSchema } from "../../src/features/console/data/team-contract";
+import { formFieldSchema, publicQuestionnaireSchema } from "../../src/features/console/data/questionnaire-contract";
 import { getSafeReturnPath, isAuthOnlyPath, isPublicPath } from "../../src/lib/supabase/routing";
 
 const VALID_UUID = "123e4567-e89b-12d3-a456-426614174000";
@@ -259,8 +260,6 @@ test("contracts: jobUpdateSchema accepts a new start or a cleared start", () => 
   );
 });
 
-import { publicQuestionnaireSchema } from "../../src/features/console/data/questionnaire-contract";
-
 test("contracts: publicQuestionnaireSchema validates forms properly", () => {
   const validPayload = {
     already_submitted: false,
@@ -285,4 +284,11 @@ test("contracts: publicQuestionnaireSchema validates forms properly", () => {
 
   const missingTitle = { ...validPayload, questionnaire: { ...validPayload.questionnaire, title: undefined } };
   assert.equal(publicQuestionnaireSchema.safeParse(missingTitle).success, false);
+});
+
+test("contracts: formFieldSchema accepts a null label without throwing", () => {
+  const parsed = formFieldSchema.parse({ id: "q8", label: null, type: "text" });
+  assert.equal(parsed.label, "Untitled");
+  const unknownType = formFieldSchema.parse({ id: "q9", label: "Notes", type: "select" });
+  assert.equal(unknownType.type, "text");
 });

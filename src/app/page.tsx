@@ -23,10 +23,20 @@ import {
   listTeamInvitations,
   listTeamMembers,
 } from "@/features/console/data/team-repository";
+import { businessProfile as defaultBusinessProfile } from "@/features/console/domain";
 import { getBusinessContext } from "@/lib/supabase/business";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
+
+async function loadHomeSlice<T>(label: string, task: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await task;
+  } catch (error) {
+    console.error(`Console home failed to load ${label}`, error);
+    return fallback;
+  }
+}
 
 export default async function Home() {
   if (!isSupabaseConfigured()) {
@@ -37,16 +47,16 @@ export default async function Home() {
   if (!context) redirect("/sign-in");
 
   const [clients, jobRequests, questionnaires, questionnaireSubmissions, quotes, jobs, teamMembers, invitations, businessDetails, invoices] = await Promise.all([
-    listClients(context),
-    listJobRequests(context),
-    listQuestionnaires(context),
-    listQuestionnaireSubmissions(context),
-    listQuotes(context),
-    listJobs(context),
-    listTeamMembers(context, { includeInactive: true }),
-    listTeamInvitations(context),
-    getBusinessProfile(context),
-    listInvoices(context),
+    loadHomeSlice("clients", listClients(context), []),
+    loadHomeSlice("job requests", listJobRequests(context), []),
+    loadHomeSlice("questionnaires", listQuestionnaires(context), []),
+    loadHomeSlice("questionnaire submissions", listQuestionnaireSubmissions(context), []),
+    loadHomeSlice("quotes", listQuotes(context), []),
+    loadHomeSlice("jobs", listJobs(context), []),
+    loadHomeSlice("team members", listTeamMembers(context, { includeInactive: true }), []),
+    loadHomeSlice("team invitations", listTeamInvitations(context), []),
+    loadHomeSlice("business profile", getBusinessProfile(context), defaultBusinessProfile),
+    loadHomeSlice("invoices", listInvoices(context), []),
   ]);
 
   return (

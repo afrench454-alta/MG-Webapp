@@ -29,7 +29,7 @@ export const formFieldSchema = z.object({
     (value) => (typeof value === "string" && value.trim() ? value : "Untitled"),
     z.string(),
   ),
-  type: z.enum(["text", "textarea", "radio", "checkbox"]),
+  type: z.enum(["text", "textarea", "radio", "checkbox"]).catch("text"),
   required: z.boolean().optional(),
   options: z.array(z.string()).optional()
 });

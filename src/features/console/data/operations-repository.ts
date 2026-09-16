@@ -36,10 +36,14 @@ import {
   toDbDocumentStatus,
   voidInvoice,
 } from "./invoice-lifecycle";
+import {
+  lineItemRowSchema,
+  parseAddressLookups,
+  type AddressLookup,
+} from "./operations-row-schemas";
 
-const itemSchema = z.object({ label: z.string().nullable().optional(), description: z.string(), quantity: z.coerce.number(), unit_label: z.string().optional(), unit_price: z.coerce.number(), tax_rate: z.coerce.number().optional() });
+const itemSchema = lineItemRowSchema;
 const clientRowSchema = z.object({ id: z.uuid(), display_name: z.string() });
-const addressRowSchema = z.object({ id: z.uuid(), label: z.string(), line_1: z.string() });
 const profileRowSchema = z.object({ id: z.uuid(), display_name: z.string().nullable(), email: z.string().nullable(), role: z.enum(["owner", "co_owner", "technician"]) });
 const assignmentRowSchema = z.object({ job_id: z.uuid(), profile_id: z.uuid(), is_lead: z.boolean() });
 const attachmentRowSchema = z.object({ id: z.uuid(), job_id: z.uuid(), storage_bucket: z.string(), storage_path: z.string(), original_filename: z.string(), caption: z.string().nullable(), created_at: z.string() });
@@ -54,7 +58,6 @@ const QUOTE_SELECT = "id, client_id, service_address_id, job_request_id, documen
 const JOB_SELECT = "id, client_id, service_address_id, job_request_id, status, title, scope_of_work, internal_instructions, scheduled_start";
 const INVOICE_SELECT = "id, client_id, billing_address_id, job_id, quote_id, document_number, document_status, payment_status, title, issue_date, due_date, payment_instructions, internal_notes";
 
-type AddressLookup = { label: string; line1: string };
 type LookupMaps = { clients: Map<string, string>; addresses: Map<string, AddressLookup> };
 
 async function loadLookupMaps(context: BusinessContext): Promise<LookupMaps> {
@@ -67,7 +70,7 @@ async function loadLookupMaps(context: BusinessContext): Promise<LookupMaps> {
   if (addressesResult.error) throw new Error(addressesResult.error.message);
   return {
     clients: new Map(z.array(clientRowSchema).parse(clientsResult.data || []).map((row) => [row.id, row.display_name])),
-    addresses: new Map(z.array(addressRowSchema).parse(addressesResult.data || []).map((row) => [row.id, { label: row.label, line1: row.line_1 }])),
+    addresses: parseAddressLookups(addressesResult.data),
   };
 }
 
@@ -86,12 +89,12 @@ function groupRows<T>(rows: T[], parentId: (row: T) => string): Map<string, T[]>
 function formatDate(value: string | null): string { return value ? new Intl.DateTimeFormat("en-AU", { day: "2-digit", month: "short", year: "numeric", timeZone: "Australia/Brisbane" }).format(new Date(`${value}T00:00:00`)) : "—"; }
 function formatScheduledDate(value: string): { date: string; time: string; dateKey: string } { const instant = new Date(value); const parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Brisbane", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(instant); const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value || ""; const dateKey = `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`; return { date: new Intl.DateTimeFormat("en-AU", { day: "2-digit", month: "short", year: "numeric", timeZone: "Australia/Brisbane" }).format(instant), time: new Intl.DateTimeFormat("en-AU", { hour: "numeric", minute: "2-digit", timeZone: "Australia/Brisbane" }).format(instant), dateKey }; }
 function mapRecurrence(value?: z.infer<typeof recurrenceRowSchema>): string { if (!value) return "One-off"; if (value.frequency === "monthly") return "Monthly"; if (value.frequency === "weekly" && value.interval_count === 2) return "Fortnightly"; if (value.frequency === "weekly" && value.interval_count === 4) return "Four-weekly"; return "Weekly"; }
-function mapLineItems(items: Array<{ label?: string | null; description: string; quantity: number; unit_label?: string; unit_price: number }>) {
+function mapLineItems(items: Array<{ label?: string | null; description: string; quantity: number; unit_label?: string | null; unit_price: number }>) {
   return items.map((item) => ({
     label: item.label || undefined,
     description: item.description,
     quantity: item.quantity,
-    unitLabel: item.unit_label,
+    unitLabel: item.unit_label || undefined,
     rate: item.unit_price,
   }));
 }
