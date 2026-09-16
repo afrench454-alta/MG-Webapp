@@ -1,1 +1,32 @@
-/* temporary stub - replaced next */
+:root {
+  --ink: #2d3436;
+  --muted: #5c6a6e;
+  --micro: #5c6a6e;
+  --surface: #f7f8f3;
+  --panel: #ffffff;
+  --panel-soft: #f2f5ef;
+  --border: #e3e8de;
+  --border-strong: #d3dbcf;
+  --brand: #4d624d;
+  --brand-hover: #3b4e3b;
+  --brand-dark: #2a382a;
+  --deep-forest: #1b4332;
+  --sage: #5c744c;
+  --olive: #546332;
+  --amber: #875c32;
+  --red: #9e362d;
+  --success: #388e3c;
+  --unpaid: #a05c3c;
+  --on-brand: #ffffff;
+  --shadow: 0 1px 6px rgba(34, 52, 39, 0.07);
+  --shadow-dialog: 0 18px 60px rgba(21, 31, 25, 0.24);
+  --sidebar-width: 256px;
+  --surface-soft: #eef1ea;
+  --lime: #c5d89a;
+  color: var(--ink);
+  background: var(--surface);
+  color-scheme: light;
+  font-family: "IBM Plex Sans", Arial, Helvetica, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
