@@ -86,3 +86,9 @@
     max-width: 100%;
   }
 }
+
+
+/* Today highlight for month grid (shared with mobile agenda cue). */
+.calendar-day--today {
+  box-shadow: inset 0 0 0 2px var(--brand, #173f35);
+}
