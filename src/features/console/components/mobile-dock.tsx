@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  CalendarDays,
+  ClipboardList,
   DollarSign,
   LayoutDashboard,
   Menu,
@@ -17,7 +17,7 @@ const dockItems: Array<{
   managersOnly?: boolean;
 }> = [
   { id: "dashboard", label: "Home", icon: LayoutDashboard },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
+  { id: "jobs", label: "Job Board", icon: ClipboardList },
   { id: "quotes", label: "Quotes", icon: ReceiptText, managersOnly: true },
   { id: "invoices", label: "Invoices", icon: DollarSign, managersOnly: true },
 ];

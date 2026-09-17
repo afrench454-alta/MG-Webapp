@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  ESTIMATOR_MODEL_MISS,
   ESTIMATOR_NOT_CONNECTED,
+  ESTIMATOR_RATE_LIMITED,
   ESTIMATOR_UNAUTHORIZED,
   GEMINI_MODELS,
   draftEstimateFromProvider,
@@ -42,11 +44,14 @@ test("resolveEstimatorProvider prefers Gemini over xAI", () => {
 
 test("Gemini model list prefers current Flash models over shutdown 2.0", () => {
   assert.equal(GEMINI_MODELS[0], "gemini-3.8-flash");
+  assert.ok(GEMINI_MODELS.includes("gemini-3.6-flash"));
   assert.ok(GEMINI_MODELS.includes("gemini-3.5-flash"));
+  assert.ok(GEMINI_MODELS.includes("gemini-2.5-flash"));
   assert.equal(
     (GEMINI_MODELS as readonly string[]).includes("gemini-2.0-flash"),
     false,
   );
+  assert.equal(GEMINI_MODELS.length <= 4, true);
 });
 
 test("parseEstimatePayload accepts fenced JSON from Gemini", () => {
@@ -63,12 +68,12 @@ test("extractGeminiText joins candidate parts", () => {
     candidates: [
       {
         content: {
-          parts: [{ text: '{"summary":' }, { text: '"ok"}' }],
+          parts: [{ text: '{\"summary\":' }, { text: '\"ok\"}' }],
         },
       },
     ],
   });
-  assert.equal(text, '{"summary":"ok"}');
+  assert.equal(text, '{\"summary\":\"ok\"}');
 });
 
 test("draftEstimateFromProvider uses Gemini when a Studio key is set", async () => {
@@ -141,5 +146,23 @@ test("draftEstimateFromProvider skips a retired Gemini model and uses the next o
   );
   assert.equal(result.ok, true);
   assert.match(calls[0] ?? "", /gemini-3\.8-flash/);
-  assert.match(calls[1] ?? "", /gemini-3\.5-flash/);
+  assert.match(calls[1] ?? "", /gemini-3\.6-flash/);
+});
+
+test("draftEstimateFromProvider reports rate limits clearly", async () => {
+  const result = await draftEstimateFromProvider(
+    "Service: Yard Services\nScope:\nOvergrown backyard.",
+    { GEMINI_API_KEY: "studio-key" },
+    async () => new Response("slow down", { status: 429 }),
+  );
+  assert.deepEqual(result, { ok: false, message: ESTIMATOR_RATE_LIMITED });
+});
+
+test("draftEstimateFromProvider reports a model miss when every Flash ID 404s", async () => {
+  const result = await draftEstimateFromProvider(
+    "Service: Yard Services\nScope:\nOvergrown backyard.",
+    { GEMINI_API_KEY: "studio-key" },
+    async () => new Response("not found", { status: 404 }),
+  );
+  assert.deepEqual(result, { ok: false, message: ESTIMATOR_MODEL_MISS });
 });

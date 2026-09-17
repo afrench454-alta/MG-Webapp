@@ -5,18 +5,21 @@ import {
 } from "./estimator-contract";
 
 export const ESTIMATOR_NOT_CONNECTED =
-  "AI quoting is not connected on this deployment yet. You can still build the quote by hand.";
+  "AI quoting is not connected on this deployment yet. Set GEMINI_API_KEY (or GOOGLE_API_KEY) in Vercel for Production and Preview, then redeploy. You can still build the quote by hand.";
 export const ESTIMATOR_UNAVAILABLE =
   "The estimator is briefly unavailable. Try again.";
 export const ESTIMATOR_UNAUTHORIZED =
-  "The Gemini API key was rejected. Check GEMINI_API_KEY on this deployment.";
+  "The Gemini API key was rejected. Check GEMINI_API_KEY or GOOGLE_API_KEY on this deployment.";
 export const ESTIMATOR_RATE_LIMITED =
-  "The estimator is busy. Try again in a moment.";
+  "The estimator hit a rate limit. Try again in a moment.";
+export const ESTIMATOR_MODEL_MISS =
+  "No supported Gemini Flash model is available for this API key. Confirm the key can call generateContent, or update the model list.";
 
+/** Verified Google AI Studio Flash IDs (generateContent) as of 2026-09. Short fallback chain. */
 export const GEMINI_MODELS = [
   "gemini-3.8-flash",
+  "gemini-3.6-flash",
   "gemini-3.5-flash",
-  "gemini-3.1-flash-lite",
   "gemini-2.5-flash",
 ] as const;
 
@@ -140,7 +143,7 @@ type GeminiDraftResult =
   | { ok: true; content: string }
   | {
       ok: false;
-      reason: "unauthorized" | "rate_limited" | "unavailable";
+      reason: "unauthorized" | "rate_limited" | "model_miss" | "unavailable";
     };
 
 async function requestGeminiDraft(
@@ -148,7 +151,11 @@ async function requestGeminiDraft(
   userPrompt: string,
   fetchImpl: FetchLike,
 ): Promise<GeminiDraftResult> {
+  let sawNon404Failure = false;
+  let attempted = 0;
+
   for (const model of GEMINI_MODELS) {
+    attempted += 1;
     const response = await fetchImpl(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
@@ -179,12 +186,18 @@ async function requestGeminiDraft(
       return { ok: false, reason: "rate_limited" };
     }
     if (!response.ok) {
+      sawNon404Failure = true;
       continue;
     }
     const content = extractGeminiText(await readJson(response));
     if (content) {
       return { ok: true, content };
     }
+    sawNon404Failure = true;
+  }
+
+  if (attempted > 0 && !sawNon404Failure) {
+    return { ok: false, reason: "model_miss" };
   }
   return { ok: false, reason: "unavailable" };
 }
@@ -244,6 +257,9 @@ export async function draftEstimateFromProvider(
     }
     if (content.reason === "rate_limited") {
       return { ok: false, message: ESTIMATOR_RATE_LIMITED };
+    }
+    if (content.reason === "model_miss") {
+      return { ok: false, message: ESTIMATOR_MODEL_MISS };
     }
     return { ok: false, message: ESTIMATOR_UNAVAILABLE };
   }
