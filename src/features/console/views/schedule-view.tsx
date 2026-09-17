@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import type { Job } from "../domain";
 import { displayServiceCategory } from "../data/service-catalog";
-import { currentMonthStart, formatCalendarEvent, formatSiteTitle } from "../data/work-identity";
+import {
+  brisbaneDateKey,
+  currentMonthStart,
+  formatCalendarEvent,
+  formatSiteTitle,
+} from "../data/work-identity";
 import { Button, EmptyState, IconButton, PageHeader } from "../components/ui-elements";
 import { Dialog } from "../components/dialog";
 
@@ -21,6 +26,8 @@ export function ScheduleView({
 }) {
   const [month, setMonth] = useState(() => currentMonthStart());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const todayKey = useMemo(() => brisbaneDateKey(), []);
+  const todayAgendaRef = useRef<HTMLButtonElement | null>(null);
 
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
@@ -47,6 +54,32 @@ export function ScheduleView({
   jobsByDay.forEach((dayJobs) =>
     dayJobs.sort((a, b) => a.dateKey.localeCompare(b.dateKey)),
   );
+
+  /** Upcoming-from-today first; earlier days of the month follow so today stays near the top. */
+  const agendaJobs = useMemo(() => {
+    const dayOf = (dateKey: string) => dateKey.slice(0, 10);
+    const monthJobs = jobs.filter((job) => job.dateKey.startsWith(monthPrefix));
+    const sorted = [...monthJobs].sort((a, b) =>
+      a.dateKey.localeCompare(b.dateKey),
+    );
+    const upcoming = sorted.filter((job) => dayOf(job.dateKey) >= todayKey);
+    const past = sorted.filter((job) => dayOf(job.dateKey) < todayKey);
+    return [...upcoming, ...past];
+  }, [jobs, monthPrefix, todayKey]);
+
+  const firstTodayOrUpcomingId = useMemo(() => {
+    const dayOf = (dateKey: string) => dateKey.slice(0, 10);
+    const todayJob = agendaJobs.find((job) => dayOf(job.dateKey) === todayKey);
+    if (todayJob) return todayJob.id;
+    return agendaJobs.find((job) => dayOf(job.dateKey) > todayKey)?.id ?? null;
+  }, [agendaJobs, todayKey]);
+
+  useEffect(() => {
+    todayAgendaRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [monthPrefix, firstTodayOrUpcomingId]);
 
   const selectedJobs = selectedDateKey
     ? jobs
@@ -106,9 +139,10 @@ export function ScheduleView({
             const dateKey = day
               ? `${monthPrefix}${String(day).padStart(2, "0")}`
               : "";
+            const isToday = Boolean(day && dateKey === todayKey);
             return (
               <div
-                className={`calendar-day ${day ? "" : "calendar-day--empty"} ${dayJobs.length ? "calendar-day--busy" : ""}`}
+                className={`calendar-day ${day ? "" : "calendar-day--empty"} ${dayJobs.length ? "calendar-day--busy" : ""} ${isToday ? "calendar-day--today" : ""}`}
                 key={`${monthPrefix}${index}`}
               >
                 {day ? (
@@ -157,17 +191,26 @@ export function ScheduleView({
         </div>
       </div>
       <div className="mobile-agenda">
-        {visibleJobs.map((job) => (
-          <button key={job.id} onClick={() => onJob(job)}>
-            <span>
-              {job.date}
-              {job.time ? ` · ${job.time}` : ""}
-            </span>
-            <strong>{job.client}</strong>
-            <small>{job.address}</small>
-          </button>
-        ))}
-        {!visibleJobs.length ? (
+        {agendaJobs.map((job) => {
+          const isAnchor = job.id === firstTodayOrUpcomingId;
+          return (
+            <button
+              key={job.id}
+              ref={isAnchor ? todayAgendaRef : undefined}
+              type="button"
+              onClick={() => onJob(job)}
+              data-agenda-day={job.dateKey.slice(0, 10)}
+            >
+              <span>
+                {job.date}
+                {job.time ? ` · ${job.time}` : ""}
+              </span>
+              <strong>{job.client}</strong>
+              <small>{job.address}</small>
+            </button>
+          );
+        })}
+        {!agendaJobs.length ? (
           <div className="empty-state">
             <p>No jobs scheduled for {monthLabel}.</p>
           </div>

@@ -9,13 +9,33 @@ export const sendQuestionnaireSchema = z.object({
   clientId: z.uuid().optional(),
 });
 
-export const publicQuestionnaireSubmissionSchema = z.object({
-  token: z.string().min(32).max(512),
-  name: z.string().trim().max(160),
-  email: z.union([z.literal(""), z.email().max(320)]),
-  phone: z.string().trim().max(80),
-  answers: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
-});
+export const publicQuestionnaireSubmissionSchema = z
+  .object({
+    token: z.string().min(32).max(512),
+    name: z.string().trim().min(1, "Enter your name.").max(160),
+    email: z.union([z.literal(""), z.email().max(320)]),
+    phone: z.string().trim().max(80),
+    answers: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
+  })
+  .superRefine((data, ctx) => {
+    const phone = data.phone.trim();
+    const email = typeof data.email === "string" ? data.email.trim() : "";
+    if (!phone && !email) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Provide a phone number or email — at least one.",
+        path: ["phone"],
+      });
+    }
+    const site = data.answers._site_address;
+    if (typeof site !== "string" || !site.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter the property address.",
+        path: ["answers", "_site_address"],
+      });
+    }
+  });
 
 type ActionFailure = Readonly<{ ok: false; message: string }>;
 export type SendQuestionnaireResult = Readonly<{ ok: true; path: string; recipient: string; email: string }> | ActionFailure;

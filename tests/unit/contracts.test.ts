@@ -9,7 +9,7 @@ import {
   scheduleJobSchema,
 } from "../../src/features/console/data/operations-contract";
 import { joinWithPasswordSchema, teamMemberUpdateSchema } from "../../src/features/console/data/team-contract";
-import { formFieldSchema, publicQuestionnaireSchema } from "../../src/features/console/data/questionnaire-contract";
+import { formFieldSchema, publicQuestionnaireSchema, publicQuestionnaireSubmissionSchema } from "../../src/features/console/data/questionnaire-contract";
 import { getSafeReturnPath, isAuthOnlyPath, isPublicPath } from "../../src/lib/supabase/routing";
 
 const VALID_UUID = "123e4567-e89b-12d3-a456-426614174000";
@@ -291,4 +291,53 @@ test("contracts: formFieldSchema accepts a null label without throwing", () => {
   assert.equal(parsed.label, "Untitled");
   const unknownType = formFieldSchema.parse({ id: "q9", label: "Notes", type: "select" });
   assert.equal(unknownType.type, "text");
+});
+
+
+
+test("contracts: publicQuestionnaireSubmissionSchema requires name, address, and phone or email", () => {
+  const token = "x".repeat(32);
+  const base = {
+    token,
+    name: "Alex Client",
+    email: "",
+    phone: "",
+    answers: { _site_address: "12 Elm Street, Kingaroy" },
+  };
+
+  assert.equal(publicQuestionnaireSubmissionSchema.safeParse(base).success, false);
+
+  assert.equal(
+    publicQuestionnaireSubmissionSchema.safeParse({
+      ...base,
+      phone: "0400123456",
+    }).success,
+    true,
+  );
+
+  assert.equal(
+    publicQuestionnaireSubmissionSchema.safeParse({
+      ...base,
+      email: "alex@example.com",
+    }).success,
+    true,
+  );
+
+  assert.equal(
+    publicQuestionnaireSubmissionSchema.safeParse({
+      ...base,
+      phone: "0400123456",
+      answers: {},
+    }).success,
+    false,
+  );
+
+  assert.equal(
+    publicQuestionnaireSubmissionSchema.safeParse({
+      ...base,
+      name: "",
+      phone: "0400123456",
+    }).success,
+    false,
+  );
 });

@@ -79,16 +79,22 @@ export function PublicQuestionnairePreview({
               setSubmitted(true);
             }}
           >
-            <fieldset className={styles.fieldCard}>
-              <legend className={styles.cardTitle}>Contact Information</legend>
+            <fieldset className={styles.fieldCard} aria-labelledby="preview-contact-title">
+              <h2 id="preview-contact-title" className={styles.cardTitle}>Contact Information</h2>
               <div className={styles.identity}>
                 <label className={styles.inputGroup}>
                   <span>Your name *</span>
                   <input required />
                 </label>
                 <label className={styles.inputGroup}>
-                  <span>Phone *</span>
-                  <input required />
+                  <span>Phone</span>
+                  <input type="tel" inputMode="tel" placeholder="04xx xxx xxx" />
+                  <span className={styles.hint}>Phone or email — at least one</span>
+                </label>
+                <label className={styles.inputGroup}>
+                  <span>Email</span>
+                  <input type="email" />
+                  <span className={styles.hint}>Phone or email — at least one</span>
                 </label>
                 <label className={styles.inputGroup}>
                   <span>Property address *</span>
@@ -97,11 +103,11 @@ export function PublicQuestionnairePreview({
               </div>
             </fieldset>
             {fields.map((field, index) => (
-              <fieldset className={styles.fieldCard} key={field.id}>
-                <legend className={styles.cardTitle}>
+              <fieldset className={styles.fieldCard} key={field.id} aria-labelledby={`preview-q-${field.id}`}>
+                <h2 id={`preview-q-${field.id}`} className={styles.cardTitle}>
                   {index + 1}. {field.label}
                   {field.required ? " *" : ""}
-                </legend>
+                </h2>
                 {field.type === "textarea" ? (
                   <textarea className={styles.textInput} rows={4} />
                 ) : field.type === "text" ? (
