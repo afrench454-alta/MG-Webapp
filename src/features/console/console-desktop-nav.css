@@ -4,12 +4,16 @@
 }
 
 .sidebar {
+  width: var(--sidebar-width);
+  max-width: var(--sidebar-width);
   min-width: 0;
+  box-sizing: border-box;
   overflow-x: hidden;
 }
 
 .sidebar-nav {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -17,11 +21,17 @@
 }
 
 .sidebar-nav button {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 40px;
+  box-sizing: border-box;
 }
 
 .sidebar-nav button > svg {
-  flex: 0 0 auto;
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
 }
 
 .sidebar-nav button > span {
@@ -33,16 +43,23 @@
 
 .sidebar-footer {
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .theme-toggle,
 .ai-button {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 40px;
+  box-sizing: border-box;
 }
 
 .signed-in {
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .signed-in strong {
@@ -52,6 +69,7 @@
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+  word-break: normal;
 }
 
 @media (min-width: 1024px) {
