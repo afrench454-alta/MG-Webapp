@@ -46,7 +46,6 @@ const fieldRoutes: ConsoleRoute[] = [
 export function Sidebar({
   active,
   onNavigate,
-  onEstimate: _onEstimate,
   mobileOpen,
   onClose,
   signedInEmail,
@@ -55,7 +54,6 @@ export function Sidebar({
 }: {
   active: ConsoleRoute;
   onNavigate: (route: ConsoleRoute) => void;
-  onEstimate?: () => void;
   mobileOpen: boolean;
   onClose: () => void;
   signedInEmail: string;
