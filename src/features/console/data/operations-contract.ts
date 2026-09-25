@@ -26,6 +26,7 @@ export const invoiceDraftSchema = z.object({
   extraPropertyIds: z.array(z.uuid()).max(20).optional(),
   jobId: z.uuid().optional(),
   quoteId: z.uuid().optional(),
+  scope: z.string().trim().max(20_000).optional(),
   items: z.array(lineItemSchema).min(1).max(100),
   dueDays: z.coerce.number().int().min(0).max(365),
   notes: z.string().trim().max(20_000),
