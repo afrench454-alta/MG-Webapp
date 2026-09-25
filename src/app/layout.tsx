@@ -10,6 +10,7 @@ import "@fontsource/work-sans/500.css";
 import "@fontsource/work-sans/600.css";
 import "@fontsource/work-sans/700.css";
 import "@fontsource/work-sans/800.css";
+import { PhoneShellSync } from "@/features/console/components/phone-shell";
 import { PwaRegister } from "@/features/console/components/pwa-register";
 import { ThemeScript } from "@/features/console/components/theme-script";
 import "./globals.css";
@@ -45,6 +46,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: "#4d624d",
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({
@@ -56,6 +58,7 @@ export default function RootLayout({
     <html lang="en-AU" suppressHydrationWarning>
       <body>
         <ThemeScript />
+        <PhoneShellSync />
         {children}
         <PwaRegister />
         <SpeedInsights />

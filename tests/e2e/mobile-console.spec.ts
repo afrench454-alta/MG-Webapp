@@ -27,4 +27,14 @@ test.describe("Mow & Glow Console - Mobile", () => {
     await dock.getByRole("button", { name: "Quotes" }).click();
     await expect(page.getByRole("heading", { name: "Quotes" })).toBeVisible();
   });
+
+  test("does not horizontally overflow the iPhone 12 Pro viewport", async ({ page }) => {
+    const metrics = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      mainMargin: getComputedStyle(document.querySelector(".app-main")!).marginLeft,
+    }));
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+    expect(metrics.mainMargin).toBe("0px");
+  });
 });

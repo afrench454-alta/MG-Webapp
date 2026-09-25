@@ -1,0 +1,175 @@
+/* Phone shell that does not depend on CSS viewport width.
+   Safari "Request Desktop Website" inflates innerWidth to ~1024–1280 on
+   iPhone 12 Pro (390×844), which skips the max-width: 1100px rules.
+   html[data-phone] is set from screen.width + pointer:coarse. */
+
+html[data-phone="true"] input,
+html[data-phone="true"] select,
+html[data-phone="true"] textarea {
+  font-size: 16px;
+}
+
+html[data-phone="true"] .app-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html[data-phone="true"] .sidebar {
+  width: min(320px, 88vw);
+  max-width: min(320px, 88vw);
+  transform: translateX(-102%);
+  box-shadow: var(--shadow-dialog);
+  transition: transform 180ms ease;
+}
+
+html[data-phone="true"] .sidebar--open {
+  transform: translateX(0);
+}
+
+html[data-phone="true"] .icon-button.sidebar__close {
+  display: inline-grid;
+}
+
+html[data-phone="true"] .mobile-scrim {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  background: rgba(20, 26, 22, 0.52);
+}
+
+html[data-phone="true"] .app-main {
+  width: 100%;
+  margin-left: 0;
+}
+
+html[data-phone="true"] .mobile-header {
+  min-height: calc(58px + env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 24;
+  padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+html[data-phone="true"] .mobile-header > button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+html[data-phone="true"] .mobile-header > div {
+  display: grid;
+  gap: 1px;
+}
+
+html[data-phone="true"] .mobile-header small {
+  color: var(--micro);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+html[data-phone="true"] .mobile-header strong {
+  font-size: 15px;
+}
+
+html[data-phone="true"] .mobile-dock {
+  display: flex;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 28;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding: 4px 6px env(safe-area-inset-bottom);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  justify-content: space-around;
+  align-items: stretch;
+  gap: 2px;
+}
+
+html[data-phone="true"] .mobile-dock button {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+html[data-phone="true"] .mobile-dock button.is-active {
+  color: var(--brand);
+  background: var(--panel-soft);
+}
+
+html[data-phone="true"] .workspace {
+  padding: 20px 16px calc(96px + env(safe-area-inset-bottom));
+}
+
+html[data-phone="true"] .metric-grid,
+html[data-phone="true"] .dashboard-grid,
+html[data-phone="true"] .client-grid,
+html[data-phone="true"] .questionnaire-grid,
+html[data-phone="true"] .form-grid--two,
+html[data-phone="true"] .form-grid--three,
+html[data-phone="true"] .job-facts,
+html[data-phone="true"] .settings-grid {
+  grid-template-columns: 1fr;
+}
+
+html[data-phone="true"] .page-header {
+  flex-wrap: wrap;
+}
+
+html[data-phone="true"] .page-actions,
+html[data-phone="true"] .search-field,
+html[data-phone="true"] .compact-select,
+html[data-phone="true"] .compact-select--wide {
+  min-width: 0;
+  width: 100%;
+}
+
+html[data-phone="true"] .calendar-wrap {
+  display: none;
+}
+
+html[data-phone="true"] .mobile-agenda {
+  display: grid;
+  gap: 10px;
+}
+
+html[data-phone="true"] .job-board,
+html[data-phone="true"] .job-board--done {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: min(82vw, 320px);
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  margin-inline: -16px;
+  padding: 2px 16px 10px;
+  -webkit-overflow-scrolling: touch;
+}
