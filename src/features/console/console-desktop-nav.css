@@ -3,12 +3,14 @@
   --sidebar-width: 272px;
 }
 
-.sidebar {
-  width: var(--sidebar-width);
-  max-width: var(--sidebar-width);
-  min-width: 0;
-  box-sizing: border-box;
-  overflow-x: hidden;
+@media (min-width: 1101px) {
+  html:not([data-phone="true"]) .sidebar {
+    width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
 }
 
 .sidebar-nav {
