@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
-import type { Client, Job, LineItem, Quote } from "../domain";
+import type { Client, Invoice, Job, LineItem, Quote } from "../domain";
+import { invoicePrefillJobs, rankedClients } from "../data/form-options";
 import { formatWorkLabel } from "../data/work-identity";
+import { EntityPicker } from "../components/entity-picker";
 import { Button, Field } from "../components/ui-elements";
 import { LineItemEditor, Totals } from "../components/line-item-editor";
 
@@ -15,6 +17,7 @@ export type InvoiceDraft = {
   extraPropertyIds?: string[];
   jobId?: string;
   quoteId?: string;
+  scope?: string;
   items: LineItem[];
   dueDays: string;
   notes: string;
@@ -23,6 +26,7 @@ export type InvoiceDraft = {
 export function InvoiceFormDialog({
   clients,
   jobs,
+  invoices = [],
   prefill,
   sourceQuote,
   onClose,
@@ -32,6 +36,7 @@ export function InvoiceFormDialog({
 }: {
   clients: Client[];
   jobs: Job[];
+  invoices?: Invoice[];
   prefill?: InvoiceDraft;
   sourceQuote?: Quote;
   onClose: () => void;
@@ -47,6 +52,7 @@ export function InvoiceFormDialog({
     prefill?.extraPropertyIds || [],
   );
   const [jobId, setJobId] = useState(prefill?.jobId || "");
+  const [scope, setScope] = useState(prefill?.scope || sourceQuote?.scope || "");
   const [items, setItems] = useState<LineItem[]>(
     prefill?.items?.length
       ? prefill.items.map((item) => ({ ...item }))
@@ -57,6 +63,61 @@ export function InvoiceFormDialog({
     prefill?.notes ||
       "Invoices are due upon completion with a 7-day grace period.",
   );
+
+  const clientOptions = useMemo(
+    () =>
+      rankedClients(clients).map((client) => ({
+        id: client.id,
+        label: `${client.name}${client.status === "Active" ? "" : ` · ${client.status}`}`,
+        keywords: `${client.email} ${client.phone} ${client.properties.map((property) => property.address).join(" ")}`,
+      })),
+    [clients],
+  );
+
+  const visibleJobs = useMemo(
+    () =>
+      invoicePrefillJobs({
+        jobs,
+        invoices,
+        client: selectedClient,
+        selectedJobId: jobId,
+      }),
+    [jobs, invoices, selectedClient, jobId],
+  );
+
+  const jobOptions = useMemo(
+    () =>
+      visibleJobs.map((job) => ({
+        id: job.id,
+        label: formatWorkLabel(job),
+        keywords: `${job.client} ${job.address} ${job.scope} ${job.status}`,
+      })),
+    [visibleJobs],
+  );
+
+  const applyJob = (nextJobId: string) => {
+    setJobId(nextJobId);
+    const next = jobs.find((job) => job.id === nextJobId);
+    if (!next) return;
+    const client =
+      clients.find((item) => item.id === next.clientId) ||
+      clients.find((item) => item.name === next.client);
+    setClientId(client?.id || "");
+    setPropertyId(
+      client?.properties.find(
+        (property) =>
+          property.id === next.serviceAddressId ||
+          property.address === next.address,
+      )?.id || "",
+    );
+    setExtraPropertyIds([]);
+    if (!scope.trim() && next.scope.trim()) setScope(next.scope);
+    const blankItems =
+      items.length === 1 && !items[0]?.description.trim() && !Number(items[0]?.rate);
+    if (blankItems && next.scope.trim()) {
+      setItems([{ description: next.scope, quantity: 1, rate: 0 }]);
+    }
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -69,6 +130,7 @@ export function InvoiceFormDialog({
       extraPropertyIds: extraPropertyIds.filter((id) => id !== propertyId),
       jobId: jobId || undefined,
       quoteId: prefill?.quoteId,
+      scope: scope.trim(),
       items,
       dueDays,
       notes,
@@ -80,63 +142,43 @@ export function InvoiceFormDialog({
       {sourceQuote ? (
         <p className="form-banner">
           Prefilling from quote {sourceQuote.documentNumber || sourceQuote.id}.
-          Review line items, dates, and notes before saving.
+          Review scope, line items, and notes before saving.
         </p>
       ) : null}
       <div className="form-grid form-grid--two">
-        <Field label="Client" required>
-          <select
-            value={clientId}
-            onChange={(event) => {
-              const next = clients.find(
-                (client) => client.id === event.target.value,
-              );
-              setClientId(event.target.value);
-              setPropertyId(next?.properties[0]?.id || "");
-              setExtraPropertyIds([]);
-            }}
-            required
-            disabled={pending}
-          >
-            <option value="">Choose...</option>
-            {clients.map((client) => (
-              <option value={client.id} key={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Prefill from job">
-          <select
-            value={jobId}
-            onChange={(event) => {
-              const next = jobs.find((job) => job.id === event.target.value);
-              setJobId(event.target.value);
-              if (next) {
-                const client =
-                  clients.find((item) => item.id === next.clientId) ||
-                  clients.find((item) => item.name === next.client);
-                setClientId(client?.id || "");
-                setPropertyId(
-                  client?.properties.find(
-                    (property) =>
-                      property.id === next.serviceAddressId ||
-                      property.address === next.address,
-                  )?.id || "",
-                );
-                setExtraPropertyIds([]);
-              }
-            }}
-            disabled={pending}
-          >
-            <option value="">Start blank</option>
-            {jobs.map((job) => (
-              <option value={job.id} key={job.id}>
-                {formatWorkLabel(job)}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <EntityPicker
+          label="Client"
+          required
+          value={clientId}
+          onChange={(nextId) => {
+            const next = clients.find((client) => client.id === nextId);
+            setClientId(nextId);
+            setPropertyId(next?.properties[0]?.id || "");
+            setExtraPropertyIds([]);
+            if (jobId && !matchesSelectedJob(jobs, jobId, next)) {
+              setJobId("");
+            }
+          }}
+          options={clientOptions}
+          placeholder="Choose a client"
+          filterPlaceholder="Search clients by name, phone, or address"
+          disabled={pending}
+        />
+        <EntityPicker
+          label="Prefill from job"
+          hint={
+            selectedClient
+              ? "Showing this client's open jobs"
+              : "Pick a client first to narrow the list"
+          }
+          value={jobId}
+          onChange={applyJob}
+          options={jobOptions}
+          placeholder={selectedClient ? "Start blank" : "Choose a client or job"}
+          filterPlaceholder="Search jobs by site or scope"
+          emptyLabel="No matching jobs"
+          disabled={pending}
+        />
       </div>
       <Field label="Address / Property" required>
         <select
@@ -183,6 +225,19 @@ export function InvoiceFormDialog({
             ))}
         </fieldset>
       ) : null}
+      <Field
+        label="Scope of work"
+        hint="Printed on the invoice. One idea per line."
+      >
+        <textarea
+          className="scope-editor"
+          rows={5}
+          value={scope}
+          onChange={(event) => setScope(event.target.value)}
+          disabled={pending}
+          placeholder="What was completed at this property?"
+        />
+      </Field>
       <LineItemEditor items={items} setItems={setItems} />
       <Totals items={items} />
       <div className="form-grid form-grid--three">
@@ -231,4 +286,16 @@ export function InvoiceFormDialog({
       </div>
     </form>
   );
+}
+
+function matchesSelectedJob(
+  jobs: Job[],
+  jobId: string,
+  client: Client | undefined,
+): boolean {
+  if (!client) return false;
+  const job = jobs.find((item) => item.id === jobId);
+  if (!job) return false;
+  if (job.clientId && job.clientId === client.id) return true;
+  return job.client.trim().toLowerCase() === client.name.trim().toLowerCase();
 }
