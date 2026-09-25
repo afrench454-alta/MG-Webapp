@@ -10,6 +10,7 @@ import "@fontsource/work-sans/500.css";
 import "@fontsource/work-sans/600.css";
 import "@fontsource/work-sans/700.css";
 import "@fontsource/work-sans/800.css";
+import { PhoneShellSync } from "@/features/console/components/phone-shell";
 import { PwaRegister } from "@/features/console/components/pwa-register";
 import { ThemeScript } from "@/features/console/components/theme-script";
 import "./globals.css";
@@ -57,6 +58,7 @@ export default function RootLayout({
     <html lang="en-AU" suppressHydrationWarning>
       <body>
         <ThemeScript />
+        <PhoneShellSync />
         {children}
         <PwaRegister />
         <SpeedInsights />
