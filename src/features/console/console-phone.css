@@ -9,6 +9,14 @@ html[data-phone="true"] textarea {
   font-size: 16px;
 }
 
+html[data-phone="true"] button,
+html[data-phone="true"] a,
+html[data-phone="true"] input,
+html[data-phone="true"] select,
+html[data-phone="true"] textarea {
+  touch-action: manipulation;
+}
+
 html[data-phone="true"] .app-shell {
   width: 100%;
   max-width: 100%;
@@ -172,4 +180,38 @@ html[data-phone="true"] .job-board--done {
   margin-inline: -16px;
   padding: 2px 16px 10px;
   -webkit-overflow-scrolling: touch;
+}
+
+/* P1 field-ops: 44px targets, iOS dialog height, reduced motion.
+   Scoped to html[data-phone] so desktop console.css is unchanged. */
+html[data-phone="true"] .icon-button {
+  width: 44px;
+  height: 44px;
+}
+
+html[data-phone="true"] .sidebar-nav button,
+html[data-phone="true"] .filter-chip,
+html[data-phone="true"] .button,
+html[data-phone="true"] .ai-button,
+html[data-phone="true"] .estimator-submit {
+  min-height: 44px;
+}
+
+html[data-phone="true"] .dialog:has(.estimator-form) .dialog__header .icon-button {
+  width: 44px;
+  height: 44px;
+}
+
+html[data-phone="true"] .dialog {
+  max-height: min(860px, calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-phone="true"] .sidebar,
+  html[data-phone="true"] .sidebar-nav button,
+  html[data-phone="true"] .button,
+  html[data-phone="true"] .questionnaire-card {
+    transition: none;
+    transform: none;
+  }
 }
