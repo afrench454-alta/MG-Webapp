@@ -1,7 +1,7 @@
 import type { Client, Invoice, JobRequest, Quote } from "../domain";
 import { invoiceDisplayStatus } from "./invoice-lifecycle";
 
-export const invoiceFilterIds = ["live", "open", "paid", "voided"] as const;
+export const invoiceFilterIds = ["live", "open", "overdue", "draft", "paid", "voided"] as const;
 export type InvoiceFilterId = (typeof invoiceFilterIds)[number];
 
 export const quoteFilterIds = ["live", "open", "accepted", "voided"] as const;
@@ -30,6 +30,8 @@ export function matchesInvoiceFilter(
   if (display === "Void") return false;
   if (filter === "live") return true;
   if (filter === "paid") return display === "Paid" || display === "Refunded";
+  if (filter === "overdue") return display === "Overdue";
+  if (filter === "draft") return display === "Draft";
   return ["Draft", "Issued", "Sent", "Overdue", "Part paid"].includes(display);
 }
 
