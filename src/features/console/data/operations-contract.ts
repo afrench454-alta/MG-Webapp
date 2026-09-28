@@ -79,7 +79,11 @@ export type UploadJobPhotoAction = (formData: FormData) => Promise<JobPhotoActio
 export type DeleteJobPhotoAction = (jobId: string, photoId: string) => Promise<DeleteActionResult>;
 export type DeleteJobAction = (id: string) => Promise<DeleteActionResult>;
 export type SaveInvoiceAction = (input: InvoiceDraftInput) => Promise<InvoiceActionResult>;
-export type UpdateInvoicePaymentAction = (id: string, status: z.infer<typeof invoicePaymentStatusSchema>) => Promise<InvoiceActionResult>;
+export type UpdateInvoicePaymentAction = (
+  id: string,
+  status: z.infer<typeof invoicePaymentStatusSchema>,
+  amount?: number,
+) => Promise<InvoiceActionResult>;
 export type FinalizeInvoiceAction = (id: string) => Promise<InvoiceActionResult>;
 export type MarkInvoiceSentAction = (id: string) => Promise<InvoiceActionResult>;
 export type VoidInvoiceAction = (id: string) => Promise<InvoiceActionResult>;
