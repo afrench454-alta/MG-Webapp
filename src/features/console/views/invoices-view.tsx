@@ -54,7 +54,9 @@ const InvoiceRow = memo(function InvoiceRow({
 }) {
   const totals = quoteTotals(record.items);
   const display = invoiceDisplayStatus(record);
-  const paymentOptions = allowedPaymentStatuses(record);
+  const paymentOptions = allowedPaymentStatuses(record).filter(
+    (option) => option !== "Part paid" || option === record.paymentStatus,
+  );
 
   const handlePaymentChange = (event: ChangeEvent<HTMLSelectElement>) => {
     onPaymentStatusChange(
@@ -231,7 +233,7 @@ export function InvoicesView({
       <PageHeader
         eyebrow="Billing"
         title="Invoices"
-        subtitle="Mark paid records a payment and issues a draft in one step. Void unpaid issued invoices. Delete drafts only."
+        subtitle="Mark paid records a payment. Mark sent is a console status only — it does not email the client. Void unpaid issued invoices. Delete drafts only."
       >
         <div className="billing-summary">
           <span>
@@ -262,7 +264,9 @@ export function InvoicesView({
             onChange={setFilter}
             options={[
               { id: "live", label: "All", count: counts.live },
-              { id: "open", label: "Open", count: counts.open },
+              { id: "open", label: "Unpaid", count: counts.open },
+              { id: "overdue", label: "Overdue", count: counts.overdue },
+              { id: "draft", label: "Draft", count: counts.draft },
               { id: "paid", label: "Paid", count: counts.paid },
               { id: "voided", label: "Voided", count: counts.voided },
             ]}
