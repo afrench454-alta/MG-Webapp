@@ -198,12 +198,27 @@ export async function saveInvoiceAction(input: unknown): Promise<InvoiceActionRe
   }
 }
 
-export async function updateInvoicePaymentAction(id: string, status: unknown): Promise<InvoiceActionResult> {
+export async function updateInvoicePaymentAction(
+  id: string,
+  status: unknown,
+  amount?: unknown,
+): Promise<InvoiceActionResult> {
   const parsedId = idSchema.safeParse(id);
   const parsedStatus = invoicePaymentStatusSchema.safeParse(status);
-  if (!parsedId.success || !parsedStatus.success) return { ok: false, message: "The invoice update was invalid." };
+  const parsedAmount =
+    amount === undefined || amount === null
+      ? { success: true as const, data: undefined }
+      : z.coerce.number().positive().max(10_000_000).safeParse(amount);
+  if (!parsedId.success || !parsedStatus.success || !parsedAmount.success) {
+    return { ok: false, message: "The invoice update was invalid." };
+  }
   try {
-    const invoice = await updateInvoicePayment(await manager(), parsedId.data, parsedStatus.data);
+    const invoice = await updateInvoicePayment(
+      await manager(),
+      parsedId.data,
+      parsedStatus.data,
+      parsedAmount.data,
+    );
     revalidatePath("/");
     return { ok: true, invoice };
   } catch (error) {
