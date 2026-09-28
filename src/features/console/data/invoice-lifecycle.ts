@@ -173,6 +173,7 @@ export function planInvoicePaymentRecords(
   invoice: Pick<Invoice, "items" | "discount" | "taxRate">,
   next: Invoice["paymentStatus"],
   recordedSum = 0,
+  explicitAmount?: number,
 ): InvoicePaymentWrite {
   const total = invoiceTotal(invoice);
   const recorded = roundMoney(Math.max(0, recordedSum));
@@ -204,11 +205,23 @@ export function planInvoicePaymentRecords(
     if (total <= 0.01) {
       throw new OperationsRuleError("This invoice is too small to mark as part paid.");
     }
-    if (recorded > 0 && recorded < total) {
+    if (recorded > 0 && recorded < total && explicitAmount == null) {
       return { voidRecorded: false, insert: null };
     }
-    const half = roundMoney(total / 2);
-    const amount = roundMoney(Math.min(Math.max(half, 0.01), total - 0.01));
+    if (explicitAmount == null) {
+      throw new OperationsRuleError(
+        "Enter a part-payment amount on the invoice. The list cannot invent a half payment.",
+      );
+    }
+    const amount = roundMoney(explicitAmount);
+    if (amount <= 0) {
+      throw new OperationsRuleError("Part payment must be greater than zero.");
+    }
+    if (amount >= total) {
+      throw new OperationsRuleError(
+        "Part payment must be less than the invoice total. Use Mark paid instead.",
+      );
+    }
     return {
       voidRecorded: recorded > 0,
       insert: {

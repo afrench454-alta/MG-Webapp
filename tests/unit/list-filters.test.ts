@@ -79,6 +79,19 @@ test("voided invoices are hidden from live, open, and paid views", () => {
   assert.equal(matchesInvoiceFilter(voided, "voided"), true);
 });
 
+test("overdue and draft invoice filters", () => {
+  const overdue = invoice({
+    documentStatus: "Issued",
+    paymentStatus: "Unpaid",
+    dueDate: "2020-01-01",
+  });
+  const draft = invoice({ documentStatus: "Draft", paymentStatus: "Unpaid" });
+  assert.equal(matchesInvoiceFilter(overdue, "overdue"), true);
+  assert.equal(matchesInvoiceFilter(draft, "overdue"), false);
+  assert.equal(matchesInvoiceFilter(draft, "draft"), true);
+  assert.equal(matchesInvoiceFilter(overdue, "draft"), false);
+});
+
 test("invoice groups keep unpaid work together and paid work together", () => {
   const draft = invoice({ documentStatus: "Draft" });
   const overdue = invoice({ dueDate: "2020-01-01" });

@@ -34,6 +34,7 @@ import {
 } from "./joseph-next-stop";
 import { listClients } from "./client-repository";
 import { listInvoices, listJobs, listQuotes } from "./operations-repository";
+import { buildJosephSnapshot } from "./today-board";
 
 const MAX_TOOL_ROUNDS = 4;
 
@@ -55,8 +56,19 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
     return { ok: false, message: JOSEPH_NOT_CONNECTED };
   }
 
+  const [jobs, invoices] = await Promise.all([
+    listJobs(context),
+    listInvoices(context),
+  ]);
+  const snapshot = buildJosephSnapshot({
+    jobs,
+    invoices,
+    actorId: context.actorId,
+    actorRole: context.role,
+  });
+
   const history: OpenRouterMessage[] = [
-    { role: "system", content: josephSystemPrompt(context.role) },
+    { role: "system", content: josephSystemPrompt(context.role, snapshot) },
     ...parsed.data.messages.map((message: JosephMessage) => ({
       role: message.role,
       content: message.content,
