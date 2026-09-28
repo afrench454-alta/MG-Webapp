@@ -27,10 +27,12 @@ export function RequestsView({
   onQuote,
   onDelete,
   canManage,
+  onEstimate: _onEstimate,
 }: {
   requests: JobRequest[];
   onCreate: () => void;
   onQuote: (request: JobRequest) => void;
+  onEstimate?: (request: JobRequest) => void;
   onDelete: (request: JobRequest) => void;
   canManage: boolean;
 }) {
@@ -59,7 +61,7 @@ export function RequestsView({
       <PageHeader
         eyebrow="Intake"
         title="Job Requests"
-        subtitle="Each request is a client at a property \u2014 not just a service type."
+        subtitle="Each request is a client at a property — not just a service type."
       >
         {canManage ? (
           <Button icon={Plus} onClick={onCreate}>
@@ -109,8 +111,8 @@ export function RequestsView({
               <p className="request-scope">{request.scope}</p>
               <p className="request-dates">
                 Created {request.created}
-                {request.scheduled ? ` \u00b7 Scheduled ${request.scheduled}` : ""}
-                {request.visit ? ` \u00b7 Visit ${request.visit}` : ""}
+                {request.scheduled ? ` · Scheduled ${request.scheduled}` : ""}
+                {request.visit ? ` · Visit ${request.visit}` : ""}
               </p>
             </div>
             <div className="request-card__actions">
