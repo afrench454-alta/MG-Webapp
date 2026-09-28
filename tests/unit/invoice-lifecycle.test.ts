@@ -161,12 +161,22 @@ test("planInvoicePaymentRecords writes payment rows instead of payment_status", 
   const alreadyPaid = planInvoicePaymentRecords(record, "Paid", 80);
   assert.equal(alreadyPaid.insert, null);
 
-  const part = planInvoicePaymentRecords(record, "Part paid", 0);
-  assert.equal(part.insert?.amount, 40);
+  assert.throws(
+    () => planInvoicePaymentRecords(record, "Part paid", 0),
+    /part-payment amount/i,
+  );
+
+  const part = planInvoicePaymentRecords(record, "Part paid", 0, 25);
+  assert.equal(part.insert?.amount, 25);
   assert.equal(part.insert?.status, "recorded");
 
   const alreadyPart = planInvoicePaymentRecords(record, "Part paid", 25);
   assert.equal(alreadyPart.insert, null);
+
+  assert.throws(
+    () => planInvoicePaymentRecords(record, "Part paid", 0, 80),
+    /less than the invoice total/i,
+  );
 
   const refunded = planInvoicePaymentRecords(record, "Refunded", 80);
   assert.equal(refunded.voidRecorded, true);
