@@ -12,7 +12,6 @@ import {
   MessageCircle,
   ReceiptText,
   Settings,
-  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -47,7 +46,7 @@ const fieldRoutes: ConsoleRoute[] = [
 export function Sidebar({
   active,
   onNavigate,
-  onEstimate,
+  onEstimate: _onEstimate,
   mobileOpen,
   onClose,
   signedInEmail,
@@ -56,7 +55,7 @@ export function Sidebar({
 }: {
   active: ConsoleRoute;
   onNavigate: (route: ConsoleRoute) => void;
-  onEstimate: () => void;
+  onEstimate?: () => void;
   mobileOpen: boolean;
   onClose: () => void;
   signedInEmail: string;
@@ -111,12 +110,6 @@ export function Sidebar({
         })}
       </nav>
       <div className="sidebar-footer">
-        {canManage ? (
-          <button className="ai-button" type="button" onClick={onEstimate}>
-            <Sparkles aria-hidden="true" size={18} />
-            <span>AI Estimator</span>
-          </button>
-        ) : null}
         <ThemeToggle />
         <InstallAppButton />
         <div className="signed-in">

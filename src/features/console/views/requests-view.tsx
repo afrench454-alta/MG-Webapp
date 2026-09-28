@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MapPin, Plus, ReceiptText, Search, Sparkles, Trash2 } from "lucide-react";
+import { MapPin, Plus, ReceiptText, Search, Trash2 } from "lucide-react";
 import type { JobRequest } from "../domain";
 import {
   countMatching,
@@ -25,14 +25,14 @@ export function RequestsView({
   requests,
   onCreate,
   onQuote,
-  onEstimate,
   onDelete,
   canManage,
+  onEstimate: _onEstimate,
 }: {
   requests: JobRequest[];
   onCreate: () => void;
   onQuote: (request: JobRequest) => void;
-  onEstimate: (request: JobRequest) => void;
+  onEstimate?: (request: JobRequest) => void;
   onDelete: (request: JobRequest) => void;
   canManage: boolean;
 }) {
@@ -125,13 +125,6 @@ export function RequestsView({
               >
                 Create quote
               </Button>
-              <button
-                className="ai-secondary"
-                type="button"
-                onClick={() => onEstimate(request)}
-              >
-                <Sparkles aria-hidden="true" size={17} /> AI estimate
-              </button>
                 <IconButton
                   label={`Delete request for ${formatSiteTitle(request)}`}
                   icon={Trash2}

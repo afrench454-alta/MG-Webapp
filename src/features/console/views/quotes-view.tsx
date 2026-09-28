@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DollarSign, Eye, Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { DollarSign, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { money, quoteTotals, type Invoice, type Quote } from "../domain";
 import {
   countMatching,
@@ -31,17 +31,17 @@ export function QuotesView({
   onNew,
   onView,
   onEdit,
-  onEstimate,
   onCreateInvoice,
   onViewInvoice,
   onDelete,
+  onEstimate: _onEstimate,
 }: {
   quotes: Quote[];
   invoices: Invoice[];
   onNew: () => void;
   onView: (quote: Quote) => void;
   onEdit: (quote: Quote) => void;
-  onEstimate: () => void;
+  onEstimate?: () => void;
   onCreateInvoice: (quote: Quote) => void;
   onViewInvoice: (invoice: Invoice) => void;
   onDelete: (quote: Quote) => void;
@@ -74,9 +74,6 @@ export function QuotesView({
         title="Quotes"
         subtitle="14-day validity · No GST applied. Accepted quotes can prefill an invoice."
       >
-        <Button variant="secondary" icon={Sparkles} onClick={onEstimate}>
-          AI Estimator
-        </Button>
         <Button icon={Plus} onClick={onNew}>
           New Quote
         </Button>
