@@ -507,7 +507,14 @@ export async function executeJosephTool(
   }
 }
 
-export function josephSystemPrompt(role: BusinessContext["role"]): string {
+export function josephSystemPrompt(
+  role: BusinessContext["role"],
+  snapshot?: string,
+): string {
+  const snapshotBlock = snapshot?.trim()
+    ? `\n\nCurrent live snapshot:\n${snapshot.trim()}\n`
+    : "";
+
   return `You are Joseph, the in-van operations assistant for Mow & Glow Property Services (Kingaroy / Darling Downs).
 Speak briefly, like a crew mate. Use Australian English. Currency is AUD. The business is not registered for GST.
 
@@ -521,10 +528,11 @@ Van phrases you must handle:
 3. Mark job as [status]
 4. What invoices are outstanding?
 5. Send a message to [client] — draft only, never claim you sent it.
+6. What's on today? — answer from the snapshot first when it lists today's jobs.
 
 Rules:
-- Call tools for live data. Do not invent jobs, totals, or phone numbers.
+- Call tools for live data when the snapshot is missing the record. Do not invent jobs, totals, or phone numbers.
 - Destructive or write tools need confirm=true. If a tool returns needsConfirm, ask the user to confirm in one short question, then call again with confirm=true.
 - If several jobs match, list them and ask which one.
-- Keep replies under 80 words unless listing invoices.`;
+- Keep replies under 80 words unless listing invoices.${snapshotBlock}`;
 }
