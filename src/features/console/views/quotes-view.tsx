@@ -34,12 +34,14 @@ export function QuotesView({
   onCreateInvoice,
   onViewInvoice,
   onDelete,
+  onEstimate: _onEstimate,
 }: {
   quotes: Quote[];
   invoices: Invoice[];
   onNew: () => void;
   onView: (quote: Quote) => void;
   onEdit: (quote: Quote) => void;
+  onEstimate?: () => void;
   onCreateInvoice: (quote: Quote) => void;
   onViewInvoice: (invoice: Invoice) => void;
   onDelete: (quote: Quote) => void;
@@ -70,7 +72,7 @@ export function QuotesView({
       <PageHeader
         eyebrow="Pricing"
         title="Quotes"
-        subtitle="14-day validity \u00b7 No GST applied. Accepted quotes can prefill an invoice."
+        subtitle="14-day validity · No GST applied. Accepted quotes can prefill an invoice."
       >
         <Button icon={Plus} onClick={onNew}>
           New Quote
@@ -115,7 +117,7 @@ export function QuotesView({
                 </div>
                 <strong className="record-client">{formatSiteTitle(quote)}</strong>
                 <p>
-                  Issued {quote.issued} \u00b7 Expires {quote.expires}
+                  Issued {quote.issued} · Expires {quote.expires}
                 </p>
               </div>
               <div className="record-row__actions">
