@@ -23,6 +23,8 @@ export type InvoiceDraft = {
   notes: string;
 };
 
+const DEFAULT_INVOICE_NOTE = "We appreciate your business.";
+
 export function InvoiceFormDialog({
   clients,
   jobs,
@@ -60,8 +62,7 @@ export function InvoiceFormDialog({
   );
   const [dueDays, setDueDays] = useState(prefill?.dueDays || "7");
   const [notes, setNotes] = useState(
-    prefill?.notes ||
-      "Invoices are due upon completion with a 7-day grace period.",
+    prefill?.notes || DEFAULT_INVOICE_NOTE,
   );
 
   const clientOptions = useMemo(
