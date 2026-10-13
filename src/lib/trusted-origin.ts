@@ -7,7 +7,10 @@ type AppOriginEnv = {
   NEXT_PUBLIC_APP_URL?: string;
 };
 
-export function trustedOrigin(headerList: Headers, env: AppOriginEnv = process.env): string {
+export function trustedOrigin(
+  headerList: Headers,
+  env: AppOriginEnv = { NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL },
+): string {
   const configured = env.NEXT_PUBLIC_APP_URL?.trim();
   if (configured) {
     try {
