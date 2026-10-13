@@ -96,6 +96,40 @@ if (/grant execute on function public\.(?:bootstrap_current_user_business|save_c
   throw new Error("Migration check failed: a private business/client RPC was granted to anon.");
 }
 
+
+const spawnMigration = readFileSync(
+  resolve(migrationDirectory, "202610130001_harden_spawn_next_recurring_job.sql"),
+  "utf8",
+);
+
+requirePattern(
+  spawnMigration,
+  /security definer\s*set search_path = public, pg_temp/,
+  "spawn_next_recurring_job must be security definer with fixed search_path",
+);
+requirePattern(
+  spawnMigration,
+  /is_business_member\(completed\.business_id\)/,
+  "spawn_next_recurring_job must verify business membership before mutation",
+);
+requirePattern(
+  spawnMigration,
+  /can_manage_business\(completed\.business_id\)/,
+  "spawn_next_recurring_job must verify manage permission before mutation",
+);
+requirePattern(
+  spawnMigration,
+  /revoke all on function public\.spawn_next_recurring_job\(uuid\) from public;/,
+  "spawn_next_recurring_job must revoke public execute",
+);
+requirePattern(
+  spawnMigration,
+  /grant execute on function public\.spawn_next_recurring_job\(uuid\) to authenticated;/,
+  "spawn_next_recurring_job must grant only to authenticated",
+);
+
+console.log("Hardened recurring-job RPC authorisation checks passed.");
+
 console.log(
   `Migration checks passed: ${tableNames.length}/${tableNames.length} RLS tables and authenticated-only business/client RPCs.`,
 );

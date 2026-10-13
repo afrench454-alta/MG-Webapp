@@ -151,6 +151,7 @@ export type ConsoleAppProps = {
   businessDetails?: BusinessProfile;
   initialInvoices?: Invoice[];
   dataMode?: "demo" | "live";
+  dataLoadError?: string;
   signedInEmail?: string;
   actorId?: string;
   actorRole?: "owner" | "co_owner" | "technician";
@@ -199,6 +200,7 @@ export function ConsoleApp({
   businessDetails,
   initialInvoices: providedInvoices,
   dataMode = "demo",
+  dataLoadError,
   signedInEmail = "ops@fieldcentral.local",
   actorId,
   actorRole = "owner",
@@ -1698,6 +1700,11 @@ export function ConsoleApp({
 
   return (
     <div className="app-shell">
+      {dataLoadError ? (
+        <div className="mx-4 mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+          {dataLoadError}
+        </div>
+      ) : null}
       <Sidebar
         active={currentRoute}
         onNavigate={setActive}
