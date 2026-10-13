@@ -5,11 +5,11 @@ import {
 } from "./estimator-contract";
 
 export const ESTIMATOR_NOT_CONNECTED =
-  "AI quoting is not connected on this deployment yet. Set GEMINI_API_KEY (or GOOGLE_API_KEY) in Vercel for Production and Preview, then redeploy. You can still build the quote by hand.";
+  "AI quoting is not connected on this deployment yet. Set GEMINI_API_KEY (or GOOGLE_API_KEY), XAI_API_KEY, or OPENROUTER_API_KEY in Vercel for Production and Preview, then redeploy. You can still build the quote by hand.";
 export const ESTIMATOR_UNAVAILABLE =
   "The estimator is briefly unavailable. Try again.";
 export const ESTIMATOR_UNAUTHORIZED =
-  "The Gemini API key was rejected. Check GEMINI_API_KEY or GOOGLE_API_KEY on this deployment.";
+  "The API key was rejected. Check GEMINI_API_KEY, GOOGLE_API_KEY, XAI_API_KEY, or OPENROUTER_API_KEY on this deployment.";
 export const ESTIMATOR_RATE_LIMITED =
   "The estimator hit a rate limit. Try again in a moment.";
 export const ESTIMATOR_MODEL_MISS =
@@ -22,6 +22,9 @@ export const GEMINI_MODELS = [
   "gemini-3.5-flash",
   "gemini-2.5-flash",
 ] as const;
+
+/** Default OpenRouter model for estimator JSON drafts. Free models can be unreliable for strict JSON; gpt-4o-mini is the reliable default matching Joseph. */
+export const DEFAULT_OPENROUTER_ESTIMATOR_MODEL = "openai/gpt-4o-mini";
 
 export const ESTIMATOR_SYSTEM_PROMPT = `You are the quoting assistant for Mow & Glow Property Services, a field-ops business in regional Queensland (Toowoomba / Kingaroy and nearby).
 
@@ -45,11 +48,14 @@ export type EstimatorEnv = {
   GEMINI_API_KEY?: string;
   GOOGLE_API_KEY?: string;
   XAI_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_MODEL?: string;
 };
 
 export type EstimatorProvider =
   | { kind: "gemini"; apiKey: string }
-  | { kind: "xai"; apiKey: string };
+  | { kind: "xai"; apiKey: string }
+  | { kind: "openrouter"; apiKey: string; model: string };
 
 function envValue(env: object, key: keyof EstimatorEnv): string {
   const value = (env as Record<string, unknown>)[key];
@@ -66,6 +72,12 @@ export function resolveEstimatorProvider(
   const xai = envValue(env, "XAI_API_KEY");
   if (xai) {
     return { kind: "xai", apiKey: xai };
+  }
+  const openRouter = envValue(env, "OPENROUTER_API_KEY");
+  if (openRouter) {
+    const model =
+      envValue(env, "OPENROUTER_MODEL") || DEFAULT_OPENROUTER_ESTIMATOR_MODEL;
+    return { kind: "openrouter", apiKey: openRouter, model };
   }
   return null;
 }
@@ -113,7 +125,8 @@ export function extractGeminiText(body: unknown): string | null {
   return text || null;
 }
 
-export function extractXaiText(body: unknown): string | null {
+/** Shared extractor for OpenAI-compatible chat completions (xAI and OpenRouter). */
+export function extractChatContent(body: unknown): string | null {
   if (!body || typeof body !== "object") {
     return null;
   }
@@ -129,6 +142,10 @@ export function extractXaiText(body: unknown): string | null {
   return typeof content === "string" && content.trim() ? content : null;
 }
 
+export function extractXaiText(body: unknown): string | null {
+  return extractChatContent(body);
+}
+
 type FetchLike = typeof fetch;
 
 async function readJson(response: Response): Promise<unknown> {
@@ -139,7 +156,7 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-type GeminiDraftResult =
+type DraftResult =
   | { ok: true; content: string }
   | {
       ok: false;
@@ -150,7 +167,7 @@ async function requestGeminiDraft(
   apiKey: string,
   userPrompt: string,
   fetchImpl: FetchLike,
-): Promise<GeminiDraftResult> {
+): Promise<DraftResult> {
   let sawNon404Failure = false;
   let attempted = 0;
 
@@ -228,7 +245,50 @@ async function requestXaiDraft(
   if (!response.ok) {
     return null;
   }
-  return extractXaiText(await readJson(response));
+  return extractChatContent(await readJson(response));
+}
+
+async function requestOpenRouterDraft(
+  apiKey: string,
+  model: string,
+  userPrompt: string,
+  fetchImpl: FetchLike,
+): Promise<DraftResult> {
+  const response = await fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://mg-webapp-host.vercel.app",
+      "X-Title": "Mow & Glow Estimator",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.3,
+      max_tokens: 1200,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: ESTIMATOR_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false, reason: "unauthorized" };
+  }
+  if (response.status === 429) {
+    return { ok: false, reason: "rate_limited" };
+  }
+  if (!response.ok) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  const content = extractChatContent(await readJson(response));
+  if (!content) {
+    return { ok: false, reason: "unavailable" };
+  }
+  return { ok: true, content };
 }
 
 export async function draftEstimateFromProvider(
@@ -241,15 +301,22 @@ export async function draftEstimateFromProvider(
     return { ok: false, message: ESTIMATOR_NOT_CONNECTED };
   }
 
-  const content =
-    provider.kind === "gemini"
-      ? await requestGeminiDraft(provider.apiKey, userPrompt, fetchImpl)
-      : await requestXaiDraft(provider.apiKey, userPrompt, fetchImpl).then(
-          (text) =>
-            text
-              ? ({ ok: true, content: text } as const)
-              : ({ ok: false, reason: "unavailable" } as const),
-        );
+  let content: DraftResult;
+  if (provider.kind === "gemini") {
+    content = await requestGeminiDraft(provider.apiKey, userPrompt, fetchImpl);
+  } else if (provider.kind === "xai") {
+    const text = await requestXaiDraft(provider.apiKey, userPrompt, fetchImpl);
+    content = text
+      ? { ok: true, content: text }
+      : { ok: false, reason: "unavailable" };
+  } else {
+    content = await requestOpenRouterDraft(
+      provider.apiKey,
+      provider.model,
+      userPrompt,
+      fetchImpl,
+    );
+  }
 
   if (!content.ok) {
     if (content.reason === "unauthorized") {
