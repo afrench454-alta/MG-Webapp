@@ -1,4 +1,4 @@
-import { invoiceTerms, type Client, type Invoice, type Job, type Quote } from "../domain";
+import { defaultInvoiceNote, type Client, type Invoice, type Job, type Quote } from "../domain";
 import type { InvoiceDraft } from "../dialogs/invoice-form-dialog";
 
 export function canCreateInvoiceFromQuote(quote: Quote): boolean {
@@ -44,7 +44,7 @@ export function draftInvoiceFromQuote(
     scope: quote.scope,
     items: quote.items.map((item) => ({ ...item })),
     dueDays: "7",
-    notes: `${invoiceTerms}\nQuoted as ${quoteNumber}.`,
+    notes: `${defaultInvoiceNote}\nQuoted as ${quoteNumber}.`,
   };
 }
 
