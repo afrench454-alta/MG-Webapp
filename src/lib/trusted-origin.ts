@@ -3,7 +3,11 @@
  * Prefer the canonical NEXT_PUBLIC_APP_URL when set.
  * Fall back to request headers only for local development hosts.
  */
-export function trustedOrigin(headerList: Headers, env: NodeJS.ProcessEnv = process.env): string {
+type AppOriginEnv = {
+  NEXT_PUBLIC_APP_URL?: string;
+};
+
+export function trustedOrigin(headerList: Headers, env: AppOriginEnv = process.env): string {
   const configured = env.NEXT_PUBLIC_APP_URL?.trim();
   if (configured) {
     try {
