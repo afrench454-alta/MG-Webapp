@@ -86,7 +86,7 @@ export function LineItemEditor({
                 type="number"
                 inputMode="decimal"
                 min="0"
-                step="0.25"
+                step="0.5"
                 value={item.quantity}
                 onChange={(event) =>
                   update(index, "quantity", event.target.value)
@@ -112,7 +112,7 @@ export function LineItemEditor({
               type="number"
               inputMode="decimal"
               min="0"
-              step="0.01"
+              step="10"
               value={item.rate}
               onChange={(event) => update(index, "rate", event.target.value)}
               required
