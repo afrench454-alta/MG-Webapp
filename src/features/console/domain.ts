@@ -125,6 +125,8 @@ export const quoteTerms = "This quotation is an estimate only. Any unforeseen co
 
 export const invoiceTerms = "Invoices due upon completion have a grace period of 7 days only. Mow & Glow Property Services is a current ABN holder, carries public liability insurance, and is not registered for GST.";
 
+export const defaultInvoiceNote = "We appreciate your business.";
+
 export type Job = {
   id: string;
   displayName: string;
@@ -258,7 +260,7 @@ export const invoiceSeed: Invoice = {
   documentStatus: "Draft",
   paymentStatus: "Unpaid",
   scope: ["Deep clean 3BR", "Window cleaning"],
-  notes: "Invoices are due upon completion with a 7-day grace period.",
+  notes: "We appreciate your business.",
   discount: 0,
   taxRate: 0,
   items: [
