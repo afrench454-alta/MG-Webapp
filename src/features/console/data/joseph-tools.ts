@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { BusinessContext } from "@/lib/supabase/business";
-import { invoiceTerms, money, quoteTotals, type JobStatus } from "../domain";
+import { defaultInvoiceNote, money, quoteTotals, type JobStatus } from "../domain";
 import { listClients } from "./client-repository";
 import { invoiceDisplayStatus } from "./invoice-lifecycle";
 import { isLiveInvoice } from "./list-filters";
@@ -137,7 +137,7 @@ export const JOSEPH_TOOL_DEFINITIONS: OpenRouterTool[] = [
     function: {
       name: "complete_job_and_draft_invoice",
       description:
-        "Mark a job completed and create a draft invoice. Requires confirm=true. Owners and co-owners only.",
+        "Mark a job completed and draft an invoice from an accepted quote, the client's recent past invoice, or an AI estimate. Requires confirm=true. Owners and co-owners only. If no basis is found, return needsMoreInfo so the user can clarify.",
       parameters: {
         type: "object",
         properties: {
@@ -356,30 +356,60 @@ export async function executeJosephTool(
             (quote) => quote.jobRequestId === job.jobRequestId && quote.status === "Accepted",
           )
         : [];
-      const sourceItems =
+      const allInvoices = await listInvoices(context);
+      const pastInvoices = allInvoices
+        .filter(
+          (inv) =>
+            inv.clientId === job.clientId &&
+            isLiveInvoice(inv) &&
+            inv.items.length > 0,
+        )
+        .sort((a, b) => (b.issued || "").localeCompare(a.issued || ""))
+        .slice(0, 1);
+      let sourceItems =
         quotes[0]?.items && quotes[0].items.length > 0
           ? quotes[0].items
-          : [
-              {
-                description: job.scope || job.category || "Completed works",
-                quantity: 1,
-                unitLabel: "ea",
-                rate: parsed.rate ?? 0,
-              },
-            ];
+          : pastInvoices[0]?.items && pastInvoices[0].items.length > 0
+            ? pastInvoices[0].items
+            : [
+                {
+                  description: job.scope || job.category || "Completed works",
+                  quantity: 1,
+                  unitLabel: "ea",
+                  rate: parsed.rate ?? 0,
+                },
+              ];
+      let usedAi = false;
       if (sourceItems.every((item) => Number(item.rate) <= 0) && parsed.rate == null) {
-        return {
-          text: JSON.stringify({
-            needsConfirm: true,
-            preview: `Need a rate to invoice ${job.client} for ${job.category}.`,
-          }),
-        };
+        const brief = job.scope || job.category || "Completed works";
+        const estimate = await draftEstimateFromProvider(
+          [`Scope:\n${brief}`, `Property: ${job.address}`].join("\n"),
+        );
+        if (estimate.ok && estimate.estimate.items.length > 0) {
+          sourceItems = estimate.estimate.items;
+          usedAi = true;
+        } else {
+          return {
+            text: JSON.stringify({
+              needsMoreInfo: true,
+              questions: [
+                `How many hours or units for ${job.category || "this job"}?`,
+                "Any materials or extras to include?",
+              ],
+              preview: `No past invoice or accepted quote found for ${job.client}. Clarify so I can draft for editing.`,
+            }),
+          };
+        }
       }
       if (!parsed.confirm) {
         return {
           text: JSON.stringify({
             needsConfirm: true,
-            preview: `Complete ${job.client} at ${job.address} and draft an invoice.`,
+            preview: usedAi
+              ? `Complete ${job.client} and draft an AI-estimated invoice for editing.`
+              : pastInvoices.length && !quotes[0]
+                ? `Complete ${job.client} and draft from their recent invoice.`
+                : `Complete ${job.client} at ${job.address} and draft an invoice.`,
           }),
         };
       }
@@ -389,15 +419,12 @@ export async function executeJosephTool(
         notes: job.notes,
         recurrence: jobRecurrence(job.recurrence),
       });
-      const items =
-        parsed.rate != null && (!quotes[0] || quotes[0].items.length === 0)
-          ? [{ description: job.scope || job.category, quantity: 1, rate: parsed.rate }]
-          : sourceItems.map((item) => ({
-              description: item.description,
-              quantity: Number(item.quantity),
-              unitLabel: item.unitLabel,
-              rate: Number(item.rate),
-            }));
+      const items = sourceItems.map((item) => ({
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitLabel: item.unitLabel,
+        rate: Number(item.rate),
+      }));
       const invoice = await createInvoice(context, {
         clientId: job.clientId,
         propertyId: job.serviceAddressId,
@@ -405,7 +432,7 @@ export async function executeJosephTool(
         quoteId: quotes[0]?.id,
         items,
         dueDays: 7,
-        notes: invoiceTerms,
+        notes: defaultInvoiceNote,
       });
       return {
         text: JSON.stringify({
@@ -414,8 +441,9 @@ export async function executeJosephTool(
           invoiceId: invoice.id,
           invoiceNumber: invoice.documentNumber,
           total: money(quoteTotals(invoice.items).total),
+          basis: usedAi ? "ai-estimate" : quotes[0] ? "quote" : pastInvoices.length ? "past-invoice" : "simple",
         }),
-        action: `Completed ${job.client} and drafted invoice ${invoice.documentNumber || invoice.id}.`,
+        action: `Completed ${job.client} and drafted invoice ${invoice.documentNumber || invoice.id} for editing.`,
       };
     }
     case "draft_quote_estimate": {
@@ -522,9 +550,15 @@ Van phrases you must handle:
 4. What invoices are outstanding?
 5. Send a message to [client] — draft only, never claim you sent it.
 
+Invoice drafting:
+- Prefer an accepted quote for the job, then the client's most recent live invoice (for regulars), then a simple line.
+- If no usable rates, use the AI estimator or return needsMoreInfo so you can ask 1–2 short clarifying questions (hours/units, extras). Present the draft for the user to edit in the console.
+- Always use the short client note “We appreciate your business.”
+
 Rules:
 - Call tools for live data. Do not invent jobs, totals, or phone numbers.
 - Destructive or write tools need confirm=true. If a tool returns needsConfirm, ask the user to confirm in one short question, then call again with confirm=true.
+- If a tool returns needsMoreInfo, ask the clarifying questions and call again once you have enough to estimate.
 - If several jobs match, list them and ask which one.
 - Keep replies under 80 words unless listing invoices.`;
 }
