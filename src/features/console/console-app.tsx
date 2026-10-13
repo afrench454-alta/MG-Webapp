@@ -151,6 +151,7 @@ export type ConsoleAppProps = {
   businessDetails?: BusinessProfile;
   initialInvoices?: Invoice[];
   dataMode?: "demo" | "live";
+  dataLoadError?: string;
   signedInEmail?: string;
   actorId?: string;
   actorRole?: "owner" | "co_owner" | "technician";
@@ -199,6 +200,7 @@ export function ConsoleApp({
   businessDetails,
   initialInvoices: providedInvoices,
   dataMode = "demo",
+  dataLoadError,
   signedInEmail = "ops@fieldcentral.local",
   actorId,
   actorRole = "owner",
@@ -1423,9 +1425,6 @@ export function ConsoleApp({
                 },
               })
             }
-            onEstimate={(request) =>
-              setDialog({ type: "estimator", jobRequestId: request.id })
-            }
             onDelete={(request) => {
               setRequestMutationError("");
               setDialog({ type: "delete-request", request });
@@ -1472,7 +1471,6 @@ export function ConsoleApp({
                 },
               })
             }
-            onEstimate={() => setDialog({ type: "estimator" })}
             onCreateInvoice={(quote) => setDialog({ type: "invoice-form", quote })}
             onViewInvoice={(record) => setDialog({ type: "invoice-document", record })}
             onDelete={(quote) => setDialog({ type: "delete-quote", quote })}
@@ -1698,10 +1696,14 @@ export function ConsoleApp({
 
   return (
     <div className="app-shell">
+      {dataLoadError ? (
+        <div className="mx-4 mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+          {dataLoadError}
+        </div>
+      ) : null}
       <Sidebar
         active={currentRoute}
         onNavigate={setActive}
-        onEstimate={() => setDialog({ type: "estimator" })}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         signedInEmail={signedInEmail}

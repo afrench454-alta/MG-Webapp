@@ -31,12 +31,15 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
-async function loadHomeSlice<T>(label: string, task: Promise<T>, fallback: T): Promise<T> {
+type LoadResult<T> = { ok: true; data: T } | { ok: false; data: T; label: string };
+
+async function loadHomeSlice<T>(label: string, task: Promise<T>, fallback: T): Promise<LoadResult<T>> {
   try {
-    return await task;
+    const data = await task;
+    return { ok: true, data };
   } catch (error) {
     console.error(`Console home failed to load ${label}`, error);
-    return fallback;
+    return { ok: false, data: fallback, label };
   }
 }
 
@@ -48,7 +51,7 @@ export default async function Home() {
   const context = await getBusinessContext();
   if (!context) redirect("/sign-in");
 
-  const [clients, jobRequests, questionnaires, questionnaireSubmissions, quotes, jobs, teamMembers, invitations, businessDetails, invoices] = await Promise.all([
+  const results = await Promise.all([
     loadHomeSlice("clients", listClients(context), []),
     loadHomeSlice("job requests", listJobRequests(context), []),
     loadHomeSlice("questionnaires", listQuestionnaires(context), []),
@@ -60,6 +63,22 @@ export default async function Home() {
     loadHomeSlice("business profile", getBusinessProfile(context), defaultBusinessProfile),
     loadHomeSlice("invoices", listInvoices(context), []),
   ]);
+
+  const failedLabels = results.filter((r) => !r.ok).map((r) => (r as { label: string }).label);
+  const dataLoadError = failedLabels.length > 0
+    ? `Some dashboard data could not be loaded (${failedLabels.join(", ")}). Please refresh or try again later.`
+    : undefined;
+
+  const clients = results[0].data as typeof results[0]["data"];
+  const jobRequests = results[1].data as typeof results[1]["data"];
+  const questionnaires = results[2].data as typeof results[2]["data"];
+  const questionnaireSubmissions = results[3].data as typeof results[3]["data"];
+  const quotes = results[4].data as typeof results[4]["data"];
+  const jobs = results[5].data as typeof results[5]["data"];
+  const teamMembers = results[6].data as typeof results[6]["data"];
+  const invitations = results[7].data as typeof results[7]["data"];
+  const businessDetails = results[8].data as typeof results[8]["data"];
+  const invoices = results[9].data as typeof results[9]["data"];
 
   return (
     <ConsoleApp
@@ -74,6 +93,7 @@ export default async function Home() {
       businessDetails={businessDetails}
       initialInvoices={invoices}
       dataMode="live"
+      dataLoadError={dataLoadError}
       signedInEmail={context.actorEmail || "Signed-in operator"}
       actorId={context.actorId}
       actorRole={context.role}

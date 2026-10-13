@@ -55,6 +55,7 @@ export function JosephView({
   const [error, setError] = useState("");
   const [invoiceConfirm, setInvoiceConfirm] = useState(false);
   const [opsOverlay, setOpsOverlay] = useState<NextStopOpsOverlay | null>(null);
+  const [seenBriefJobId, setSeenBriefJobId] = useState<string | undefined>();
   const [loadedJobs, setLoadedJobs] = useState<Job[]>([]);
   const [loadedClients, setLoadedClients] = useState<Client[]>([]);
   const [loadedInvoices, setLoadedInvoices] = useState<Invoice[]>([]);
@@ -115,6 +116,12 @@ export function JosephView({
     ],
   );
   const opsStatus = brief?.opsStatus ?? null;
+  const briefJobId = brief?.jobId;
+  if (briefJobId !== seenBriefJobId) {
+    setSeenBriefJobId(briefJobId);
+    setOpsOverlay(null);
+    setInvoiceConfirm(false);
+  }
 
   const nextLineId = (role: JosephMessage["role"]) => {
     idRef.current += 1;
@@ -131,11 +138,6 @@ export function JosephView({
     el.style.height = "auto";
     el.style.height = `${Math.min(Math.max(el.scrollHeight, 44), 160)}px`;
   }, [draft]);
-
-  useEffect(() => {
-    setOpsOverlay(null);
-    setInvoiceConfirm(false);
-  }, [brief?.jobId]);
 
   const appendExchange = (userText: string, reply: string) => {
     setMessages((current) => [
