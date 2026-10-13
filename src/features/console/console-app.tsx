@@ -61,7 +61,7 @@ import type {
 } from "./data/operations-contract";
 import type { SendQuestionnaireAction } from "./data/questionnaire-contract";
 import type { EstimateJobAction } from "./data/estimator-contract";
-import type { AskJosephAction } from "./data/joseph-contract";
+import type { AskJosephAction, RunJosephNextStopAction } from "./data/joseph-contract";
 import { asJobRecurrence, buildNextDemoJob, clearJobSchedule, applyJobSchedule, describeJobUpdate, scheduledStartPayload, formatBrisbaneSchedule } from "./data/job-recurrence";
 import { parseClientImportText, planClientImport } from "./data/client-import";
 import type {
@@ -151,7 +151,6 @@ export type ConsoleAppProps = {
   businessDetails?: BusinessProfile;
   initialInvoices?: Invoice[];
   dataMode?: "demo" | "live";
-  dataLoadError?: string;
   signedInEmail?: string;
   actorId?: string;
   actorRole?: "owner" | "co_owner" | "technician";
@@ -181,6 +180,7 @@ export type ConsoleAppProps = {
   onSendQuestionnaire?: SendQuestionnaireAction;
   onEstimateJob?: EstimateJobAction;
   onAskJoseph?: AskJosephAction;
+  onRunNextStop?: RunJosephNextStopAction;
   onInviteTeamMember?: InviteTeamAction;
   onRevokeTeamInvite?: RevokeTeamInviteAction;
   onUpdateTeamMember?: UpdateTeamMemberAction;
@@ -200,7 +200,6 @@ export function ConsoleApp({
   businessDetails,
   initialInvoices: providedInvoices,
   dataMode = "demo",
-  dataLoadError,
   signedInEmail = "ops@fieldcentral.local",
   actorId,
   actorRole = "owner",
@@ -230,6 +229,7 @@ export function ConsoleApp({
   onSendQuestionnaire,
   onEstimateJob,
   onAskJoseph,
+  onRunNextStop,
   onInviteTeamMember,
   onRevokeTeamInvite,
   onUpdateTeamMember,
@@ -917,6 +917,7 @@ export function ConsoleApp({
   const updateInvoicePaymentStatus = async (
     invoiceId: string,
     status: Invoice["paymentStatus"],
+    amount?: number,
   ) => {
     setOperationMutationError("");
     if (dataMode === "live") {
@@ -928,7 +929,7 @@ export function ConsoleApp({
       setOperationMutationPending(true);
       let result;
       try {
-        result = await onUpdateInvoicePayment(invoiceId, status);
+        result = await onUpdateInvoicePayment(invoiceId, status, amount);
       } catch {
         setOperationMutationError("A network error occurred. Please try again.");
         setOperationMutationPending(false);
@@ -1425,9 +1426,6 @@ export function ConsoleApp({
                 },
               })
             }
-            onEstimate={(request) =>
-              setDialog({ type: "estimator", jobRequestId: request.id })
-            }
             onDelete={(request) => {
               setRequestMutationError("");
               setDialog({ type: "delete-request", request });
@@ -1474,7 +1472,6 @@ export function ConsoleApp({
                 },
               })
             }
-            onEstimate={() => setDialog({ type: "estimator" })}
             onCreateInvoice={(quote) => setDialog({ type: "invoice-form", quote })}
             onViewInvoice={(record) => setDialog({ type: "invoice-document", record })}
             onDelete={(quote) => setDialog({ type: "delete-quote", quote })}
@@ -1503,7 +1500,18 @@ export function ConsoleApp({
           />
         );
       case "joseph":
-        return <JosephView onAskJoseph={onAskJoseph} />;
+        return (
+          <JosephView
+            onAskJoseph={onAskJoseph}
+            onRunNextStop={onRunNextStop}
+            jobs={jobs}
+            clients={clients}
+            invoices={invoiceRecords}
+            quotes={quotes}
+            actorId={actorId}
+            actorRole={actorRole}
+          />
+        );
       case "invoices":
         return (
           <InvoicesView
@@ -1692,7 +1700,9 @@ export function ConsoleApp({
             currentMemberId={actorId}
             teamMembers={teamMembers}
             canManage={canOperateOffice}
+            actorRole={actorRole}
             onNavigate={setActive}
+            onOpenJob={(job) => setDialog({ type: "job", job })}
           />
         );
     }
@@ -1700,15 +1710,9 @@ export function ConsoleApp({
 
   return (
     <div className="app-shell">
-      {dataLoadError ? (
-        <div className="mx-4 mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
-          {dataLoadError}
-        </div>
-      ) : null}
       <Sidebar
         active={currentRoute}
         onNavigate={setActive}
-        onEstimate={() => setDialog({ type: "estimator" })}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         signedInEmail={signedInEmail}
@@ -2049,10 +2053,11 @@ export function ConsoleApp({
             record={dialog.record}
             profile={businessDetailsState}
             onClose={closeDialog}
-            onStatusChange={(status) =>
+            onStatusChange={(status, amount) =>
               updateInvoicePaymentStatus(
                 dialog.record.id,
                 status as Invoice["paymentStatus"],
+                amount,
               )
             }
             onFinalize={() => void finalizeInvoice(dialog.record)}

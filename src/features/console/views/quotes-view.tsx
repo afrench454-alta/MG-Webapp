@@ -34,14 +34,12 @@ export function QuotesView({
   onCreateInvoice,
   onViewInvoice,
   onDelete,
-  onEstimate: _onEstimate,
 }: {
   quotes: Quote[];
   invoices: Invoice[];
   onNew: () => void;
   onView: (quote: Quote) => void;
   onEdit: (quote: Quote) => void;
-  onEstimate?: () => void;
   onCreateInvoice: (quote: Quote) => void;
   onViewInvoice: (invoice: Invoice) => void;
   onDelete: (quote: Quote) => void;

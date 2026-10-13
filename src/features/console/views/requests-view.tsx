@@ -27,12 +27,10 @@ export function RequestsView({
   onQuote,
   onDelete,
   canManage,
-  onEstimate: _onEstimate,
 }: {
   requests: JobRequest[];
   onCreate: () => void;
   onQuote: (request: JobRequest) => void;
-  onEstimate?: (request: JobRequest) => void;
   onDelete: (request: JobRequest) => void;
   canManage: boolean;
 }) {
