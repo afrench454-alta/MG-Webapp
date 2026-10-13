@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  DEFAULT_OPENROUTER_ESTIMATOR_MODEL,
   ESTIMATOR_MODEL_MISS,
   ESTIMATOR_NOT_CONNECTED,
   ESTIMATOR_RATE_LIMITED,
@@ -23,11 +24,12 @@ const SAMPLE_ESTIMATE = {
   ],
 };
 
-test("resolveEstimatorProvider prefers Gemini over xAI", () => {
+test("resolveEstimatorProvider prefers Gemini over xAI over OpenRouter", () => {
   assert.deepEqual(
     resolveEstimatorProvider({
       GEMINI_API_KEY: " gemini-live ",
       XAI_API_KEY: "xai-live",
+      OPENROUTER_API_KEY: "or-live",
     }),
     { kind: "gemini", apiKey: "gemini-live" },
   );
@@ -38,6 +40,18 @@ test("resolveEstimatorProvider prefers Gemini over xAI", () => {
   assert.deepEqual(resolveEstimatorProvider({ XAI_API_KEY: "xai-live" }), {
     kind: "xai",
     apiKey: "xai-live",
+  });
+  assert.deepEqual(
+    resolveEstimatorProvider({
+      OPENROUTER_API_KEY: " or-live ",
+      OPENROUTER_MODEL: " custom/model ",
+    }),
+    { kind: "openrouter", apiKey: "or-live", model: "custom/model" },
+  );
+  assert.deepEqual(resolveEstimatorProvider({ OPENROUTER_API_KEY: "or-live" }), {
+    kind: "openrouter",
+    apiKey: "or-live",
+    model: DEFAULT_OPENROUTER_ESTIMATOR_MODEL,
   });
   assert.equal(resolveEstimatorProvider({}), null);
 });
@@ -116,6 +130,40 @@ test("draftEstimateFromProvider falls back to xAI and reports a missing key", as
       ),
   );
   assert.equal(result.ok, true);
+});
+
+test("draftEstimateFromProvider uses OpenRouter when only that key is set", async () => {
+  const calls: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    calls.push(String(input));
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(SAMPLE_ESTIMATE) } }],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  };
+
+  const result = await draftEstimateFromProvider(
+    "Service: Yard Services\nScope:\nOvergrown backyard.",
+    { OPENROUTER_API_KEY: "or-key" },
+    fetchImpl,
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.estimate.items[0]?.description, "Mow and edge");
+  }
+  assert.match(calls[0] ?? "", /openrouter\.ai\/api\/v1\/chat\/completions$/);
+});
+
+test("draftEstimateFromProvider reports a rejected OpenRouter key", async () => {
+  const result = await draftEstimateFromProvider(
+    "Service: Yard Services\nScope:\nOvergrown backyard.",
+    { OPENROUTER_API_KEY: "bad-key" },
+    async () => new Response("denied", { status: 401 }),
+  );
+  assert.deepEqual(result, { ok: false, message: ESTIMATOR_UNAUTHORIZED });
 });
 
 test("draftEstimateFromProvider reports a rejected Gemini key", async () => {
