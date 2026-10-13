@@ -32,5 +32,12 @@ test("trustedOrigin allows localhost fallback", () => {
 test("trustedOrigin rejects malformed hosts", () => {
   const env = {};
   assert.equal(trustedOrigin(headers({ host: "localhost/evil" }), env), "");
-  assert.equal(trustedOrigin(headers({ host: "localhost\n" }), env), "");
+  assert.equal(trustedOrigin(headers({ host: "localhost evil" }), env), "");
+  const injected = {
+    get(name: string) {
+      if (name === "host") return "localhost\nevil";
+      return null;
+    },
+  } as Headers;
+  assert.equal(trustedOrigin(injected, env), "");
 });
