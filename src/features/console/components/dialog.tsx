@@ -88,12 +88,18 @@ export function Dialog({
         aria-labelledby="dialog-title"
         ref={panelRef}
       >
+        <div className="dialog__accent" aria-hidden="true" />
         <div className="dialog__header">
           <h2 id="dialog-title">
             {TitleIcon ? <TitleIcon aria-hidden="true" size={19} /> : null}
             {title}
           </h2>
-          <IconButton label="Close dialog" icon={X} onClick={onClose} />
+          <div className="dialog__header-controls">
+            <kbd className="dialog__esc-pill" aria-hidden="true">
+              ESC
+            </kbd>
+            <IconButton label="Close dialog" icon={X} onClick={onClose} />
+          </div>
         </div>
         <div className="dialog__body">{children}</div>
       </section>

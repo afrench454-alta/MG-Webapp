@@ -22,17 +22,74 @@ import { IconButton } from "./ui-elements";
 import { InstallAppButton } from "./install-app";
 import { ThemeToggle } from "./theme-toggle";
 
-export const navItems: Array<{ id: ConsoleRoute; label: string; icon: LucideIcon }> = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "joseph", label: "Joseph", icon: MessageCircle },
-  { id: "clients", label: "Clients", icon: Users },
-  { id: "requests", label: "Job Requests", icon: ClipboardList },
-  { id: "questionnaires", label: "Intake forms", icon: FileText },
-  { id: "quotes", label: "Quotes", icon: ReceiptText },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
-  { id: "jobs", label: "Job Board", icon: Columns3 },
-  { id: "invoices", label: "Invoices", icon: DollarSign },
-  { id: "settings", label: "Team & business", icon: Settings },
+export type NavSection = "Field Operations" | "Client & Intake" | "Financials & Admin";
+
+export const navItems: Array<{
+  id: ConsoleRoute;
+  label: string;
+  icon: LucideIcon;
+  section: NavSection;
+}> = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    section: "Field Operations",
+  },
+  {
+    id: "joseph",
+    label: "Joseph",
+    icon: MessageCircle,
+    section: "Field Operations",
+  },
+  {
+    id: "schedule",
+    label: "Schedule",
+    icon: CalendarDays,
+    section: "Field Operations",
+  },
+  {
+    id: "jobs",
+    label: "Job Board",
+    icon: Columns3,
+    section: "Field Operations",
+  },
+  {
+    id: "clients",
+    label: "Clients",
+    icon: Users,
+    section: "Client & Intake",
+  },
+  {
+    id: "requests",
+    label: "Job Requests",
+    icon: ClipboardList,
+    section: "Client & Intake",
+  },
+  {
+    id: "questionnaires",
+    label: "Intake forms",
+    icon: FileText,
+    section: "Client & Intake",
+  },
+  {
+    id: "quotes",
+    label: "Quotes",
+    icon: ReceiptText,
+    section: "Financials & Admin",
+  },
+  {
+    id: "invoices",
+    label: "Invoices",
+    icon: DollarSign,
+    section: "Financials & Admin",
+  },
+  {
+    id: "settings",
+    label: "Team & business",
+    icon: Settings,
+    section: "Financials & Admin",
+  },
 ];
 
 const fieldRoutes: ConsoleRoute[] = [
@@ -51,6 +108,7 @@ export function Sidebar({
   signedInEmail,
   onSignOut,
   canManage = true,
+  counts,
 }: {
   active: ConsoleRoute;
   onNavigate: (route: ConsoleRoute) => void;
@@ -59,7 +117,16 @@ export function Sidebar({
   signedInEmail: string;
   onSignOut?: () => Promise<void>;
   canManage?: boolean;
+  counts?: Partial<Record<ConsoleRoute, number>>;
 }) {
+  const allowedItems = navItems.filter((item) =>
+    canManage ? true : fieldRoutes.includes(item.id),
+  );
+
+  const sections: NavSection[] = canManage
+    ? ["Field Operations", "Client & Intake", "Financials & Admin"]
+    : ["Field Operations"];
+
   return (
     <aside
       id="console-sidebar"
@@ -69,11 +136,11 @@ export function Sidebar({
         <Image
           src="/mow-glow-logo.png"
           alt=""
-          width={40}
-          height={40}
+          width={36}
+          height={36}
           className="brand-lockup__mark"
         />
-        <div>
+        <div className="brand-lockup__text">
           <p>{productBrand}</p>
           <strong>Console</strong>
         </div>
@@ -84,29 +151,53 @@ export function Sidebar({
           onClick={onClose}
         />
       </div>
+
       <nav aria-label="Main navigation" className="sidebar-nav">
-        {navItems
-          .filter((item) =>
-            canManage ? true : fieldRoutes.includes(item.id),
-          )
-          .map((item) => {
-          const Icon = item.icon;
+        {sections.map((section) => {
+          const items = allowedItems.filter((item) => item.section === section);
+          if (!items.length) return null;
+
           return (
-            <button
-              key={item.id}
-              className={active === item.id ? "is-active" : ""}
-              aria-current={active === item.id ? "page" : undefined}
-              onClick={() => {
-                onNavigate(item.id);
-                onClose();
-              }}
-            >
-              <Icon aria-hidden="true" size={19} strokeWidth={1.8} />
-              <span>{item.label}</span>
-            </button>
+            <div className="sidebar-nav__group" key={section}>
+              <span className="sidebar-nav__heading" aria-hidden="true">
+                {section}
+              </span>
+              <div className="sidebar-nav__items">
+                {items.map((item) => {
+                  const Icon = item.icon;
+                  const badgeCount = counts?.[item.id];
+                  const isActive = active === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`sidebar-nav__item ${isActive ? "is-active" : ""}`}
+                      aria-current={isActive ? "page" : undefined}
+                      onClick={() => {
+                        onNavigate(item.id);
+                        onClose();
+                      }}
+                    >
+                      <Icon aria-hidden="true" size={17} strokeWidth={1.9} />
+                      <span className="sidebar-nav__label">{item.label}</span>
+                      {typeof badgeCount === "number" && badgeCount > 0 ? (
+                        <small
+                          className="sidebar-nav__badge"
+                          aria-hidden="true"
+                        >
+                          {badgeCount}
+                        </small>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
+
       <div className="sidebar-footer">
         <ThemeToggle />
         <InstallAppButton />
@@ -116,12 +207,12 @@ export function Sidebar({
           {onSignOut ? (
             <form action={onSignOut}>
               <button type="submit">
-                <LogOut aria-hidden="true" size={16} /> Sign out
+                <LogOut aria-hidden="true" size={15} /> Sign out
               </button>
             </form>
           ) : (
             <button type="button">
-              <LogOut aria-hidden="true" size={16} /> Sign out
+              <LogOut aria-hidden="true" size={15} /> Sign out
             </button>
           )}
         </div>

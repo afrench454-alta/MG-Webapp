@@ -1,6 +1,12 @@
+import os from "os";
 import type { NextConfig } from "next";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+const lanIps = Object.values(os.networkInterfaces())
+  .flat()
+  .filter((iface): iface is os.NetworkInterfaceInfo => Boolean(iface && iface.family === "IPv4" && !iface.internal))
+  .map((iface) => iface.address);
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -10,6 +16,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: Array.from(new Set(["localhost", "127.0.0.1", "10.0.4.55", "10.0.4.54", ...lanIps])),
   ...(supabaseUrl ? { images: { remotePatterns: [new URL("/storage/v1/object/sign/**", supabaseUrl)] } } : {}),
   experimental: {
     serverActions: {

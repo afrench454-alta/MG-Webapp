@@ -1,19 +1,32 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Check } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Check,
+  MapPin,
+  UserCheck,
+  Wrench,
+} from "lucide-react";
 import type { Job, JobRequest, TeamMember } from "../domain";
 import {
   findAssignmentConflicts,
   findSiteConflict,
 } from "../data/schedule-planning";
-import { defaultDateTimeLocal, formatWorkLabel } from "../data/work-identity";
-import { Button, Field } from "../components/ui-elements";
+import { displayServiceCategory } from "../data/service-catalog";
+import {
+  defaultDateTimeLocal,
+  formatSiteTitle,
+  formatWorkLabel,
+} from "../data/work-identity";
+import { Badge, Button, Field } from "../components/ui-elements";
 
 export function ScheduleFormDialog({
   requests,
   jobs = [],
   teamMembers = [],
+  initialRequestId,
   onClose,
   onSchedule,
   pending = false,
@@ -22,6 +35,7 @@ export function ScheduleFormDialog({
   requests: JobRequest[];
   jobs?: Job[];
   teamMembers?: TeamMember[];
+  initialRequestId?: string;
   onClose: () => void;
   onSchedule: (payload: {
     jobRequestId: string;
@@ -31,7 +45,7 @@ export function ScheduleFormDialog({
   pending?: boolean;
   error?: string;
 }) {
-  const [request, setRequest] = useState("");
+  const [request, setRequest] = useState(initialRequestId || "");
   const [date, setDate] = useState(() => defaultDateTimeLocal());
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const selected = useMemo(
@@ -62,7 +76,7 @@ export function ScheduleFormDialog({
 
   return (
     <form
-      className="form-stack"
+      className="form-stack schedule-dispatch-form"
       onSubmit={(event) => {
         event.preventDefault();
         void onSchedule({
@@ -73,75 +87,117 @@ export function ScheduleFormDialog({
       }}
       aria-busy={pending}
     >
-      <Field label="Job request" required>
-        <select
-          value={request}
-          onChange={(event) => setRequest(event.target.value)}
-          required
-          disabled={pending}
-        >
-          <option value="">Choose...</option>
-          {requests.map((item) => (
-            <option value={item.id} key={item.id}>
-              {formatWorkLabel(item)}
-            </option>
-          ))}
-        </select>
-      </Field>
-      {selected ? (
-        <p className="muted-copy">
-          {selected.address}
-          {selected.scope ? ` · ${selected.scope}` : ""}
-        </p>
-      ) : null}
-      <Field label="Date & time" required>
-        <input
-          type="datetime-local"
-          value={date}
-          onChange={(event) => setDate(event.target.value)}
-          required
-          disabled={pending}
-        />
-      </Field>
-      {assignable.length ? (
-        <section className="assignment-section">
-          <div>
-            <p className="eyebrow">Assign team</p>
-            <span>
-              {assigneeIds.length
-                ? `${assigneeIds.length} selected`
-                : "Optional"}
-            </span>
+      <div className="schedule-dispatch-grid">
+        <div className="schedule-dispatch-col">
+          <div className="schedule-dispatch-section-head">
+            <Wrench aria-hidden="true" size={16} />
+            <span>1. Job Request & Site Scope</span>
           </div>
-          <div className="assignment-options">
-            {assignable.map((member) => {
-              const busy = conflicts.some(
-                (conflict) => conflict.profileId === member.id,
-              );
-              return (
-                <label
-                  key={member.id}
-                  className={busy ? "assignment-options__busy" : undefined}
-                >
-                  <input
-                    type="checkbox"
-                    checked={assigneeIds.includes(member.id)}
-                    onChange={() => toggleAssignee(member.id)}
-                    disabled={pending}
-                  />
-                  <span>
-                    <strong>{member.name}</strong>
-                    <small>
-                      {member.role}
-                      {busy ? " · already booked" : ""}
-                    </small>
-                  </span>
-                </label>
-              );
-            })}
+          <Field label="Job request" required>
+            <select
+              value={request}
+              onChange={(event) => setRequest(event.target.value)}
+              required
+              disabled={pending}
+            >
+              <option value="">Choose...</option>
+              {requests.map((item) => (
+                <option value={item.id} key={item.id}>
+                  {formatWorkLabel(item)}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {selected ? (
+            <div className="schedule-site-preview">
+              <div className="schedule-site-preview__top">
+                <strong>{formatSiteTitle(selected)}</strong>
+                <Badge tone="olive">
+                  {displayServiceCategory(selected.category)}
+                </Badge>
+              </div>
+              <p className="schedule-site-preview__address">
+                <MapPin aria-hidden="true" size={14} />
+                <span>{selected.address}</span>
+              </p>
+              {selected.scope ? (
+                <p className="schedule-site-preview__scope">{selected.scope}</p>
+              ) : null}
+              <small className="muted-copy">
+                {selected.address}
+                {selected.scope ? ` · ${selected.scope}` : ""}
+              </small>
+            </div>
+          ) : (
+            <div className="schedule-site-placeholder">
+              <p>
+                Select an open job request to preview the client property,
+                service category, and scope before dispatching a crew.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="schedule-dispatch-col">
+          <div className="schedule-dispatch-section-head">
+            <CalendarClock aria-hidden="true" size={16} />
+            <span>2. Dispatch Window & Crew Assignment</span>
           </div>
-        </section>
-      ) : null}
+          <Field label="Date & time" required>
+            <input
+              type="datetime-local"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              required
+              disabled={pending}
+            />
+          </Field>
+
+          {assignable.length ? (
+            <section className="assignment-section">
+              <div className="assignment-section__header">
+                <p className="eyebrow">
+                  <UserCheck aria-hidden="true" size={13} /> Assign team
+                </p>
+                <span>
+                  {assigneeIds.length
+                    ? `${assigneeIds.length} selected`
+                    : "Optional"}
+                </span>
+              </div>
+              <div className="assignment-options">
+                {assignable.map((member) => {
+                  const busy = conflicts.some(
+                    (conflict) => conflict.profileId === member.id,
+                  );
+                  return (
+                    <label
+                      key={member.id}
+                      className={busy ? "assignment-options__busy" : undefined}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={assigneeIds.includes(member.id)}
+                        onChange={() => toggleAssignee(member.id)}
+                        disabled={pending}
+                      />
+                      <span>
+                        <strong>{member.name}</strong>
+                        <small>
+                          {member.role}
+                          {busy ? " · already booked" : ""}
+                        </small>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </div>
+
       {conflicts.length || siteClash ? (
         <div className="conflict-note conflict-note--warn" role="status">
           <AlertTriangle aria-hidden="true" size={17} />
