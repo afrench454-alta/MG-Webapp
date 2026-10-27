@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
 import type { Client, Invoice, Job, LineItem, Quote } from "../domain";
-import { invoicePrefillJobs, rankedClients } from "../data/form-options";
+import { buildClientRateChips, invoicePrefillJobs, rankedClients } from "../data/form-options";
 import { formatWorkLabel } from "../data/work-identity";
 import { EntityPicker } from "../components/entity-picker";
 import { Button, Field } from "../components/ui-elements";
@@ -26,6 +26,7 @@ export type InvoiceDraft = {
 export function InvoiceFormDialog({
   clients,
   jobs,
+  quotes = [],
   invoices = [],
   prefill,
   sourceQuote,
@@ -36,8 +37,9 @@ export function InvoiceFormDialog({
 }: {
   clients: Client[];
   jobs: Job[];
+  quotes?: Quote[];
   invoices?: Invoice[];
-  prefill?: InvoiceDraft;
+  prefill?: Partial<InvoiceDraft>;
   sourceQuote?: Quote;
   onClose: () => void;
   onSave: (draft: InvoiceDraft) => void | Promise<void>;
@@ -93,6 +95,20 @@ export function InvoiceFormDialog({
         keywords: `${job.client} ${job.address} ${job.scope} ${job.status}`,
       })),
     [visibleJobs],
+  );
+
+  const rateChips = useMemo(
+    () =>
+      buildClientRateChips({
+        client: selectedClient
+          ? { id: selectedClient.id, name: selectedClient.name }
+          : sourceQuote
+            ? { id: sourceQuote.clientId, name: sourceQuote.client }
+            : null,
+        quotes,
+        invoices,
+      }),
+    [selectedClient, sourceQuote, quotes, invoices],
   );
 
   const applyJob = (nextJobId: string) => {
@@ -238,7 +254,16 @@ export function InvoiceFormDialog({
           placeholder="What was completed at this property?"
         />
       </Field>
-      <LineItemEditor items={items} setItems={setItems} />
+      <LineItemEditor
+        items={items}
+        setItems={setItems}
+        rateChips={rateChips}
+        onApplyRateChip={(chip) => {
+          if (!scope.trim()) {
+            setScope(chip.description);
+          }
+        }}
+      />
       <Totals items={items} />
       <div className="form-grid form-grid--three">
         <Field label="Payment due">

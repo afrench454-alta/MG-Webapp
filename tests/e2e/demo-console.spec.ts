@@ -26,7 +26,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("navigates to Clients directory and filters records", async ({ page }) => {
-    await page.getByRole("button", { name: "Clients" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Clients" }).click();
     await expect(page.getByRole("heading", { name: "Clients" })).toBeVisible();
     await expect(page.getByText("No clients match the current filters.")).toBeVisible();
 
@@ -40,7 +40,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("navigates to Quotes and shows the empty directory", async ({ page }) => {
-    await page.getByRole("button", { name: "Quotes" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Quotes" }).click();
     await expect(page.getByRole("heading", { name: "Quotes" })).toBeVisible();
     await expect(page.getByText("No quotes match the current filters.")).toBeVisible();
   });
@@ -55,7 +55,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("navigates to Job Board kanban", async ({ page }) => {
-    await page.getByRole("button", { name: "Job Board" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Job Board" }).click();
     await expect(page.getByRole("heading", { name: "Job Board" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Scheduled", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "In Progress" })).toBeVisible();
@@ -65,14 +65,14 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("navigates to Invoices and checks billing summary", async ({ page }) => {
-    await page.getByRole("button", { name: "Invoices" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Invoices" }).click();
     await expect(page.getByRole("heading", { name: "Invoices" })).toBeVisible();
     await expect(page.getByText("Outstanding:")).toBeVisible();
     await expect(page.getByText("Paid:")).toBeVisible();
   });
 
   test("tests invoice lifecycle: finalize draft and status updates", async ({ page }) => {
-    await page.getByRole("button", { name: "Invoices" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Invoices" }).click();
     
     // Find the first draft invoice's finalize button
     const issueBtn = page.getByRole("button", { name: "Issue" }).first();
@@ -83,14 +83,14 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("tests questionnaire intake with no seeded forms", async ({ page }) => {
-    await page.getByRole("button", { name: "Intake forms" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Intake forms" }).click();
     await expect(page.getByRole("heading", { name: "Intake forms" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Send form" })).toBeVisible();
     await expect(page.getByText("No new answers waiting.")).toBeVisible();
   });
 
   test("verifies keyboard navigation and focus traps", async ({ page }) => {
-    await page.getByRole("button", { name: "Clients" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Clients" }).click();
     await page.getByRole("button", { name: "New Client" }).click();
     
     await expect(page.getByRole("heading", { name: "New Client" })).toBeVisible();
@@ -115,7 +115,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   test("toggles dark mode from the sidebar", async ({ page }) => {
     await page.getByRole("button", { name: "Switch to dark mode" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-    await page.getByRole("button", { name: "Clients" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Clients" }).click();
     const filterBg = await page.locator(".list-filters").evaluate((el) => {
       const color = getComputedStyle(el).backgroundColor;
       const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
@@ -128,7 +128,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
   });
 
   test("reschedules a job and can clear it from the calendar", async ({ page }) => {
-    await page.getByRole("button", { name: "Clients" }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Clients" }).click();
     await page.getByRole("button", { name: "New Client" }).click();
     await page.locator(".field", { hasText: "Name" }).locator("input").fill("Reschedule Client");
     await page.locator(".field", { hasText: "Phone" }).locator("input").fill("0400 000 001");

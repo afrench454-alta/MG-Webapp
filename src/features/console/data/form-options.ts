@@ -129,3 +129,132 @@ export function scopeTextFromInvoice(
   if (invoice.scope?.length) return invoice.scope.join("\n");
   return "";
 }
+
+export type RateChipOption = {
+  id: string;
+  description: string;
+  rate: number;
+  quantity: number;
+  unitLabel?: string;
+  source: "last-quote" | "last-invoice" | "catalog";
+  sourceLabel: string;
+};
+
+const CATALOG_RATE_CHIPS: RateChipOption[] = [
+  {
+    id: "cat-general-clean",
+    description: "General domestic clean (per hour)",
+    rate: 65,
+    quantity: 3,
+    unitLabel: "hrs",
+    source: "catalog",
+    sourceLabel: "Standard rate",
+  },
+  {
+    id: "cat-mow-edge",
+    description: "Lawn mowing, edging & blow-down",
+    rate: 85,
+    quantity: 1,
+    unitLabel: "ea",
+    source: "catalog",
+    sourceLabel: "Standard rate",
+  },
+  {
+    id: "cat-yard-maint",
+    description: "Garden & property maintenance (per hour)",
+    rate: 75,
+    quantity: 2,
+    unitLabel: "hrs",
+    source: "catalog",
+    sourceLabel: "Standard rate",
+  },
+  {
+    id: "cat-bond-clean",
+    description: "End-of-lease / bond detail clean",
+    rate: 380,
+    quantity: 1,
+    unitLabel: "ea",
+    source: "catalog",
+    sourceLabel: "Standard rate",
+  },
+  {
+    id: "cat-green-waste",
+    description: "Green waste removal & tip fee",
+    rate: 45,
+    quantity: 1,
+    unitLabel: "ea",
+    source: "catalog",
+    sourceLabel: "Standard rate",
+  },
+];
+
+export function buildClientRateChips(options: {
+  client?: { id?: string; name?: string } | null;
+  quotes?: Quote[];
+  invoices?: Invoice[];
+}): RateChipOption[] {
+  const clientId = options.client?.id?.trim();
+  const clientName = options.client?.name?.trim().toLowerCase();
+  const seen = new Set<string>();
+  const chips: RateChipOption[] = [];
+
+  const matchesRecordClient = (rec: { clientId?: string; client: string }) => {
+    if (!clientId && !clientName) return false;
+    if (clientId && rec.clientId && rec.clientId === clientId) return true;
+    if (clientName && rec.client.trim().toLowerCase() === clientName) return true;
+    return false;
+  };
+
+  for (const quote of options.quotes ?? []) {
+    if (quote.status === "Void" || !matchesRecordClient(quote)) continue;
+    const docRef = quote.documentNumber || quote.id;
+    for (const item of quote.items) {
+      const desc = item.description.trim();
+      const rate = Number(item.rate);
+      if (!desc || !Number.isFinite(rate) || rate <= 0) continue;
+      const key = `${desc.toLowerCase()}@${rate}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      chips.push({
+        id: `quote-${quote.id}-${chips.length}`,
+        description: desc,
+        rate,
+        quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+        unitLabel: item.unitLabel,
+        source: "last-quote",
+        sourceLabel: `Last quote (${docRef})`,
+      });
+    }
+  }
+
+  for (const inv of options.invoices ?? []) {
+    if (inv.documentStatus === "Void" || !matchesRecordClient(inv)) continue;
+    const docRef = inv.documentNumber || inv.id;
+    for (const item of inv.items) {
+      const desc = item.description.trim();
+      const rate = Number(item.rate);
+      if (!desc || !Number.isFinite(rate) || rate <= 0) continue;
+      const key = `${desc.toLowerCase()}@${rate}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      chips.push({
+        id: `inv-${inv.id}-${chips.length}`,
+        description: desc,
+        rate,
+        quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+        unitLabel: item.unitLabel,
+        source: "last-invoice",
+        sourceLabel: `Billed (${docRef})`,
+      });
+    }
+  }
+
+  for (const catalogChip of CATALOG_RATE_CHIPS) {
+    const key = `${catalogChip.description.toLowerCase()}@${catalogChip.rate}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    chips.push(catalogChip);
+  }
+
+  return chips.slice(0, 8);
+}
