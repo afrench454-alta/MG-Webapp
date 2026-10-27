@@ -1,4 +1,4 @@
-const CACHE = "mow-glow-console-v2";
+const CACHE = "mow-glow-console-v3";
 const PRECACHE = [
   "/mow-glow-logo.png",
   "/icons/icon-192.png",

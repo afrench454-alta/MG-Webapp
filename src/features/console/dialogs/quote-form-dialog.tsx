@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Save, Sparkles } from "lucide-react";
-import type { JobRequest, LineItem } from "../domain";
+import type { Invoice, JobRequest, LineItem, Quote } from "../domain";
 import {
   estimateToLineItems,
   type EstimateJobAction,
 } from "../data/estimator-contract";
+import { buildClientRateChips } from "../data/form-options";
 import { isServiceCategory, parseServiceTitle } from "../data/service-catalog";
 import { formatWorkLabel } from "../data/work-identity";
 import { Button, Field } from "../components/ui-elements";
@@ -24,6 +25,8 @@ export type QuoteDraft = {
 
 export function QuoteFormDialog({
   requests,
+  quotes = [],
+  invoices = [],
   prefill,
   onClose,
   onSave,
@@ -32,6 +35,8 @@ export function QuoteFormDialog({
   error = "",
 }: {
   requests: JobRequest[];
+  quotes?: Quote[];
+  invoices?: Invoice[];
   prefill?: Partial<QuoteDraft>;
   onClose: () => void;
   onSave: (draft: QuoteDraft) => void | Promise<void>;
@@ -58,6 +63,18 @@ export function QuoteFormDialog({
   const [estimateError, setEstimateError] = useState("");
 
   const selected = requests.find((request) => request.id === jobRequestId);
+
+  const rateChips = useMemo(
+    () =>
+      buildClientRateChips({
+        client: selected
+          ? { id: selected.clientId, name: selected.client }
+          : null,
+        quotes,
+        invoices,
+      }),
+    [selected, quotes, invoices],
+  );
 
   const suggestWithAi = async () => {
     setEstimateError("");
@@ -160,7 +177,16 @@ export function QuoteFormDialog({
           </Button>
         </div>
       ) : null}
-      <LineItemEditor items={items} setItems={setItems} />
+      <LineItemEditor
+        items={items}
+        setItems={setItems}
+        rateChips={rateChips}
+        onApplyRateChip={(chip) => {
+          if (!scope.trim()) {
+            setScope(chip.description);
+          }
+        }}
+      />
       <Totals items={items} />
       <div className="form-grid form-grid--two">
         <Field label="Client notes">

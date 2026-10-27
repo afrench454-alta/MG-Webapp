@@ -15,16 +15,26 @@ test.describe("Mow & Glow Console - Mobile", () => {
 
     const dock = page.getByRole("navigation", { name: "Quick navigation" });
     await expect(dock.getByRole("button", { name: "Home" })).toBeVisible();
-    await expect(dock.getByRole("button", { name: "Schedule" })).toBeVisible();
+    await expect(dock.getByRole("button", { name: "Job Board" })).toBeVisible();
     await expect(dock.getByRole("button", { name: "Quotes" })).toBeVisible();
     await expect(dock.getByRole("button", { name: "Invoices" })).toBeVisible();
     await expect(dock.getByRole("button", { name: "More" })).toBeVisible();
-    await expect(dock.getByRole("button", { name: "Jobs" })).toHaveCount(0);
+    await expect(dock.getByRole("button", { name: "Schedule" })).toHaveCount(0);
 
-    await dock.getByRole("button", { name: "Schedule" }).click();
-    await expect(page.getByRole("heading", { name: "Schedule" })).toBeVisible();
+    await dock.getByRole("button", { name: "Job Board" }).click();
+    await expect(page.getByRole("heading", { name: /Job Board|Jobs/i })).toBeVisible();
 
     await dock.getByRole("button", { name: "Quotes" }).click();
     await expect(page.getByRole("heading", { name: "Quotes" })).toBeVisible();
+  });
+
+  test("does not horizontally overflow the iPhone 12 Pro viewport", async ({ page }) => {
+    const metrics = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      mainMargin: getComputedStyle(document.querySelector(".app-main")!).marginLeft,
+    }));
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+    expect(metrics.mainMargin).toBe("0px");
   });
 });

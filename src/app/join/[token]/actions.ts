@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { trustedOrigin } from "@/lib/trusted-origin";
 import { createClient } from "@/lib/supabase/server";
 import { joinWithPasswordSchema } from "@/features/console/data/team-contract";
 import { previewTeamInvitation } from "@/features/console/data/team-repository";
@@ -17,12 +18,7 @@ export type JoinAccountState = Readonly<{
   }>;
 }>;
 
-function requestOrigin(headerList: Headers): string {
-  const host = headerList.get("x-forwarded-host") || headerList.get("host");
-  if (!host || host.includes("\n") || host.includes("/")) return "";
-  const proto = headerList.get("x-forwarded-proto") === "http" ? "http" : "https";
-  return `${proto}://${host}`;
-}
+
 
 function alreadyRegistered(error: { message?: string; code?: string } | null, identities?: Array<unknown> | null) {
   if (identities && identities.length === 0) return true;
@@ -80,7 +76,7 @@ export async function joinWithPasswordAction(
   }
 
   const supabase = await createClient();
-  const origin = requestOrigin(await headers());
+  const origin = trustedOrigin(await headers());
   const nextPath = `/join/${parsed.data.token}`;
   const emailRedirectTo = origin
     ? `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`

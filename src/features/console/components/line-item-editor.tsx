@@ -1,8 +1,9 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { History, Plus, Sparkles, Trash2 } from "lucide-react";
 import { money, quoteTotals, type LineItem } from "../domain";
+import type { RateChipOption } from "../data/form-options";
 import { Button, IconButton } from "./ui-elements";
 
 const quantityUnits = ["hrs", "ea"] as const;
@@ -14,10 +15,61 @@ export type EditableLineItem = LineItem & {
 export function LineItemEditor({
   items,
   setItems,
+  rateChips = [],
+  onApplyRateChip,
 }: {
   items: LineItem[];
   setItems: Dispatch<SetStateAction<LineItem[]>>;
+  rateChips?: RateChipOption[];
+  onApplyRateChip?: (chip: RateChipOption) => void;
 }) {
+  const applyChip = (chip: RateChipOption) => {
+    setItems((current) => {
+      const existingIndex = current.findIndex(
+        (item) =>
+          item.description.trim().toLowerCase() ===
+          chip.description.trim().toLowerCase(),
+      );
+      if (existingIndex >= 0) {
+        return current.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                rate: chip.rate,
+                unitLabel: chip.unitLabel || item.unitLabel,
+              }
+            : item,
+        );
+      }
+
+      const blankIndex = current.findIndex(
+        (item) => !item.description.trim() && Number(item.rate || 0) === 0,
+      );
+      if (blankIndex >= 0) {
+        return current.map((item, idx) =>
+          idx === blankIndex
+            ? {
+                description: chip.description,
+                quantity: chip.quantity,
+                rate: chip.rate,
+                unitLabel: chip.unitLabel,
+              }
+            : item,
+        );
+      }
+
+      return [
+        ...current,
+        {
+          description: chip.description,
+          quantity: chip.quantity,
+          rate: chip.rate,
+          unitLabel: chip.unitLabel,
+        },
+      ];
+    });
+    onApplyRateChip?.(chip);
+  };
   const update = (index: number, key: keyof LineItem, value: string) => {
     setItems((current) =>
       current.map((item, itemIndex) =>
@@ -57,6 +109,47 @@ export function LineItemEditor({
           Add item
         </Button>
       </div>
+      {rateChips.length > 0 ? (
+        <div
+          className="rate-chips-bar"
+          role="group"
+          aria-label="Deterministic rate & service chips"
+        >
+          <span className="rate-chips-bar__label">
+            <History size={13} aria-hidden="true" />
+            <span>Quick rates & last-quote history:</span>
+          </span>
+          <div className="rate-chips-bar__list">
+            {rateChips.map((chip) => {
+              const isHistorical =
+                chip.source === "last-quote" || chip.source === "last-invoice";
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  className={`rate-chip ${
+                    isHistorical ? "rate-chip--history" : "rate-chip--catalog"
+                  }`}
+                  onClick={() => applyChip(chip)}
+                  title={`${chip.sourceLabel}: ${chip.description} (${money(chip.rate)}${chip.unitLabel ? `/${chip.unitLabel}` : ""})`}
+                >
+                  {isHistorical ? (
+                    <Sparkles size={12} aria-hidden="true" />
+                  ) : null}
+                  <span className="rate-chip__desc">{chip.description}</span>
+                  <strong className="rate-chip__price tabular-nums">
+                    {money(chip.rate)}
+                    {chip.unitLabel ? `/${chip.unitLabel}` : ""}
+                  </strong>
+                  {isHistorical ? (
+                    <small className="rate-chip__tag">{chip.sourceLabel}</small>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
       <div className="line-item-labels">
         <span>Description</span>
         <span>Qty</span>

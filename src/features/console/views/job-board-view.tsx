@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { GripVertical, Trash2 } from "lucide-react";
-import { statusColumns, type Job, type JobStatus, type TeamMember } from "../domain";
+import { CheckCircle2, GripVertical, MapPin, Play, ReceiptText, Trash2 } from "lucide-react";
+import { statusColumns, type Invoice, type Job, type JobStatus, type TeamMember } from "../domain";
+import { liveInvoicedJobIds } from "../data/form-options";
+import { stripJobOpsSentinel } from "../data/joseph-next-stop";
 import {
   displayServiceCategory,
   displayServiceDetail,
@@ -24,6 +26,7 @@ const activeColumnIds: JobStatus[] = [
 
 export function JobBoardView({
   jobs,
+  invoices = [],
   teamMembers = [],
   currentMemberId,
   preferMine = false,
@@ -31,8 +34,10 @@ export function JobBoardView({
   onJob,
   onMove,
   onDelete,
+  onDraftInvoiceForJob,
 }: {
   jobs: Job[];
+  invoices?: Invoice[];
   teamMembers?: TeamMember[];
   currentMemberId?: string;
   preferMine?: boolean;
@@ -40,12 +45,14 @@ export function JobBoardView({
   onJob: (job: Job) => void;
   onMove: (id: string, status: JobStatus) => void;
   onDelete: (job: Job) => void;
+  onDraftInvoiceForJob?: (job: Job) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [board, setBoard] = useState<"active" | "done">("active");
   const [assigneeFilter, setAssigneeFilter] = useState<string>(
     preferMine && currentMemberId ? "mine" : "all",
   );
+  const invoicedJobIds = useMemo(() => liveInvoicedJobIds(invoices), [invoices]);
   const doneCount = jobs.filter(
     (job) => job.status === "completed" || job.status === "cancelled",
   ).length;
@@ -146,6 +153,13 @@ export function JobBoardView({
               </div>
               {columnJobs.map((job) => {
                 const serviceType = displayServiceDetail(job.category);
+                const cleanNotes = stripJobOpsSentinel(job.notes);
+                const scopePreview = job.scope || cleanNotes;
+                const isReadyToInvoice =
+                  job.status === "completed" && !invoicedJobIds.has(job.id);
+                const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  job.address,
+                )}`;
                 return (
                   <article
                     className={`job-card${
@@ -168,14 +182,22 @@ export function JobBoardView({
                         <Badge tone="sage">
                           {displayServiceCategory(job.category)}
                         </Badge>
+                        {isReadyToInvoice ? (
+                          <Badge tone="amber">Ready to Invoice</Badge>
+                        ) : null}
                       </span>
                       <strong>{job.client}</strong>
                       <span className="job-card__property">{job.address}</span>
-                      <span className="job-card__when">
+                      <span className="job-card__when tabular-nums">
                         {formatWhen(job) || job.date || "Unscheduled"}
                       </span>
                       {serviceType ? (
                         <span className="job-card__detail">{serviceType}</span>
+                      ) : null}
+                      {scopePreview ? (
+                        <span className="job-card__scope-preview">
+                          {scopePreview}
+                        </span>
                       ) : null}
                       <small>
                         {job.assignees.length
@@ -183,6 +205,60 @@ export function JobBoardView({
                           : "Unassigned"}
                       </small>
                     </button>
+
+                    <div className="job-card__field-footer">
+                      <a
+                        className="job-card__map-link"
+                        href={mapsHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <MapPin size={13} aria-hidden="true" />
+                        <span>Navigate</span>
+                      </a>
+
+                      {job.status === "scheduled" ||
+                      job.status === "unscheduled" ||
+                      job.status === "on-hold" ? (
+                        <button
+                          type="button"
+                          className="button button--primary job-card__action-btn"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onMove(job.id, "in-progress");
+                          }}
+                        >
+                          <Play size={14} aria-hidden="true" />
+                          <span>Start Job</span>
+                        </button>
+                      ) : job.status === "in-progress" ? (
+                        <button
+                          type="button"
+                          className="button button--primary job-card__action-btn"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onMove(job.id, "completed");
+                          }}
+                        >
+                          <CheckCircle2 size={14} aria-hidden="true" />
+                          <span>Complete</span>
+                        </button>
+                      ) : isReadyToInvoice && onDraftInvoiceForJob ? (
+                        <button
+                          type="button"
+                          className="button button--primary job-card__action-btn"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDraftInvoiceForJob(job);
+                          }}
+                        >
+                          <ReceiptText size={14} aria-hidden="true" />
+                          <span>Draft Invoice</span>
+                        </button>
+                      ) : null}
+                    </div>
+
                     {canDelete ? (
                     <IconButton
                       className="job-card__delete"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Menu, Sparkles } from "lucide-react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 import "./console.css";
 import {
   businessProfile as defaultBusinessProfile,
@@ -83,7 +83,10 @@ import { ScheduleView } from "./views/schedule-view";
 import { JobBoardView } from "./views/job-board-view";
 import { JosephView } from "./views/joseph-view";
 import { InvoicesView } from "./views/invoices-view";
+import { TopCommandBar } from "./components/top-command-bar";
+import { AlertsDrawer } from "./components/alerts-drawer";
 import { SettingsView } from "./views/settings-view";
+import { isLiveInvoice, isLiveQuote } from "./data/list-filters";
 
 import { ClientFormDialog } from "./dialogs/client-form-dialog";
 import { QuoteFormDialog, type QuoteDraft } from "./dialogs/quote-form-dialog";
@@ -108,6 +111,7 @@ import {
 import {
   applyInvoicePayment,
   finalizeInvoiceRecord,
+  invoiceDisplayStatus,
   markInvoiceSent,
   voidInvoice,
 } from "./data/invoice-lifecycle";
@@ -151,6 +155,7 @@ export type ConsoleAppProps = {
   businessDetails?: BusinessProfile;
   initialInvoices?: Invoice[];
   dataMode?: "demo" | "live";
+  dataLoadError?: string;
   signedInEmail?: string;
   actorId?: string;
   actorRole?: "owner" | "co_owner" | "technician";
@@ -199,6 +204,7 @@ export function ConsoleApp({
   businessDetails,
   initialInvoices: providedInvoices,
   dataMode = "demo",
+  dataLoadError,
   signedInEmail = "ops@fieldcentral.local",
   actorId,
   actorRole = "owner",
@@ -236,6 +242,8 @@ export function ConsoleApp({
 }: ConsoleAppProps = {}) {
   const [active, setActive] = useState<ConsoleRoute>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [clients, setClients] = useState<Client[]>(() =>
     structuredClone(initialClients ?? clientsSeed),
@@ -1390,6 +1398,12 @@ export function ConsoleApp({
         return (
           <ClientsView
             clients={clients}
+            jobs={jobs}
+            jobRequests={jobRequests}
+            quotes={quotes}
+            invoices={invoiceRecords}
+            selectedClientId={selectedClientId}
+            onSelectClient={setSelectedClientId}
             onCreate={() => {
               setClientMutationError("");
               setDialog({ type: "client" });
@@ -1402,6 +1416,34 @@ export function ConsoleApp({
               setClientMutationError("");
               setDialog({ type: "delete-client", client });
             }}
+            onNewRequestForClient={(client) => {
+              setRequestMutationError("");
+              setDialog({
+                type: "request",
+                prefill: {
+                  clientId: client.id,
+                  propertyId: client.properties[0]?.id || "",
+                  category: "Yard Services",
+                  serviceDetail: "",
+                  scope: "",
+                },
+              });
+            }}
+            onNewQuoteForClient={(client) => {
+              const matchingReq = jobRequests.find(
+                (req) =>
+                  req.clientId === client.id ||
+                  req.client.toLowerCase() === client.name.toLowerCase(),
+              );
+              setDialog({
+                type: "quote-form",
+                prefill: {
+                  jobRequestId: matchingReq?.id || "",
+                  scope: matchingReq?.scope || "",
+                },
+              });
+            }}
+            onOpenJob={(job) => setDialog({ type: "job", job })}
             canManage={canManageClients}
             archiveMode={dataMode === "live"}
           />
@@ -1422,9 +1464,6 @@ export function ConsoleApp({
                   scope: request.scope,
                 },
               })
-            }
-            onEstimate={(request) =>
-              setDialog({ type: "estimator", jobRequestId: request.id })
             }
             onDelete={(request) => {
               setRequestMutationError("");
@@ -1472,7 +1511,6 @@ export function ConsoleApp({
                 },
               })
             }
-            onEstimate={() => setDialog({ type: "estimator" })}
             onCreateInvoice={(quote) => setDialog({ type: "invoice-form", quote })}
             onViewInvoice={(record) => setDialog({ type: "invoice-document", record })}
             onDelete={(quote) => setDialog({ type: "delete-quote", quote })}
@@ -1686,27 +1724,83 @@ export function ConsoleApp({
             jobRequests={jobRequests}
             quotes={quotes}
             invoices={invoiceRecords}
+            submissions={questionnaireSubmissions}
             signedInEmail={signedInEmail}
             currentMemberId={actorId}
             teamMembers={teamMembers}
             canManage={canOperateOffice}
             onNavigate={setActive}
+            onOpenJob={(job) => setDialog({ type: "job", job })}
+            onOpenQuote={(quote) => setDialog({ type: "quote-document", quote })}
+            onOpenInvoice={(record) =>
+              setDialog({ type: "invoice-document", record })
+            }
+            onScheduleJob={() => setDialog({ type: "schedule" })}
+            onNewQuote={() => setDialog({ type: "quote-form" })}
+            onNewInvoice={() => setDialog({ type: "invoice-form" })}
+            onOpenEstimator={() => setDialog({ type: "estimator" })}
           />
         );
     }
   };
 
+  const openRequestsCount = jobRequests.filter(
+    (req) => !["Closed", "Rejected"].includes(req.status),
+  ).length;
+  const activeJobsCount = jobs.filter(
+    (job) => job.status !== "completed" && job.status !== "cancelled",
+  ).length;
+  const liveQuotesList = quotes.filter(isLiveQuote);
+  const liveInvoicesList = invoiceRecords.filter(isLiveInvoice);
+  const actionableAlertsCount =
+    (canOperateOffice
+      ? liveInvoicesList.filter(
+          (inv) => invoiceDisplayStatus(inv) === "Overdue",
+        ).length +
+        questionnaireSubmissions.filter((sub) => !sub.jobRequestId).length +
+        liveQuotesList.filter((q) => ["Draft", "Sent"].includes(q.status))
+          .length
+      : 0) +
+    jobs.filter(
+      (job) =>
+        job.status === "on-hold" ||
+        ((job.status === "scheduled" || job.status === "in-progress") &&
+          job.assigneeIds.length === 0),
+    ).length +
+    jobRequests.filter((req) => req.status === "New").length;
+
+
   return (
     <div className="app-shell">
+      {dataLoadError ? (
+        <div className="mx-4 mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+          {dataLoadError}
+        </div>
+      ) : null}
       <Sidebar
         active={currentRoute}
         onNavigate={setActive}
-        onEstimate={() => setDialog({ type: "estimator" })}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         signedInEmail={signedInEmail}
         onSignOut={onSignOut}
         canManage={canOperateOffice}
+        counts={{
+          clients: clients.length,
+          requests: openRequestsCount,
+          questionnaires: questionnaireSubmissions.filter(
+            (sub) => !sub.jobRequestId,
+          ).length,
+          quotes: liveQuotesList.filter((q) =>
+            ["Draft", "Sent"].includes(q.status),
+          ).length,
+          schedule: jobs.filter((j) => j.status === "scheduled").length,
+          jobs: activeJobsCount,
+          invoices: liveInvoicesList.filter(
+            (inv) =>
+              inv.paymentStatus !== "Paid" && inv.paymentStatus !== "Refunded",
+          ).length,
+        }}
       />
       {mobileOpen ? (
         <button
@@ -1716,19 +1810,41 @@ export function ConsoleApp({
         />
       ) : null}
       <div className="app-main">
-        <header className="mobile-header">
-          <button
-            aria-label="Open navigation"
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu aria-hidden="true" />
-          </button>
-          <div>
-            <small>Mow & Glow</small>
-            <strong>Console</strong>
-          </div>
-        </header>
-        <main className={currentRoute === "joseph" ? "workspace workspace--chat" : "workspace"}>
+        <TopCommandBar
+          businessDetails={businessDetailsState}
+          clients={clients}
+          jobs={jobs}
+          jobRequests={jobRequests}
+          quotes={quotes}
+          invoices={invoiceRecords}
+          alertCount={actionableAlertsCount}
+          alertsOpen={alertsOpen}
+          canManage={canOperateOffice}
+          onOpenMobileNav={() => setMobileOpen(true)}
+          onToggleAlerts={() => setAlertsOpen((open) => !open)}
+          onNavigate={setActive}
+          onSelectClient={(client) => {
+            setSelectedClientId(client.id);
+            setActive("clients");
+          }}
+          onSelectJob={(job) => setDialog({ type: "job", job })}
+          onSelectQuote={(quote) => setDialog({ type: "quote-document", quote })}
+          onSelectInvoice={(record) =>
+            setDialog({ type: "invoice-document", record })
+          }
+          onNewClient={() => {
+            setClientMutationError("");
+            setDialog({ type: "client" });
+          }}
+          onNewRequest={() => {
+            setRequestMutationError("");
+            setDialog({ type: "request" });
+          }}
+          onNewQuote={() => setDialog({ type: "quote-form" })}
+          onNewInvoice={() => setDialog({ type: "invoice-form" })}
+          onScheduleJob={() => setDialog({ type: "schedule" })}
+        />
+                <main className={currentRoute === "joseph" ? "workspace workspace--chat" : "workspace"}>
           {operationMutationError ? (
             <div className="workspace-alert" role="alert">
               <p>{operationMutationError}</p>
@@ -1753,6 +1869,27 @@ export function ConsoleApp({
           onMore={() => setMobileOpen((open) => !open)}
         />
       </div>
+
+      <AlertsDrawer
+        open={alertsOpen}
+        onClose={() => setAlertsOpen(false)}
+        jobs={jobs}
+        jobRequests={jobRequests}
+        quotes={quotes}
+        invoices={invoiceRecords}
+        submissions={questionnaireSubmissions}
+        canManage={canOperateOffice}
+        onNavigate={setActive}
+        onOpenJob={(job) => setDialog({ type: "job", job })}
+        onOpenQuote={(quote) => setDialog({ type: "quote-document", quote })}
+        onOpenInvoice={(record) =>
+          setDialog({ type: "invoice-document", record })
+        }
+        onOpenSubmission={(submission) =>
+          setDialog({ type: "submission", submission })
+        }
+        onScheduleJob={() => setDialog({ type: "schedule" })}
+      />
 
       {dialog?.type === "estimator" ? (
         <Dialog
@@ -1943,7 +2080,7 @@ export function ConsoleApp({
       ) : null}
 
       {dialog?.type === "schedule" ? (
-        <Dialog title="Schedule Job" onClose={closeDialog}>
+        <Dialog title="Schedule Job" onClose={closeDialog} wide>
           <ScheduleFormDialog
             requests={jobRequests}
             jobs={jobs}

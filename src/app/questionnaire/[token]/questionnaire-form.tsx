@@ -49,27 +49,45 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
         </div>
       </div>
 
-      <form className={styles.form} onSubmit={async (event) => { event.preventDefault(); setError(""); const missing = questionnaire.form_schema.fields.some((field: z.infer<typeof formFieldSchema>) => field.required && (!answers[field.id] || answers[field.id].length === 0)); if (missing) { setError("Complete each required question."); return; } setPending(true); const result = await submitQuestionnaireAction({ token, name: identity.name, email: identity.email, phone: identity.phone, answers: { ...answers, ...(identity.address.trim() ? { _site_address: identity.address.trim() } : {}) } }); setPending(false); if (!result.ok) { setError(result.message); return; } setSubmitted(true); }}>
+      <form className={styles.form} onSubmit={async (event) => {
+        event.preventDefault();
+        setError("");
+        const name = identity.name.trim();
+        const address = identity.address.trim();
+        const phone = identity.phone.trim();
+        const email = identity.email.trim();
+        if (!name) { setError("Enter your name."); return; }
+        if (!address) { setError("Enter the property address."); return; }
+        if (!phone && !email) { setError("Provide a phone number or email — at least one."); return; }
+        const missing = questionnaire.form_schema.fields.some((field: z.infer<typeof formFieldSchema>) => field.required && (!answers[field.id] || answers[field.id].length === 0));
+        if (missing) { setError("Complete each required question."); return; }
+        setPending(true);
+        const result = await submitQuestionnaireAction({ token, name, email, phone, answers: { ...answers, _site_address: address } });
+        setPending(false);
+        if (!result.ok) { setError(result.message); return; }
+        setSubmitted(true);
+      }}>
         
-        <fieldset className={styles.fieldCard}>
-          <legend className={styles.cardTitle}>Contact Information</legend>
+        <fieldset className={styles.fieldCard} aria-labelledby="intake-contact-title">
+          <h2 id="intake-contact-title" className={styles.cardTitle}>Contact Information</h2>
           <div className={styles.identity}>
             <label className={styles.inputGroup}>
               <span>Your name <span aria-hidden="true" className={styles.asterisk}>*</span></span>
-              <input value={identity.name} onChange={(event) => setIdentity((current) => ({ ...current, name: event.target.value }))} required aria-required="true" />
+              <input value={identity.name} onChange={(event) => setIdentity((current) => ({ ...current, name: event.target.value }))} required aria-required="true" autoComplete="name" />
             </label>
             <label className={styles.inputGroup}>
-              <span>Phone <span aria-hidden="true" className={styles.asterisk}>*</span></span>
-              <input value={identity.phone} onChange={(event) => setIdentity((current) => ({ ...current, phone: event.target.value }))} required aria-required="true" />
-              <span className={styles.hint}>Best number to reach you</span>
+              <span>Phone</span>
+              <input type="tel" inputMode="tel" autoComplete="tel" placeholder="04xx xxx xxx" value={identity.phone} onChange={(event) => setIdentity((current) => ({ ...current, phone: event.target.value }))} />
+              <span className={styles.hint}>Phone or email — at least one</span>
             </label>
             <label className={styles.inputGroup}>
               <span>Email</span>
-              <input type="email" value={identity.email} onChange={(event) => setIdentity((current) => ({ ...current, email: event.target.value }))} />
+              <input type="email" autoComplete="email" value={identity.email} onChange={(event) => setIdentity((current) => ({ ...current, email: event.target.value }))} />
+              <span className={styles.hint}>Phone or email — at least one</span>
             </label>
             <label className={styles.inputGroup}>
               <span>Property address <span aria-hidden="true" className={styles.asterisk}>*</span></span>
-              <input value={identity.address} onChange={(event) => setIdentity((current) => ({ ...current, address: event.target.value }))} required aria-required="true" placeholder="Street, suburb" />
+              <input value={identity.address} onChange={(event) => setIdentity((current) => ({ ...current, address: event.target.value }))} required aria-required="true" placeholder="Street, suburb" autoComplete="street-address" />
             </label>
           </div>
         </fieldset>
@@ -77,11 +95,11 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
         {questionnaire.form_schema.fields.map((field: z.infer<typeof formFieldSchema>, index: number) => {
           const isError = error && field.required && (!answers[field.id] || answers[field.id].length === 0);
           return (
-            <fieldset className={`${styles.fieldCard} ${isError ? styles.fieldError : ""}`} key={field.id} aria-invalid={isError ? "true" : "false"}>
-              <legend className={styles.cardTitle}>
+            <fieldset className={`${styles.fieldCard} ${isError ? styles.fieldError : ""}`} key={field.id} aria-invalid={isError ? "true" : "false"} aria-labelledby={`intake-q-${field.id}`}>
+              <h2 id={`intake-q-${field.id}`} className={styles.cardTitle}>
                 {index + 1}. {field.label}
                 {field.required ? <span className={styles.asterisk} aria-hidden="true"> *</span> : null}
-              </legend>
+              </h2>
               {field.type === "text" ? <input className={styles.textInput} value={(answers[field.id] as string) || ""} onChange={(event) => setAnswers((current) => ({ ...current, [field.id]: event.target.value }))} aria-required={field.required} /> : null}
               {field.type === "textarea" ? <textarea className={styles.textInput} rows={4} value={(answers[field.id] as string) || ""} onChange={(event) => setAnswers((current) => ({ ...current, [field.id]: event.target.value }))} aria-required={field.required} /> : null}
               {field.type === "radio" ? <div className={styles.options} role="radiogroup" aria-required={field.required}>{(field.options || []).map((option: string) => {
@@ -113,4 +131,3 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
     </div>
   );
 }
-

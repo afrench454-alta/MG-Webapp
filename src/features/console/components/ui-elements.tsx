@@ -102,14 +102,73 @@ export function IconButton({
   );
 }
 
+export function jobStatusTone(
+  status:
+    | "unscheduled"
+    | "scheduled"
+    | "in-progress"
+    | "on-hold"
+    | "completed"
+    | "cancelled"
+    | "Ready to Invoice",
+): BadgeTone {
+  if (status === "completed") return "success";
+  if (status === "in-progress") return "forest";
+  if (status === "scheduled") return "sage";
+  if (status === "on-hold" || status === "Ready to Invoice") return "amber";
+  if (status === "cancelled") return "red";
+  return "neutral";
+}
+
+export function clientStatusTone(status: "Lead" | "Active" | "Inactive"): BadgeTone {
+  if (status === "Active") return "success";
+  if (status === "Lead") return "amber";
+  return "neutral";
+}
+
+export function requestStatusTone(
+  status: "New" | "Qualified" | "Quoting" | "Scheduled" | "Closed" | "Rejected",
+): BadgeTone {
+  if (status === "Scheduled") return "success";
+  if (status === "Quoting" || status === "Qualified") return "olive";
+  if (status === "New") return "amber";
+  if (status === "Rejected") return "red";
+  return "neutral";
+}
+
+const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
+  neutral:
+    "bg-slate-500/10 text-slate-700 border-slate-500/25 dark:text-slate-300",
+  sage: "bg-teal-500/10 text-teal-800 border-teal-500/25 dark:text-teal-300",
+  forest:
+    "bg-sky-500/10 text-sky-800 border-sky-500/25 dark:text-sky-300",
+  olive:
+    "bg-indigo-500/10 text-indigo-800 border-indigo-500/25 dark:text-indigo-300",
+  amber:
+    "bg-amber-500/10 text-amber-800 border-amber-500/25 dark:text-amber-300",
+  success:
+    "bg-emerald-500/10 text-emerald-800 border-emerald-500/25 dark:text-emerald-300",
+  unpaid:
+    "bg-orange-500/10 text-orange-800 border-orange-500/25 dark:text-orange-300",
+  red: "bg-rose-500/10 text-rose-800 border-rose-500/25 dark:text-rose-300",
+};
+
 export function Badge({
   children,
   tone = "neutral",
+  className = "",
 }: {
   children: ReactNode;
   tone?: BadgeTone;
+  className?: string;
 }) {
-  return <span className={`badge badge--${tone}`}>{children}</span>;
+  return (
+    <span
+      className={`badge badge--${tone} ${BADGE_TONE_CLASSES[tone]} text-xs font-medium px-2 py-0.5 rounded-md border tabular-nums ${className}`.trim()}
+    >
+      {children}
+    </span>
+  );
 }
 
 export function PageHeader({

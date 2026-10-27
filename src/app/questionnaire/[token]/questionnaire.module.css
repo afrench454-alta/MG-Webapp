@@ -28,26 +28,23 @@
   background: #fff;
   box-shadow: 0 4px 12px rgba(23, 63, 53, 0.03);
   transition: border-color 0.2s;
-  position: relative;
 }
 .fieldError { border-color: #d32f2f; }
-/* Keep question titles on the TOP LINE inside the field card (not mid-border float). */
+/* Title is a normal block at the top of the card — not a mid-border legend float. */
 .cardTitle {
-  float: left;
-  width: 100%;
+  display: block;
+  float: none;
+  width: auto;
+  max-width: 100%;
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  border: 0;
   font-size: 18px;
   font-weight: 700;
   color: #173f35;
   line-height: 1.4;
-  position: relative;
-  top: 0;
-  left: 0;
-}
-.fieldCard > :not(.cardTitle) {
-  clear: both;
+  position: static;
 }
 .asterisk { color: #d32f2f; }
 

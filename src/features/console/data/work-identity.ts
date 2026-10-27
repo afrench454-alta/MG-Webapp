@@ -120,13 +120,18 @@ export function submissionSiteAddress(
   return typeof site === "string" ? compactAddress(site) : "";
 }
 
-function brisbaneYmd(now: Date): string {
+/** YYYY-MM-DD in Australia/Brisbane. */
+export function brisbaneDateKey(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Australia/Brisbane",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(now);
+}
+
+function brisbaneYmd(now: Date): string {
+  return brisbaneDateKey(now);
 }
 
 export function currentMonthStart(now: Date = new Date()): Date {

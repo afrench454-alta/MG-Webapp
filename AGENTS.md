@@ -7,3 +7,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Preview URL Requirement (Always Active)
+- Whenever you make any changes to any repository, you **MUST** start or ensure the local preview server is running (outside the sandbox on Windows so the user's browser can reach it) and include a clickable preview URL (e.g., `http://localhost:3000`) in your response so the user can immediately preview the new changes.
