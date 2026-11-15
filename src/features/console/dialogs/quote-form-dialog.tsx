@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Save, Sparkles } from "lucide-react";
-import { quoteTerms, type Client, type Invoice, type JobRequest, type LineItem, type Quote } from "../domain";
+import { quoteTerms, type Client, type Invoice, type Job, type JobRequest, type LineItem, type Quote } from "../domain";
 import type { InlineClientInput } from "../data/inline-client";
 import {
   estimateToLineItems,
@@ -18,6 +18,7 @@ import { LineItemEditor, Totals } from "../components/line-item-editor";
 
 export type QuoteDraft = {
   id?: string;
+  directJobId?: string;
   jobRequestId?: string;
   clientId?: string;
   propertyId?: string;
@@ -39,6 +40,7 @@ export function QuoteFormDialog({
   quotes = [],
   invoices = [],
   prefill,
+  linkedJob,
   onClose,
   onSave,
   onEstimate,
@@ -50,6 +52,7 @@ export function QuoteFormDialog({
   quotes?: Quote[];
   invoices?: Invoice[];
   prefill?: Partial<QuoteDraft>;
+  linkedJob?: Job;
   onClose: () => void;
   onSave: (draft: QuoteDraft) => void | Promise<void>;
   onEstimate?: EstimateJobAction;
@@ -145,14 +148,16 @@ export function QuoteFormDialog({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if ((!jobRequestId && !clientId && !inlineClient?.name.trim()) || !scope.trim()
+    const directJobId = prefill?.directJobId;
+    if ((!directJobId && !jobRequestId && !clientId && !inlineClient?.name.trim()) || !scope.trim()
       || items.some((item) => !item.description.trim()))
       return;
     void onSave({
       id: prefill?.id,
+      directJobId,
       jobRequestId: jobRequestId || undefined,
-      clientId: jobRequestId || inlineClient ? undefined : clientId,
-      propertyId: jobRequestId || inlineClient ? undefined : propertyId || undefined,
+      clientId: directJobId || jobRequestId || inlineClient ? undefined : clientId,
+      propertyId: directJobId || jobRequestId || inlineClient ? undefined : propertyId || undefined,
       inlineClient: jobRequestId ? undefined : inlineClient,
       updatedAt: prefill?.updatedAt,
       issueDate,
@@ -170,7 +175,10 @@ export function QuoteFormDialog({
 
   return (
     <form className="form-stack" onSubmit={submit} aria-busy={busy}>
-      {requestOptions.length || jobRequestId ? (
+      {linkedJob ? (
+        <p className="form-banner">Linked job: {linkedJob.displayName}</p>
+      ) : null}
+      {!linkedJob && (requestOptions.length || jobRequestId) ? (
       <Field label="Job Request">
         <select
           value={jobRequestId}
@@ -196,7 +204,7 @@ export function QuoteFormDialog({
         </select>
       </Field>
       ) : null}
-      {!jobRequestId ? (
+      {!linkedJob && !jobRequestId ? (
         <fieldset className="form-stack" disabled={busy}>
           {!inlineClient ? (
             <>

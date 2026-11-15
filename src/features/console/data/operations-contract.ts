@@ -26,6 +26,7 @@ function hasOneWorkCustomer(input: z.infer<z.ZodObject<typeof workCustomer>>): b
 
 export const quoteDraftSchema = z.object({
   ...workCustomer,
+  directJobId: z.uuid().optional(),
   id: z.uuid().optional(),
   updatedAt: z.iso.datetime({ offset: true }).optional(),
   issueDate: z.iso.date().optional(),
@@ -36,7 +37,9 @@ export const quoteDraftSchema = z.object({
   items: z.array(lineItemSchema).min(1).max(100),
   clientNotes: z.string().trim().max(20_000),
   internalNotes: z.string().trim().max(20_000),
-}).refine(hasOneWorkCustomer, "Choose one client or job request.")
+}).refine((input) => input.directJobId
+  ? !input.id && !input.jobRequestId && !input.clientId && !input.propertyId && !input.inlineClient
+  : hasOneWorkCustomer(input), "Choose one job, client or job request.")
   .refine(({ issueDate, validUntil }) => !issueDate || !validUntil || validUntil >= issueDate, {
     path: ["validUntil"], message: "Expiry must be on or after the issue date.",
   });
@@ -83,17 +86,18 @@ export type JobAssignmentsInput = z.infer<typeof jobAssignmentsSchema>;
 export type JobNoteInput = z.infer<typeof jobNoteSchema>;
 
 type ActionFailure = Readonly<{ ok: false; message: string }>;
-export type QuoteActionResult = Readonly<{ ok: true; quote: Quote; client?: Client }> | ActionFailure;
+export type QuoteActionResult = Readonly<{ ok: true; quote: Quote; client?: Client; job?: Job }> | ActionFailure;
 export type JobActionResult =
   | Readonly<{ ok: true; job: Job; nextJob?: Job; client?: Client }>
   | ActionFailure;
 export type InvoiceActionResult = Readonly<{ ok: true; invoice: Invoice; client?: Client }> | ActionFailure;
 export type DeleteActionResult = Readonly<{ ok: true; id: string }> | ActionFailure;
+export type DeleteQuoteResult = Readonly<{ ok: true; id: string; job?: Job }> | ActionFailure;
 export type JobPhotoActionResult = Readonly<{ ok: true; photo: JobPhoto }> | ActionFailure;
 
 export type SaveQuoteAction = (input: QuoteDraftInput) => Promise<QuoteActionResult>;
 export type UpdateQuoteStatusAction = (id: string, status: z.infer<typeof quoteStatusSchema>) => Promise<QuoteActionResult>;
-export type DeleteQuoteAction = (id: string) => Promise<DeleteActionResult>;
+export type DeleteQuoteAction = (id: string) => Promise<DeleteQuoteResult>;
 export type ReviseQuoteAction = (id: string) => Promise<QuoteActionResult>;
 export type ScheduleJobAction = (input: ScheduleJobInput) => Promise<JobActionResult>;
 export type UpdateJobAction = (input: JobUpdateInput) => Promise<JobActionResult>;

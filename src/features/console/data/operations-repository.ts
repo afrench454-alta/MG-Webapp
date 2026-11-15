@@ -242,7 +242,7 @@ async function getQuote(context: BusinessContext, id: string): Promise<Quote> {
   return quote;
 }
 
-async function getJob(context: BusinessContext, id: string): Promise<Job> {
+export async function getJob(context: BusinessContext, id: string): Promise<Job> {
   const [job] = await listJobs(context, id);
   if (!job) throw new Error("Job not found.");
   return job;
@@ -381,7 +381,12 @@ export async function listInvoices(context: BusinessContext, recordId?: string):
 
 export async function createQuote(context: BusinessContext, input: QuoteDraftInput): Promise<Quote> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("save_work_quote", { target_business_id: context.businessId, draft: input });
+  const { directJobId, ...draft } = input;
+  const { data, error } = directJobId
+    ? await supabase.rpc("save_direct_job_quote", {
+      target_business_id: context.businessId, target_job_id: directJobId, draft,
+    })
+    : await supabase.rpc("save_work_quote", { target_business_id: context.businessId, draft });
   if (error) throw new Error(error.message);
   return getQuote(context, z.uuid().parse(data));
 }
@@ -399,7 +404,14 @@ export async function reviseQuote(context: BusinessContext, id: string): Promise
 }
 
 export async function updateQuoteStatus(context: BusinessContext, id: string, status: Quote["status"]): Promise<Quote> { const dbStatus = status === "Accepted" ? "approved" : status === "Declined" ? "declined" : status.toLowerCase(); const supabase = await createClient(); const { error } = await supabase.from("quotes").update({ status: dbStatus }).eq("business_id", context.businessId).eq("id", id); if (error) throw new Error(error.message); return getQuote(context, id); }
-export async function deleteQuote(context: BusinessContext, id: string): Promise<string> { const supabase = await createClient(); const { data, error } = await supabase.from("quotes").delete().eq("business_id", context.businessId).eq("id", id).select("id").single(); if (error) throw new Error(error.message); return z.object({ id: z.uuid() }).parse(data).id; }
+export async function deleteQuote(context: BusinessContext, id: string): Promise<{ id: string; job?: Job }> {
+  const supabase = await createClient();
+  const linked = await supabase.from("jobs").select("id").eq("business_id", context.businessId).eq("quote_id", id).maybeSingle();
+  if (linked.error) throw new Error(linked.error.message);
+  const { data, error } = await supabase.from("quotes").delete().eq("business_id", context.businessId).eq("id", id).select("id").single();
+  if (error) throw new Error(error.message);
+  return { id: z.object({ id: z.uuid() }).parse(data).id, job: linked.data ? await getJob(context, linked.data.id) : undefined };
+}
 
 export async function scheduleJob(context: BusinessContext, input: ScheduleJobInput): Promise<Job> {
   const supabase = await createClient();

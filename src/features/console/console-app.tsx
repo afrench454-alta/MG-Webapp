@@ -135,6 +135,7 @@ import {
   draftInvoiceFromRequest,
   draftReplacementInvoice,
   invoiceConflict,
+  jobForQuote,
   liveInvoiceForQuote,
 } from "./data/quote-invoice";
 import { formatServiceTitle, isServiceCategory, parseServiceTitle } from "./data/service-catalog";
@@ -747,6 +748,7 @@ export function ConsoleApp({
   };
 
   const removeQuote = async (quote: Quote) => {
+    let changedJob: Job | undefined;
     if (dataMode === "live") {
       if (!onDeleteQuote) {
         setOperationMutationError("Live quote deletion is not available.");
@@ -766,8 +768,11 @@ export function ConsoleApp({
         setOperationMutationError(result.message);
         return;
       }
+      changedJob = result.job;
     }
     setQuotes((current) => current.filter((item) => item.id !== quote.id));
+    setJobs((current) => current.map((job) => changedJob?.id === job.id
+      ? changedJob : job.quoteId === quote.id ? { ...job, quoteId: null } : job));
     setDialog(null);
     showToast("Quote deleted.");
   };
@@ -1089,9 +1094,11 @@ export function ConsoleApp({
       run: () => openRecord("quotes", quote.id, { type: "quote-document", quote }),
     };
     if (job.status === "cancelled") return;
+    if (!job.jobRequestId && (!job.clientId || invoiceRecords.some((invoice) => invoice.jobId === job.id))) return;
     return {
       label: "Create quote",
       run: () => setDialog({ type: "quote-form", prefill: {
+        directJobId: job.jobRequestId ? undefined : job.id,
         jobRequestId: job.jobRequestId ?? undefined,
         clientId: job.jobRequestId ? undefined : job.clientId,
         propertyId: job.jobRequestId ? undefined : job.serviceAddressId ?? undefined,
@@ -1202,8 +1209,17 @@ export function ConsoleApp({
     try {
       setOperationMutationPending(true);
       let quote: Quote;
+      let changedJob: Job | undefined;
       if (dataMode === "demo") {
-        const { request, client, property, createdClient } = demoWorkCustomer(draft, clients, jobRequests);
+        const job = draft.directJobId ? jobs.find((item) => item.id === draft.directJobId) : undefined;
+        if (draft.directJobId && (!job || job.jobRequestId || job.status === "cancelled" || job.quoteId)) {
+          throw new Error("Choose an available direct job without a quote.");
+        }
+        if (job && invoiceRecords.some((invoice) => invoice.jobId === job.id)) {
+          throw new Error("This job already has invoice history.");
+        }
+        const source = job ? { clientId: job.clientId, propertyId: job.serviceAddressId ?? undefined } : draft;
+        const { request, client, property, createdClient } = demoWorkCustomer(source, clients, jobRequests);
         if (!client) throw new Error("Choose a client or job request.");
         const stored = quotes.find((record) => record.id === draft.id);
         if (draft.id && stored?.status !== "Draft") throw new Error("Only draft quotes can be edited.");
@@ -1220,6 +1236,7 @@ export function ConsoleApp({
           updatedAt: new Date().toISOString(),
         };
         if (createdClient) upsertClient(createdClient);
+        if (job) changedJob = { ...job, quoteId: quote.id };
       } else {
         if (!onSaveQuote) throw new Error("Live quote saving is unavailable.");
         const result = await onSaveQuote({
@@ -1229,8 +1246,13 @@ export function ConsoleApp({
         if (!result.ok) throw new Error(result.message);
         if (result.client) upsertClient(result.client);
         quote = result.quote;
+        changedJob = result.job;
       }
       setQuotes((current) => [quote, ...current.filter((item) => item.id !== quote.id)]);
+      if (changedJob) {
+        const linked = changedJob;
+        setJobs((current) => current.map((job) => job.id === linked.id ? linked : job));
+      }
       setActive("quotes");
       showToast(draft.id ? "Draft quote updated." : "Quote saved as draft.");
     } catch (error) {
@@ -1645,6 +1667,7 @@ export function ConsoleApp({
         return (
           <QuotesView
             quotes={quotes}
+            jobs={jobs}
             invoices={invoiceRecords}
             onNew={() => setDialog({ type: "quote-form" })}
             onView={(quote) => openRecord("quotes", quote.id, { type: "quote-document", quote })}
@@ -2183,12 +2206,15 @@ export function ConsoleApp({
           wide
         >
           <QuoteFormDialog
-            key={dialog.prefill?.id || dialog.prefill?.jobRequestId || "new-quote"}
+            key={dialog.prefill?.id || dialog.prefill?.directJobId || dialog.prefill?.jobRequestId || "new-quote"}
             requests={jobRequests}
             clients={clients}
             quotes={quotes}
             invoices={invoiceRecords}
             prefill={dialog.prefill}
+            linkedJob={jobs.find((job) => job.id === dialog.prefill?.directJobId) ??
+              quotes.filter((quote) => quote.id === dialog.prefill?.id && !quote.jobRequestId)
+                .map((quote) => jobForQuote(quote, jobs, quotes))[0]}
             onClose={closeDialog}
             onSave={persistQuote}
             onEstimate={onEstimateJob}
@@ -2225,7 +2251,7 @@ export function ConsoleApp({
                 : dialog.invoice
                 ? draftInvoiceFromRecord(dialog.invoice)
                 : dialog.quote
-                  ? draftInvoiceFromQuote(dialog.quote, clients, jobs)
+                  ? draftInvoiceFromQuote(dialog.quote, clients, jobs, quotes)
                   : dialog.job
                     ? draftInvoiceFromJob(dialog.job)
                     : dialog.request ? draftInvoiceFromRequest(dialog.request) : undefined
@@ -2328,18 +2354,19 @@ export function ConsoleApp({
             }
             onRevise={["Sent", "Accepted"].includes(dialog.quote.status) ? () => void reviseQuote(dialog.quote) : undefined}
             onCreateInvoice={
-              canCreateInvoiceFromQuote(dialog.quote) &&
-              !liveInvoiceForQuote(dialog.quote, invoiceRecords, jobs)
+              canCreateInvoiceFromQuote(dialog.quote, jobs, quotes) &&
+              !liveInvoiceForQuote(dialog.quote, invoiceRecords, jobs, quotes)
                 ? () => setDialog({ type: "invoice-form", quote: dialog.quote })
                 : undefined
             }
             onViewInvoice={
-              liveInvoiceForQuote(dialog.quote, invoiceRecords, jobs)
+              liveInvoiceForQuote(dialog.quote, invoiceRecords, jobs, quotes)
                 ? () => {
                     const existing = liveInvoiceForQuote(
                       dialog.quote,
                       invoiceRecords,
                       jobs,
+                      quotes,
                     );
                     if (existing) {
                       viewInvoice(existing);

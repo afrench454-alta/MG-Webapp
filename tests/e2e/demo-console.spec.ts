@@ -80,6 +80,36 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await expect(page.getByText("Invoice issued.")).toBeVisible();
   });
 
+  test("saves a quote from a completed direct job, reloads its link and converts it once", async ({ page }) => {
+    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+    await page.getByRole("button", { name: "Create quote", exact: true }).click();
+    await page.getByLabel(/Scope summary/).fill("Trim the hedge at the completed visit");
+    await page.getByRole("textbox", { name: /description/i }).first().fill("Hedge trimming");
+    await page.getByRole("button", { name: "Save Quote", exact: true }).click();
+    await expect(page.getByText("Quote saved as draft.")).toBeVisible();
+
+    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+    await page.getByRole("button", { name: "View quote", exact: true }).click();
+    const quote = page.getByRole("dialog");
+    await expect(quote.getByText("Hedge trimming", { exact: true })).toBeVisible();
+    await quote.getByRole("combobox").selectOption("Accepted");
+    await quote.getByRole("button", { name: "Create invoice", exact: true }).click();
+    await page.getByRole("button", { name: /save.*draft/i }).click();
+    await expect(page.getByText("Invoice saved as draft.")).toBeVisible();
+    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+    await page.getByRole("button", { name: "View invoice", exact: true }).click();
+    await expect(page.getByRole("dialog").getByText("Hedge trimming", { exact: true })).toBeVisible();
+
+    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+    await page.getByRole("button", { name: "View quote", exact: true }).click();
+    await quote.getByRole("button", { name: "Create revision" }).click();
+    await expect(page.getByText("Quote revision saved as a draft.")).toBeVisible();
+    await quote.getByRole("combobox").selectOption("Accepted");
+    await expect(quote.getByRole("button", { name: "Create invoice", exact: true })).toHaveCount(0);
+    await quote.getByRole("button", { name: "View invoice", exact: true }).click();
+    await expect(quote.getByText("Hedge trimming", { exact: true })).toBeVisible();
+  });
+
   test("only counts urgent alerts among 51 items and clears a resolved job", async ({ page }) => {
     await page.goto("/?demo=populated&view=jobs");
     const alertButton = page.getByRole("button", { name: "Operational alerts" });

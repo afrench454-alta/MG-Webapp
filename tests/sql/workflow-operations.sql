@@ -16,6 +16,8 @@ declare
   next_job_value uuid;
   worker_job_id uuid;
   quote_id_value uuid;
+  linked_quote_id uuid;
+  linked_invoice_id uuid;
   revised_id uuid;
   revision_version timestamptz;
   client_id_value uuid;
@@ -141,6 +143,80 @@ begin
   end;
 
   perform set_config('request.jwt.claim.sub', owner_actor::text, true);
+  begin
+    perform public.save_direct_job_quote(other_company, job_id_value, quote_input || jsonb_build_object('items', normal_items));
+    raise exception 'Unexpected cross-tenant quote creation success';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claim.sub', assigned_actor::text, true);
+  begin
+    perform public.save_direct_job_quote(company, job_id_value, quote_input || jsonb_build_object('items', normal_items));
+    raise exception 'Unexpected technician quote creation success';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claim.sub', owner_actor::text, true);
+  begin
+    perform public.save_direct_job_quote(company, job_id_value, quote_input ||
+      jsonb_build_object('items', normal_items, 'clientId', client_id_value));
+    raise exception 'Unexpected job quote customer override success';
+  exception when raise_exception then
+    if sqlerrm not like 'Use the client and service address from the job%' then raise; end if;
+  end;
+  begin
+    perform public.save_direct_job_quote(company, job_id_value, quote_input ||
+      '{"items":[{"description":"Invalid line must roll back","quantity":0,"rate":80}]}'::jsonb);
+    raise exception 'Unexpected invalid linked quote save success';
+  exception when raise_exception then
+    if sqlerrm not like 'Check the quote line items%' then raise; end if;
+  end;
+  if exists (select 1 from public.quotes where business_id = company)
+    or exists (select 1 from public.jobs where id = job_id_value and quote_id is not null) then
+    raise exception 'Failed quote save left a quote or visit link';
+  end if;
+  linked_quote_id := public.save_direct_job_quote(company, job_id_value, quote_input ||
+    jsonb_build_object('items', normal_items));
+  if not exists (select 1 from public.jobs j join public.quotes q on q.id = j.quote_id
+    where j.id = job_id_value and q.id = linked_quote_id and q.client_id = j.client_id
+      and q.service_address_id = j.service_address_id and q.job_request_id is null) then
+    raise exception 'Reload lost the quote link or visit identity';
+  end if;
+  begin
+    perform public.save_direct_job_quote(company, job_id_value, quote_input || jsonb_build_object('items', normal_items));
+    raise exception 'Unexpected duplicate linked quote save success';
+  exception when raise_exception then
+    if sqlerrm not like 'This job already has a quote%' then raise; end if;
+  end;
+  begin
+    update public.quotes set service_address_id = null where id = linked_quote_id;
+    raise exception 'Unexpected loss of linked quote site';
+  exception when raise_exception then
+    if sqlerrm not like 'A quote linked to a job must keep%' then raise; end if;
+  end;
+  update public.quotes set status = 'approved' where id = linked_quote_id;
+  linked_invoice_id := public.save_invoice_draft(jsonb_build_object('idempotencyKey', gen_random_uuid(),
+    'clientId', client_id_value, 'propertyId', canonical_site, 'quoteId', linked_quote_id,
+    'issueDate', '2026-11-18', 'notes', '', 'items', normal_items));
+  if not exists (select 1 from public.invoices where id = linked_invoice_id
+    and job_id = job_id_value and quote_id = linked_quote_id and total = 100) then
+    raise exception 'Invoice conversion lost its visit, quote or source price';
+  end if;
+  begin
+    perform public.save_invoice_draft(jsonb_build_object('idempotencyKey', gen_random_uuid(),
+      'clientId', client_id_value, 'jobId', job_id_value, 'issueDate', '2026-11-18', 'notes', '', 'items', normal_items));
+    raise exception 'Unexpected duplicate billing from the visit';
+  exception when raise_exception then
+    if sqlerrm not like 'An invoice already exists%' then raise; end if;
+  end;
+  revised_id := public.revise_work_quote(company, linked_quote_id);
+  update public.quotes set status = 'approved' where id = revised_id;
+  begin
+    perform public.save_invoice_draft(jsonb_build_object('idempotencyKey', gen_random_uuid(),
+      'clientId', client_id_value, 'quoteId', revised_id, 'issueDate', '2026-11-18', 'notes', '', 'items', normal_items));
+    raise exception 'Unexpected duplicate billing from a quote revision';
+  exception when raise_exception then
+    if sqlerrm not like 'An invoice already exists%' then raise; end if;
+  end;
+
   quote_id_value := public.save_work_quote(company, quote_input || jsonb_build_object(
     'inlineClient', jsonb_build_object('name', 'Name only client'), 'items', normal_items));
   if not exists (select 1 from public.quotes q join public.clients c on c.id = q.client_id

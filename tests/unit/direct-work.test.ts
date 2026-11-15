@@ -15,6 +15,12 @@ test('a direct quote requires mutually exclusive customer sources', () => {
   assert.equal(quoteDraftSchema.safeParse({ ...draft, clientId, inlineClient: { name: 'Example Customer' } }).success, false);
 });
 
+test('a job-card quote uses the job as its only source', () => {
+  assert.equal(quoteDraftSchema.safeParse({ ...draft, directJobId: propertyId }).success, true);
+  assert.equal(quoteDraftSchema.safeParse({ ...draft, directJobId: propertyId, clientId }).success, false);
+  assert.equal(quoteDraftSchema.safeParse({ ...draft, directJobId: propertyId, id: clientId }).success, false);
+});
+
 test('a direct calendar job requires a service address', () => {
   assert.equal(scheduleJobSchema.safeParse({ ...visit, clientId, propertyId }).success, true);
   assert.equal(scheduleJobSchema.safeParse({ ...visit, clientId }).success, false);

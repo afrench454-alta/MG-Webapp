@@ -15,6 +15,7 @@ import {
   quoteStatusSchema,
   scheduleJobSchema,
   type DeleteActionResult,
+  type DeleteQuoteResult,
   type InvoiceActionResult,
   type JobActionResult,
   type JobPhotoActionResult,
@@ -29,6 +30,7 @@ import {
   deleteJobPhoto,
   deleteQuote,
   finalizeInvoice,
+  getJob,
   markInvoiceAsSent,
   reviseQuote,
   scheduleJob,
@@ -71,8 +73,9 @@ export async function saveQuoteAction(input: unknown): Promise<QuoteActionResult
       ? await updateQuote(context, parsed.data)
       : await createQuote(context, parsed.data);
     const client = parsed.data.inlineClient && quote.clientId ? await getClientById(context, quote.clientId) : undefined;
+    const job = parsed.data.directJobId ? await getJob(context, parsed.data.directJobId) : undefined;
     revalidatePath("/");
-    return { ok: true, quote, client };
+    return { ok: true, quote, client, job };
   } catch (error) {
     console.error("Quote save failed", error);
     return { ok: false, message: failure(error, "The quote could not be saved.") };
@@ -104,13 +107,13 @@ export async function updateQuoteStatusAction(id: string, status: unknown): Prom
   }
 }
 
-export async function deleteQuoteAction(id: string): Promise<DeleteActionResult> {
+export async function deleteQuoteAction(id: string): Promise<DeleteQuoteResult> {
   const parsed = idSchema.safeParse(id);
   if (!parsed.success) return { ok: false, message: "The quote identifier was invalid." };
   try {
-    const deletedId = await deleteQuote(await manager(), parsed.data);
+    const deleted = await deleteQuote(await manager(), parsed.data);
     revalidatePath("/");
-    return { ok: true, id: deletedId };
+    return { ok: true, ...deleted };
   } catch (error) {
     return { ok: false, message: failure(error, "The quote could not be deleted.") };
   }

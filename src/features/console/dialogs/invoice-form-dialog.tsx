@@ -8,7 +8,7 @@ import { formatWorkLabel } from "../data/work-identity";
 import type { InlineClientInput } from "../data/inline-client";
 import { invoiceDraftSchema, type InvoiceDraftInput } from "../data/invoice-contract";
 import { brisbaneToday, invoiceLineTotal } from "../data/invoice-lifecycle";
-import { draftInvoiceFromJob, draftInvoiceFromRequest, invoiceConflict } from "../data/quote-invoice";
+import { draftInvoiceFromJob, draftInvoiceFromRequest, invoiceConflict, jobForQuote } from "../data/quote-invoice";
 import { EntityPicker } from "../components/entity-picker";
 import { InlineClientFields } from "../components/inline-client-fields";
 import { Button, Field } from "../components/ui-elements";
@@ -76,7 +76,9 @@ export function InvoiceFormDialog({
   const previousSubmission = useRef<{ payload: string; key: string } | undefined>(undefined);
   const selectedClient = clients.find((client) => client.id === draft.clientId);
   const currentInvoice = invoices.find((record) => record.id === draft.id);
-  const sourceLocked = Boolean(draft.sourceLocked || sourceQuote);
+  const selectedQuote = sourceQuote ?? quotes.find((quote) => quote.id === draft.quoteId);
+  const quotedVisit = selectedQuote && jobForQuote(selectedQuote, jobs, quotes);
+  const sourceLocked = Boolean(draft.sourceLocked || sourceQuote || quotedVisit);
   const conflict = currentInvoice?.duplicateSource ? undefined : invoiceConflict(draft, invoices);
   const requestVisits = draft.requestId ? jobs.filter((job) => job.jobRequestId === draft.requestId && job.status !== "cancelled") : [];
   const requiresVisit = !draft.jobId && requestVisits.length > 0 && currentInvoice?.requestId !== draft.requestId && !draft.replacesInvoiceId;
@@ -84,7 +86,8 @@ export function InvoiceFormDialog({
   const eligibleRequests = requests.filter((request) => request.id === draft.requestId || matchesClient(request.clientId));
   const eligibleJobs = jobs.filter((job) => job.id === draft.jobId || (
     job.status === "completed" && matchesClient(job.clientId) && (!draft.requestId || job.jobRequestId === draft.requestId) &&
-    (!sourceQuote || job.quoteId === sourceQuote.id || (!job.quoteId && job.jobRequestId === sourceQuote.jobRequestId))
+    (!sourceQuote || job.quoteId === sourceQuote.id
+      || (sourceQuote.jobRequestId && !job.quoteId && job.jobRequestId === sourceQuote.jobRequestId))
   ));
   const rateChips = buildClientRateChips({
     client: selectedClient ? { id: selectedClient.id, name: selectedClient.name } : null,
@@ -187,7 +190,7 @@ export function InvoiceFormDialog({
           label="Completed visit" value={draft.jobId ?? ""} onChange={selectJob}
           options={eligibleJobs.map((job) => ({ id: job.id, label: formatWorkLabel(job), keywords: `${job.address} ${job.scope}` }))}
           placeholder="No completed visit" filterPlaceholder="Search completed visits"
-          disabled={pending || Boolean(draft.sourceLocked) || !!draft.inlineClient} required={requiresVisit}
+          disabled={pending || Boolean(draft.sourceLocked || quotedVisit) || !!draft.inlineClient} required={requiresVisit}
         />
       </div>
       {requiresVisit ? <p className="form-banner">This request has visits. Choose a completed visit to invoice.</p> : null}

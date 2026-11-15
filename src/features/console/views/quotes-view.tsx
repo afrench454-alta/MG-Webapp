@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DollarSign, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { money, quoteTotals, type Invoice, type Quote } from "../domain";
+import { money, quoteTotals, type Invoice, type Job, type Quote } from "../domain";
 import {
   countMatching,
   matchesQuoteFilter,
@@ -27,6 +27,7 @@ import { formatSiteTitle } from "../data/work-identity";
 
 export function QuotesView({
   quotes,
+  jobs,
   invoices,
   onNew,
   onView,
@@ -36,6 +37,7 @@ export function QuotesView({
   onDelete,
 }: {
   quotes: Quote[];
+  jobs: Job[];
   invoices: Invoice[];
   onNew: () => void;
   onView: (quote: Quote) => void;
@@ -103,7 +105,7 @@ export function QuotesView({
       <section className="record-list">
         {visible.map((quote) => {
           const totals = quoteTotals(quote.items);
-          const existingInvoice = liveInvoiceForQuote(quote, invoices);
+          const existingInvoice = liveInvoiceForQuote(quote, invoices, jobs, quotes);
           return (
             <article className="record-row" key={quote.id}>
               <div>
@@ -147,7 +149,7 @@ export function QuotesView({
                   >
                     View invoice
                   </Button>
-                ) : canCreateInvoiceFromQuote(quote) ? (
+                ) : canCreateInvoiceFromQuote(quote, jobs, quotes) ? (
                   <Button
                     icon={DollarSign}
                     onClick={() => onCreateInvoice(quote)}
