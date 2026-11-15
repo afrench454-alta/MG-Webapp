@@ -22,11 +22,11 @@ export function isPublicPath(pathname: string): boolean {
 
 /** Prevents callback and form parameters from becoming open redirects. */
 export function getSafeReturnPath(
-  candidate: string | null | undefined,
+  candidate: string | string[] | null | undefined,
   fallback = FALLBACK_PATH,
 ): string {
   if (
-    !candidate ||
+    typeof candidate !== "string" ||
     candidate.length > 2_048 ||
     !candidate.startsWith("/") ||
     candidate.startsWith("//") ||
@@ -39,7 +39,11 @@ export function getSafeReturnPath(
     const base = new URL("https://fieldcentral.invalid");
     const parsed = new URL(candidate, base);
 
-    if (parsed.origin !== base.origin || isAuthOnlyPath(parsed.pathname)) {
+    if (
+      parsed.origin !== base.origin ||
+      parsed.pathname.startsWith("//") ||
+      isAuthOnlyPath(parsed.pathname)
+    ) {
       return fallback;
     }
 

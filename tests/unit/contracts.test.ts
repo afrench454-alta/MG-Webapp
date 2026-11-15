@@ -34,6 +34,9 @@ test("routing: isPublicPath correctly identifies public endpoints", () => {
 test("routing: getSafeReturnPath prevents open redirect attacks", () => {
   assert.equal(getSafeReturnPath("https://evil.com"), "/");
   assert.equal(getSafeReturnPath("//evil.com"), "/");
+  assert.equal(getSafeReturnPath("/folder/..//evil.com"), "/");
+  assert.equal(getSafeReturnPath("/%2e%2e//evil.com"), "/");
+  assert.equal(getSafeReturnPath(["/clients", "/jobs"]), "/");
   assert.equal(getSafeReturnPath("javascript:alert(1)"), "/");
   assert.equal(getSafeReturnPath("/clients?status=Active"), "/clients?status=Active");
   assert.equal(getSafeReturnPath("/sign-in"), "/");
