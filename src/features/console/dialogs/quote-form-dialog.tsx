@@ -3,20 +3,30 @@
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Save, Sparkles } from "lucide-react";
-import type { Invoice, JobRequest, LineItem, Quote } from "../domain";
+import { quoteTerms, type Client, type Invoice, type JobRequest, type LineItem, type Quote } from "../domain";
+import type { InlineClientInput } from "../data/inline-client";
 import {
   estimateToLineItems,
   type EstimateJobAction,
 } from "../data/estimator-contract";
 import { buildClientRateChips } from "../data/form-options";
 import { isServiceCategory, parseServiceTitle } from "../data/service-catalog";
-import { formatWorkLabel } from "../data/work-identity";
+import { brisbaneDateKey, formatWorkLabel } from "../data/work-identity";
 import { Button, Field } from "../components/ui-elements";
+import { InlineClientFields } from "../components/inline-client-fields";
 import { LineItemEditor, Totals } from "../components/line-item-editor";
 
 export type QuoteDraft = {
   id?: string;
-  jobRequestId: string;
+  jobRequestId?: string;
+  clientId?: string;
+  propertyId?: string;
+  inlineClient?: InlineClientInput;
+  issueDate?: string;
+  validUntil?: string | null;
+  reference?: string;
+  terms?: string;
+  updatedAt?: string;
   scope: string;
   items: LineItem[];
   clientNotes: string;
@@ -25,6 +35,7 @@ export type QuoteDraft = {
 
 export function QuoteFormDialog({
   requests,
+  clients = [],
   quotes = [],
   invoices = [],
   prefill,
@@ -35,6 +46,7 @@ export function QuoteFormDialog({
   error = "",
 }: {
   requests: JobRequest[];
+  clients?: Client[];
   quotes?: Quote[];
   invoices?: Invoice[];
   prefill?: Partial<QuoteDraft>;
@@ -46,6 +58,15 @@ export function QuoteFormDialog({
 }) {
   const editing = Boolean(prefill?.id);
   const [jobRequestId, setJobRequestId] = useState(prefill?.jobRequestId || "");
+  const [clientId, setClientId] = useState(prefill?.clientId || "");
+  const [propertyId, setPropertyId] = useState(prefill?.propertyId || "");
+  const [inlineClient, setInlineClient] = useState(prefill?.inlineClient);
+  const [issueDate, setIssueDate] = useState(() => prefill?.issueDate || brisbaneDateKey());
+  const [validUntil, setValidUntil] = useState(() =>
+    prefill?.validUntil === null ? "" : prefill?.validUntil ?? brisbaneDateKey(new Date(Date.now() + 14 * 86_400_000)),
+  );
+  const [reference, setReference] = useState(prefill?.reference ?? "");
+  const [terms, setTerms] = useState(prefill?.terms ?? quoteTerms);
   const [scope, setScope] = useState(prefill?.scope || "");
   const [items, setItems] = useState<LineItem[]>(
     prefill?.items?.length
@@ -53,7 +74,7 @@ export function QuoteFormDialog({
       : [{ description: "", quantity: 1, rate: 0 }],
   );
   const [clientNotes, setClientNotes] = useState(
-    prefill?.clientNotes ||
+    prefill?.clientNotes ??
       "Please contact us if you wish to amend any items on this quote.",
   );
   const [internalNotes, setInternalNotes] = useState(
@@ -63,17 +84,25 @@ export function QuoteFormDialog({
   const [estimateError, setEstimateError] = useState("");
 
   const selected = requests.find((request) => request.id === jobRequestId);
+  const selectedClient = clients.find((client) => client.id === clientId);
+  const requestOptions = requests.filter((request) => Boolean(request.clientId)
+    && (request.id === jobRequestId || (request.status !== "Closed" && request.status !== "Rejected")));
+  const selectClient = (client: Client | undefined) => {
+    setClientId(client?.id ?? "");
+    setPropertyId("");
+    setInlineClient(undefined);
+  };
 
   const rateChips = useMemo(
     () =>
       buildClientRateChips({
         client: selected
           ? { id: selected.clientId, name: selected.client }
-          : null,
+          : selectedClient,
         quotes,
         invoices,
       }),
-    [selected, quotes, invoices],
+    [selected, selectedClient, quotes, invoices],
   );
 
   const suggestWithAi = async () => {
@@ -116,11 +145,20 @@ export function QuoteFormDialog({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!jobRequestId || !scope || items.some((item) => !item.description))
+    if ((!jobRequestId && !clientId && !inlineClient?.name.trim()) || !scope.trim()
+      || items.some((item) => !item.description.trim()))
       return;
     void onSave({
       id: prefill?.id,
-      jobRequestId,
+      jobRequestId: jobRequestId || undefined,
+      clientId: jobRequestId || inlineClient ? undefined : clientId,
+      propertyId: jobRequestId || inlineClient ? undefined : propertyId || undefined,
+      inlineClient: jobRequestId ? undefined : inlineClient,
+      updatedAt: prefill?.updatedAt,
+      issueDate,
+      validUntil: validUntil || null,
+      reference,
+      terms,
       scope,
       items,
       clientNotes,
@@ -132,7 +170,8 @@ export function QuoteFormDialog({
 
   return (
     <form className="form-stack" onSubmit={submit} aria-busy={busy}>
-      <Field label="Job request" required>
+      {requestOptions.length || jobRequestId ? (
+      <Field label="Job Request">
         <select
           value={jobRequestId}
           onChange={(event) => {
@@ -140,13 +179,13 @@ export function QuoteFormDialog({
               (request) => request.id === event.target.value,
             );
             setJobRequestId(event.target.value);
+            if (next) selectClient(undefined);
             if (next && !scope) setScope(next.scope);
           }}
-          required
-          disabled={busy || editing}
+          disabled={busy || Boolean(editing && prefill?.jobRequestId)}
         >
-          <option value="">Choose...</option>
-          {requests.map((request) => (
+          <option value="">No job request</option>
+          {requestOptions.map((request) => (
             <option value={request.id} key={request.id}>
               {formatWorkLabel({
                 ...request,
@@ -156,6 +195,35 @@ export function QuoteFormDialog({
           ))}
         </select>
       </Field>
+      ) : null}
+      {!jobRequestId ? (
+        <fieldset className="form-stack" disabled={busy}>
+          {!inlineClient ? (
+            <>
+              <Field label="Client" required>
+                <select value={clientId} required onChange={(event) => selectClient(clients.find((client) => client.id === event.target.value))}>
+                  <option value="">Choose a client</option>
+                  {clients.map((client) => <option value={client.id} key={client.id}>{client.name}</option>)}
+                  {clientId && !selectedClient ? <option value={clientId}>Current client</option> : null}
+                </select>
+              </Field>
+              {selectedClient?.properties.length || propertyId ? (
+                <Field label="Service address">
+                  <select value={propertyId} onChange={(event) => setPropertyId(event.target.value)}>
+                    <option value="">No service address</option>
+                    {selectedClient?.properties.filter((property) => property.id).map((property) => (
+                      <option value={property.id} key={property.id}>{property.address}</option>
+                    ))}
+                    {propertyId && !selectedClient?.properties.some((property) => property.id === propertyId)
+                      ? <option value={propertyId}>Current service address</option> : null}
+                  </select>
+                </Field>
+              ) : null}
+            </>
+          ) : null}
+          <InlineClientFields value={inlineClient} onChange={setInlineClient} clients={clients} onSelectExisting={selectClient} />
+        </fieldset>
+      ) : null}
       <Field label="Scope summary" required>
         <input
           value={scope}
@@ -189,6 +257,17 @@ export function QuoteFormDialog({
       />
       <Totals items={items} />
       <div className="form-grid form-grid--two">
+        <Field label="Issue date" required>
+          <input type="date" value={issueDate} required onChange={(event) => setIssueDate(event.target.value)} disabled={busy} />
+        </Field>
+        <Field label="Valid until">
+          <input type="date" min={issueDate} value={validUntil} onChange={(event) => setValidUntil(event.target.value)} disabled={busy} />
+        </Field>
+      </div>
+      <Field label="Customer reference">
+        <input value={reference} maxLength={200} onChange={(event) => setReference(event.target.value)} disabled={busy} />
+      </Field>
+      <div className="form-grid form-grid--two">
         <Field label="Client notes">
           <textarea
             rows={4}
@@ -206,6 +285,9 @@ export function QuoteFormDialog({
           />
         </Field>
       </div>
+      <Field label="Quote terms">
+        <textarea rows={3} value={terms} onChange={(event) => setTerms(event.target.value)} disabled={busy} />
+      </Field>
       {estimateError || error ? (
         <p className="form-error" role="alert">
           {estimateError || error}

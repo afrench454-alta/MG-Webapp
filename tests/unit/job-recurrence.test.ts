@@ -52,6 +52,12 @@ test("nextScheduledIso: weekly and monthly keep Brisbane local time", () => {
   assert.equal(nextScheduledIso(start, "One-off"), null);
 });
 
+test("monthly recurrence clamps a Brisbane month-end visit to the next month's final day", () => {
+  const start = dateKeyToIso("2026-01-31T09:00");
+  assert.ok(start);
+  assert.equal(nextScheduledIso(start, "Monthly"), dateKeyToIso("2026-02-28T09:00"));
+});
+
 function sampleJob(overrides: Partial<Job> = {}): Job {
   return {
     id: "job-1",
@@ -85,6 +91,16 @@ test("buildNextDemoJob: completion of a weekly job creates the next visit", () =
   assert.equal(next.assigneeIds[0], "member-1");
   assert.equal(buildNextDemoJob({ ...job, status: "scheduled" }, "job-3"), null);
   assert.equal(buildNextDemoJob({ ...job, recurrence: "One-off" }, "job-3"), null);
+});
+
+test("the next visit retains intake and leaves earlier field notes and quote with the completed visit", () => {
+  const job = sampleJob({ status: "completed", jobRequestId: "intake", quoteId: "quote", fieldNotes: [
+    { id: "note-1", body: "Finished edging", author: "Worker", created: "11 Sep 2026" },
+  ] });
+  const next = buildNextDemoJob(job, "job-2");
+  assert.equal(next?.jobRequestId, "intake");
+  assert.equal(next?.quoteId, undefined);
+  assert.deepEqual(next?.fieldNotes, []);
 });
 
 test("clearJobSchedule: parks the job without wiping notes or team", () => {

@@ -22,15 +22,22 @@ export const askJosephRequestSchema = z.object({
 export const runJosephNextStopRequestSchema = z.object({
   chip: z.enum(["on-my-way", "running-late", "done-draft-invoice"]),
   jobId: z.uuid(),
-  confirm: z.boolean().optional(),
-});
+}).strict();
+
+export const approveJosephRequestSchema = z.object({ token: z.uuid() }).strict();
+
+export type JosephProposal = Readonly<{
+  token: string;
+  title: string;
+  details: string[];
+}>;
 
 export type JosephMessage = z.infer<typeof josephMessageSchema>;
 export type AskJosephRequest = z.infer<typeof askJosephRequestSchema>;
 export type RunJosephNextStopRequest = z.infer<typeof runJosephNextStopRequestSchema>;
 
 export type AskJosephResult =
-  | Readonly<{ ok: true; reply: string; actions: string[] }>
+  | Readonly<{ ok: true; reply: string; actions: string[]; proposal?: JosephProposal }>
   | Readonly<{ ok: false; message: string }>;
 
 export type AskJosephAction = (input: AskJosephRequest) => Promise<AskJosephResult>;

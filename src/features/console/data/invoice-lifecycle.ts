@@ -1,60 +1,42 @@
-import { quoteTotals, type Invoice } from "../domain";
+import type { BusinessProfile, Invoice, LineItem } from "../domain";
+import { invoicePaymentSchema, type InvoicePaymentInput } from "./invoice-contract";
 import { OperationsRuleError } from "./operations-rules";
 
-export type InvoiceDisplayStatus =
-  | "Draft"
-  | "Issued"
-  | "Sent"
-  | "Overdue"
-  | "Part paid"
-  | "Paid"
-  | "Refunded"
-  | "Void";
+export type InvoiceDisplayStatus = "Draft" | "Issued" | "Sent" | "Overdue" | "Part paid" | "Paid" | "Refunded" | "Void";
 
-export type InvoicePaymentWrite = {
-  voidRecorded: boolean;
-  insert: {
-    amount: number;
-    status: "recorded" | "refunded";
-    method: "bank_transfer";
-    notes: string;
-  } | null;
-};
+const COLLECTABLE_DOCUMENTS: Invoice["documentStatus"][] = ["Issued", "Sent", "Overdue"];
 
-const COLLECTABLE_DOCUMENTS: Invoice["documentStatus"][] = [
-  "Issued",
-  "Sent",
-  "Overdue",
-];
-
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+function cents(value: number) {
+  return Math.round(value * 100);
 }
 
-function invoiceTotal(invoice: Pick<Invoice, "items" | "discount" | "taxRate">): number {
-  return roundMoney(quoteTotals(invoice.items, invoice.discount ?? 0, invoice.taxRate ?? 0).total);
+export function invoiceLineTotal(item: LineItem): number {
+  // Match Postgres round(quantity * unit_price, 2) using thousandths and cents.
+  return Math.round(Math.round(Number(item.quantity || 0) * 1000) * cents(Number(item.rate || 0)) / 1000) / 100;
 }
 
-function brisbaneToday(now: Date): string {
+export function invoiceAmounts(invoice: Invoice) {
+  const subtotal = invoice.subtotal ?? invoice.items.reduce((sum, item) => sum + cents(invoiceLineTotal(item)), 0) / 100;
+  const taxable = Math.max(0, subtotal - (invoice.discount ?? 0));
+  const tax = invoice.taxTotal ?? cents(taxable * (invoice.taxRate ?? 0)) / 100;
+  const total = invoice.total ?? taxable + tax;
+  const amountPaid = invoice.amountPaid ?? 0;
+  const balanceDue = invoice.documentStatus === "Void" ? 0 : invoice.balanceDue ?? Math.max(0, cents(total) - cents(amountPaid)) / 100;
+  return { subtotal, tax, total, amountPaid, balanceDue };
+}
+
+export function brisbaneToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Australia/Brisbane",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    timeZone: "Australia/Brisbane", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(now);
 }
 
-function isPastDue(invoice: Invoice, now: Date): boolean {
-  if (!invoice.dueDate) return false;
-  return invoice.dueDate < brisbaneToday(now);
-}
-
 export function canDeleteInvoice(invoice: Invoice): boolean {
-  return invoice.documentStatus === "Draft";
+  return invoice.documentStatus === "Draft" && !invoice.replacesInvoiceId && !invoice.payments?.length;
 }
 
 export function canFinalizeInvoice(invoice: Invoice): boolean {
-  return invoice.documentStatus === "Draft";
+  return invoice.documentStatus === "Draft" && !invoice.duplicateSource;
 }
 
 export function canMarkSent(invoice: Invoice): boolean {
@@ -62,180 +44,98 @@ export function canMarkSent(invoice: Invoice): boolean {
 }
 
 export function canVoidInvoice(invoice: Invoice): boolean {
-  if (invoice.documentStatus === "Draft" || invoice.documentStatus === "Void") {
-    return false;
+  return COLLECTABLE_DOCUMENTS.includes(invoice.documentStatus)
+    && invoice.paymentStatus === "Unpaid"
+    && !invoice.payments?.length;
+}
+
+export function canRecordPayment(invoice: Invoice): boolean {
+  return COLLECTABLE_DOCUMENTS.includes(invoice.documentStatus) && invoiceAmounts(invoice).balanceDue > 0;
+}
+
+export function availableInvoiceReceipts(invoice: Invoice) {
+  if (!COLLECTABLE_DOCUMENTS.includes(invoice.documentStatus)) return [];
+  const payments = invoice.payments ?? [];
+  const adjusted = new Map<string, number>();
+  for (const entry of payments) {
+    if (entry.receiptId) adjusted.set(entry.receiptId, (adjusted.get(entry.receiptId) ?? 0) + cents(entry.amount));
   }
-  return invoice.paymentStatus === "Unpaid" || invoice.paymentStatus === "Part paid";
+  return payments.filter((entry) => entry.kind === "receipt" && entry.status === "recorded")
+    .map((entry) => ({ ...entry, available: (cents(entry.amount) - (adjusted.get(entry.id) ?? 0)) / 100 }))
+    .filter((entry) => entry.available > 0);
 }
 
-export function canMarkPaid(invoice: Invoice): boolean {
-  if (invoice.documentStatus === "Void") return false;
-  if (invoice.paymentStatus === "Paid" || invoice.paymentStatus === "Refunded") {
-    return false;
-  }
-  return (
-    invoice.documentStatus === "Draft" ||
-    COLLECTABLE_DOCUMENTS.includes(invoice.documentStatus)
-  );
-}
-
-export function allowedPaymentStatuses(
-  invoice: Invoice,
-): Invoice["paymentStatus"][] {
-  if (invoice.documentStatus === "Void") return [];
-  if (invoice.paymentStatus === "Refunded") return ["Refunded"];
-  if (invoice.paymentStatus === "Paid") return ["Paid", "Refunded"];
-  return ["Unpaid", "Part paid", "Paid"];
-}
-
-export function invoiceDisplayStatus(
-  invoice: Invoice,
-  now: Date = new Date(),
-): InvoiceDisplayStatus {
+export function invoiceDisplayStatus(invoice: Invoice, now: Date = new Date()): InvoiceDisplayStatus {
   if (invoice.documentStatus === "Void") return "Void";
+  if (invoice.documentStatus === "Draft") return "Draft";
   if (invoice.paymentStatus === "Refunded") return "Refunded";
   if (invoice.paymentStatus === "Paid") return "Paid";
-  if (invoice.documentStatus === "Draft") return "Draft";
-  if (
-    COLLECTABLE_DOCUMENTS.includes(invoice.documentStatus) &&
-    (invoice.paymentStatus === "Unpaid" || invoice.paymentStatus === "Part paid") &&
-    isPastDue(invoice, now)
-  ) {
-    return "Overdue";
-  }
+  if (invoice.dueDate && invoice.dueDate < brisbaneToday(now) && invoiceAmounts(invoice).balanceDue > 0) return "Overdue";
   if (invoice.paymentStatus === "Part paid") return "Part paid";
-  if (invoice.documentStatus === "Sent") return "Sent";
-  return "Issued";
+  return invoice.documentStatus === "Sent" ? "Sent" : "Issued";
 }
 
-export function applyInvoicePayment(
-  invoice: Invoice,
-  next: Invoice["paymentStatus"],
-): Invoice {
-  const allowed = allowedPaymentStatuses(invoice);
-  if (invoice.documentStatus === "Void") {
-    throw new OperationsRuleError("A voided invoice cannot have its payment status changed.");
+export function applyInvoicePaymentEntry(invoice: Invoice, input: InvoicePaymentInput): Invoice {
+  input = invoicePaymentSchema.parse(input);
+  if (input.invoiceId !== invoice.id) throw new OperationsRuleError("Invoice not found.");
+  const payments = invoice.payments ?? [];
+  const prior = payments.find((entry) => entry.idempotencyKey === input.idempotencyKey);
+  if (prior) {
+    if (prior.kind === input.kind && prior.amount === input.amount && prior.paidOn === input.paidOn
+      && prior.method === input.method && prior.reference === input.reference && prior.reason === input.reason
+      && prior.receiptId === input.receiptId) return invoice;
+    throw new OperationsRuleError("That payment submission was already used. Open the payment form again.");
   }
-  if (!allowed.includes(next)) {
-    throw new OperationsRuleError(
-      `Cannot change payment from ${invoice.paymentStatus} to ${next}.`,
-    );
+  if (!COLLECTABLE_DOCUMENTS.includes(invoice.documentStatus)) {
+    throw new OperationsRuleError("Payments require an issued invoice.");
   }
-  if (
-    invoice.documentStatus === "Draft" &&
-    (next === "Paid" || next === "Part paid")
-  ) {
-    return { ...invoice, documentStatus: "Issued", paymentStatus: next };
-  }
-  return { ...invoice, paymentStatus: next };
-}
-
-export function markInvoicePaid(invoice: Invoice): Invoice {
-  if (!canMarkPaid(invoice)) {
-    throw new OperationsRuleError("This invoice cannot be marked paid.");
-  }
-  return applyInvoicePayment(
-    invoice.documentStatus === "Draft"
-      ? { ...invoice, documentStatus: "Issued" }
-      : invoice,
-    "Paid",
-  );
-}
-
-export function voidInvoice(invoice: Invoice): Invoice {
-  if (!canVoidInvoice(invoice)) {
-    throw new OperationsRuleError(
-      "Only issued unpaid invoices can be voided. Paid invoices can be refunded.",
-    );
-  }
-  return { ...invoice, documentStatus: "Void" };
-}
-
-export function finalizeInvoiceRecord(invoice: Invoice): Invoice {
-  if (!canFinalizeInvoice(invoice)) {
-    throw new OperationsRuleError("Only draft invoices can be finalized.");
-  }
-  return { ...invoice, documentStatus: "Issued" };
-}
-
-export function markInvoiceSent(invoice: Invoice): Invoice {
-  if (!canMarkSent(invoice)) {
-    throw new OperationsRuleError("Only issued invoices can be marked sent.");
-  }
-  return { ...invoice, documentStatus: "Sent" };
-}
-
-/**
- * Postgres derives invoices.payment_status from payment rows.
- * Direct status updates are rejected by invoices_guard_derived_fields.
- */
-export function planInvoicePaymentRecords(
-  invoice: Pick<Invoice, "items" | "discount" | "taxRate">,
-  next: Invoice["paymentStatus"],
-  recordedSum = 0,
-): InvoicePaymentWrite {
-  const total = invoiceTotal(invoice);
-  const recorded = roundMoney(Math.max(0, recordedSum));
-
-  if (next === "Unpaid") {
-    return { voidRecorded: recorded > 0, insert: null };
-  }
-
-  if (next === "Paid") {
-    if (total <= 0) {
-      throw new OperationsRuleError("This invoice has no amount to collect.");
+  if (input.paidOn > brisbaneToday()) throw new OperationsRuleError("The payment date cannot be in the future.");
+  const amounts = invoiceAmounts(invoice);
+  const isReceipt = input.kind === "receipt";
+  if (isReceipt) {
+    if (input.amount > amounts.balanceDue) throw new OperationsRuleError("The amount exceeds the outstanding balance.");
+  } else {
+    const target = availableInvoiceReceipts(invoice).find((entry) => entry.id === input.receiptId);
+    if (!target || input.amount > target.available || input.paidOn < target.paidOn || input.amount > amounts.amountPaid) {
+      throw new OperationsRuleError("The correction must fit the available receipt amount and be dated on or after the receipt.");
     }
-    const remaining = roundMoney(total - recorded);
-    if (remaining <= 0) {
-      return { voidRecorded: false, insert: null };
-    }
-    return {
-      voidRecorded: false,
-      insert: {
-        amount: remaining,
-        status: "recorded",
-        method: "bank_transfer",
-        notes: "Marked paid in console",
-      },
-    };
   }
-
-  if (next === "Part paid") {
-    if (total <= 0.01) {
-      throw new OperationsRuleError("This invoice is too small to mark as part paid.");
-    }
-    if (recorded > 0 && recorded < total) {
-      return { voidRecorded: false, insert: null };
-    }
-    const half = roundMoney(total / 2);
-    const amount = roundMoney(Math.min(Math.max(half, 0.01), total - 0.01));
-    return {
-      voidRecorded: recorded > 0,
-      insert: {
-        amount,
-        status: "recorded",
-        method: "bank_transfer",
-        notes: "Marked part paid in console",
-      },
-    };
-  }
-
+  const amountPaid = (cents(amounts.amountPaid) + (isReceipt ? 1 : -1) * cents(input.amount)) / 100;
+  const balanceDue = Math.max(0, cents(amounts.total) - cents(amountPaid)) / 100;
+  const hasRefund = input.kind === "refund" || payments.some((entry) => entry.kind === "refund");
+  const paymentStatus = amountPaid > 0 ? (balanceDue === 0 ? "Paid" : "Part paid") : hasRefund ? "Refunded" : "Unpaid";
   return {
-    voidRecorded: recorded > 0,
-    insert: {
-      amount: Math.max(total, 0.01),
-      status: "refunded",
-      method: "bank_transfer",
-      notes: "Marked refunded in console",
-    },
+    ...invoice,
+    amountPaid,
+    balanceDue,
+    paymentStatus,
+    payments: [...payments, { ...input, id: input.idempotencyKey, status: input.kind === "refund" ? "refunded" : "recorded" }],
   };
 }
 
-export function toDbPaymentStatus(status: Invoice["paymentStatus"]): string {
-  if (status === "Part paid") return "partially_paid";
-  return status.toLowerCase();
+export function voidInvoice(invoice: Invoice): Invoice {
+  if (!canVoidInvoice(invoice)) throw new OperationsRuleError("Only issued invoices without payment history can be voided.");
+  return { ...invoice, documentStatus: "Void", balanceDue: 0 };
 }
 
-export function toDbDocumentStatus(status: Invoice["documentStatus"]): string {
-  return status.toLowerCase();
+export function finalizeInvoiceRecord(invoice: Invoice, profile?: BusinessProfile): Invoice {
+  if (invoice.documentStatus !== "Draft") throw new OperationsRuleError("Only draft invoices can be issued.");
+  return {
+    ...invoice,
+    documentStatus: "Issued",
+    snapshot: profile ? {
+      clientName: invoice.client,
+      billingName: invoice.billingName,
+      billingAddress: invoice.billingAddress,
+      recipientName: invoice.recipientName,
+      recipientEmail: invoice.recipientEmail,
+      serviceAddresses: invoice.serviceAddresses ?? (invoice.address ? [invoice.address] : []),
+      issuer: { ...profile },
+    } : invoice.snapshot,
+  };
+}
+
+export function markInvoiceSent(invoice: Invoice): Invoice {
+  if (!canMarkSent(invoice)) throw new OperationsRuleError("Only issued invoices can be marked sent.");
+  return { ...invoice, documentStatus: "Sent" };
 }

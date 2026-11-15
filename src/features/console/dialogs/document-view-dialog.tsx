@@ -6,13 +6,18 @@ import {
   businessProfile as defaultBusinessProfile,
   formatLineQuantity,
   invoiceTerms,
+  money,
   quoteTerms,
   quoteTotals,
   type BusinessProfile,
   type Invoice,
   type Quote,
 } from "../domain";
-import { allowedPaymentStatuses, canFinalizeInvoice, canMarkPaid, canMarkSent, canVoidInvoice, invoiceDisplayStatus } from "../data/invoice-lifecycle";
+import {
+  availableInvoiceReceipts, canFinalizeInvoice, canMarkSent, canRecordPayment, canVoidInvoice,
+  invoiceAmounts, invoiceDisplayStatus, invoiceLineTotal,
+} from "../data/invoice-lifecycle";
+import { paymentMethodLabels } from "./invoice-payment-dialog";
 import { Badge, Button, invoiceDisplayTone, quoteStatusTone } from "../components/ui-elements";
 
 function getDisplayDocumentNumber(record: Quote | Invoice) {
@@ -64,6 +69,9 @@ export function DocumentViewDialog({
   onCreateInvoice,
   onViewInvoice,
   onEdit,
+  onRevise,
+  onRecordPayment,
+  onReplace,
 }: {
   type: "quote" | "invoice";
   record: Quote | Invoice;
@@ -76,22 +84,24 @@ export function DocumentViewDialog({
   onCreateInvoice?: () => void;
   onViewInvoice?: () => void;
   onEdit?: () => void;
+  onRevise?: () => void;
+  onRecordPayment?: () => void;
+  onReplace?: () => void;
 }) {
   const isQuote = "expires" in record;
   if ((type === "quote") !== isQuote) return null;
-  const totals = quoteTotals(
-    record.items,
-    record.discount ?? 0,
-    record.taxRate ?? 0,
-  );
+  const snapshot = isQuote ? undefined : record.snapshot;
+  const issuer = (isQuote ? record.issuerSnapshot : snapshot?.issuer) ?? profile;
+  const quoteAmounts = isQuote ? quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0) : undefined;
+  const billing = isQuote ? undefined : invoiceAmounts(record);
+  const totals = quoteAmounts ?? billing!;
+  const paid = !isQuote && canRecordPayment(record);
+  const correctable = !isQuote && availableInvoiceReceipts(record).length > 0;
+  const paymentAccount = snapshot?.issuer ?? profile;
+  const serviceAddresses = isQuote ? [] : snapshot?.serviceAddresses ?? record.serviceAddresses ?? [record.address].filter(Boolean);
   const documentLabel = isQuote ? "Quote" : "Invoice";
-  const status = isQuote ? record.status : record.paymentStatus;
-  const scope = isQuote
-    ? [record.scope]
-    : record.scope?.length
-      ? record.scope
-      : record.items.map((item) => item.description);
-  const targetRows = isQuote ? 7 : 6;
+  const scope = isQuote ? [record.scope] : record.scope ?? [];
+  const targetRows = isQuote ? 7 : 0;
   const blankRows = Math.max(0, targetRows - record.items.length);
 
   const printDocument = () => {
@@ -117,13 +127,13 @@ export function DocumentViewDialog({
       >
         <header className="document-letterhead">
           <div className="document-business">
-            <h3>{profile.name}</h3>
+            <h3>{issuer.name}</h3>
             <p>
-              <strong>ABN:</strong> {profile.abn}
+              <strong>ABN:</strong> {issuer.abn}
             </p>
-            <p>{profile.email}</p>
-            <p>{profile.phone}</p>
-            <p>{profile.website}</p>
+            <p>{issuer.email}</p>
+            <p>{issuer.phone}</p>
+            <p>{issuer.website}</p>
           </div>
           <div className="document-heading">
             <Image
@@ -144,8 +154,16 @@ export function DocumentViewDialog({
         >
           <div className="document-address">
             <h4>ADDRESSED TO</h4>
-            <strong>{record.client}</strong>
-            <span>{record.address}</span>
+            {isQuote ? <><strong>{record.client}</strong><span>{record.address}</span></> : (
+              <>
+                <strong>{snapshot?.billingName ?? record.billingName ?? snapshot?.clientName ?? record.client}</strong>
+                {snapshot?.billingAddress || record.billingAddress ? (
+                  <span className="document-multiline">{snapshot?.billingAddress ?? record.billingAddress}</span>
+                ) : null}
+                {snapshot?.recipientName || record.recipientName ? <span>{snapshot?.recipientName ?? record.recipientName}</span> : null}
+                {snapshot?.recipientEmail || record.recipientEmail ? <span>{snapshot?.recipientEmail ?? record.recipientEmail}</span> : null}
+              </>
+            )}
           </div>
           <dl className="document-facts">
             <div>
@@ -154,18 +172,18 @@ export function DocumentViewDialog({
             </div>
             <div>
               <dt>{documentLabel} Date</dt>
-              <dd>{documentDate(record.issued)}</dd>
+              <dd>{documentDate(record.issueDate ?? record.issued)}</dd>
             </div>
             <div>
-              <dt>{isQuote ? "Valid For" : "Due"}</dt>
+              <dt>{isQuote ? "Valid Until" : "Due"}</dt>
               <dd>
                 {isQuote
-                  ? `${record.validDays} Days`
-                  : record.due === "Upon completion"
-                    ? record.due
-                    : documentDate(record.due)}
+                  ? record.validUntil === null ? "No expiry" : documentDate(record.expires)
+                  : documentDate(record.dueDate ?? record.due)}
               </dd>
             </div>
+            {record.reference ? <div><dt>Reference</dt><dd>{record.reference}</dd></div> : null}
+            {!isQuote && record.serviceDate ? <div><dt>Service date</dt><dd>{documentDate(record.serviceDate)}</dd></div> : null}
             <div>
               <dt>Status</dt>
               <dd style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -183,37 +201,26 @@ export function DocumentViewDialog({
           </dl>
         </section>
 
-        <section
-          className={`document-scope-row${isQuote ? "" : " document-scope-row--invoice"}`}
-        >
+        <section className={`document-scope-row${isQuote ? "" : " document-scope-row--invoice"}`}>
           <div className="document-scope">
-            <h4>SCOPE OF WORK</h4>
-            {scope.map((line, index) => (
-              <p key={`${line}-${index}`}>{line}</p>
-            ))}
-            {isQuote && record.clientNotes ? (
-              <p className="document-recommendation">
-                <strong>Recommendation:</strong> {record.clientNotes}
-              </p>
-            ) : null}
+            {serviceAddresses.length ? <div className="document-sites">
+              <h4>Service {serviceAddresses.length === 1 ? "site" : "sites"}</h4>
+              {serviceAddresses.map((site, index) => <p key={`${site}-${index}`}>{site}</p>)}
+            </div> : null}
+            {scope.length ? <h4>SCOPE OF WORK</h4> : null}
+            {scope.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}
+            {isQuote && record.clientNotes ? <p className="document-recommendation">{record.clientNotes}</p> : null}
           </div>
-          {!isQuote ? (
+          {!isQuote && (record.paymentInstructions || paymentAccount.paymentTo || paymentAccount.bsb || paymentAccount.accountNumber) ? (
             <div className="document-payment">
               <h4>PAYMENT DETAILS</h4>
-              <dl>
-                <div>
-                  <dt>To:</dt>
-                  <dd>{profile.paymentTo}</dd>
-                </div>
-                <div>
-                  <dt>BSB:</dt>
-                  <dd>{profile.bsb}</dd>
-                </div>
-                <div>
-                  <dt>ACC:</dt>
-                  <dd>{profile.accountNumber}</dd>
-                </div>
-              </dl>
+              {record.paymentInstructions ? <p className="document-multiline">{record.paymentInstructions}</p> : (
+                <dl>
+                  {paymentAccount.paymentTo ? <div><dt>Account name</dt><dd>{paymentAccount.paymentTo}</dd></div> : null}
+                  {paymentAccount.bsb ? <div><dt>BSB</dt><dd>{paymentAccount.bsb}</dd></div> : null}
+                  {paymentAccount.accountNumber ? <div><dt>Account number</dt><dd>{paymentAccount.accountNumber}</dd></div> : null}
+                </dl>
+              )}
             </div>
           ) : null}
         </section>
@@ -237,14 +244,14 @@ export function DocumentViewDialog({
           <tbody>
             {record.items.map((item, index) => (
               <tr key={`${item.description}-${index}`}>
-                <td>{item.description}</td>
+                <td>{item.label ? <strong>{item.label}<br /></strong> : null}{item.description}</td>
                 <td>{formatLineQuantity(item)}</td>
                 <td>
                   <AccountingAmount value={Number(item.rate)} />
                 </td>
                 <td>
                   <AccountingAmount
-                    value={Number(item.quantity) * Number(item.rate)}
+                    value={isQuote ? Number(item.quantity) * Number(item.rate) : invoiceLineTotal(item)}
                   />
                 </td>
               </tr>
@@ -279,16 +286,10 @@ export function DocumentViewDialog({
                 <AccountingAmount value={totals.subtotal} />
               </dd>
             </div>
-            <div>
-              <dt>DISCOUNT</dt>
-              <dd>
-                <AccountingAmount value={totals.discount} dashForZero />
-              </dd>
-            </div>
-            <div>
-              <dt>TAX RATE</dt>
-              <dd>{(totals.taxRate * 100).toFixed(2)}%</dd>
-            </div>
+            {quoteAmounts ? <>
+              <div><dt>DISCOUNT</dt><dd><AccountingAmount value={quoteAmounts.discount} dashForZero /></dd></div>
+              <div><dt>TAX RATE</dt><dd>{(quoteAmounts.taxRate * 100).toFixed(2)}%</dd></div>
+            </> : billing?.tax ? <div><dt>Tax</dt><dd><AccountingAmount value={billing.tax} /></dd></div> : null}
             <div className="document-totals__grand">
               <dt>{documentLabel} Total</dt>
               <dd>
@@ -300,25 +301,36 @@ export function DocumentViewDialog({
 
         <footer className="document-note">
           <h4>{isQuote ? "Notes & Terms" : "Payment terms"}</h4>
-          {!isQuote && record.notes ? <p>{record.notes}</p> : null}
-          <p>{isQuote ? quoteTerms : invoiceTerms}</p>
+          {!isQuote && record.notes ? <p className="document-multiline">{record.notes}</p> : null}
+          <p className="document-multiline">{isQuote ? record.terms ?? quoteTerms : record.terms ?? invoiceTerms}</p>
         </footer>
       </article>
 
+      {!isQuote && record.documentStatus !== "Draft" ? (
+        <section className="invoice-payment-history" aria-label="Payment summary" data-print-exclude>
+          <h3>Payments</h3>
+          <p>Received {money(billing!.amountPaid)} · Balance {money(billing!.balanceDue)}</p>
+          {!record.snapshot ? <p>Legacy invoice. Customer and business details use the current records where an original snapshot is unavailable.</p> : null}
+          {record.duplicateSource ? <p>This invoice shares work with another historical invoice.</p> : null}
+          {record.replacesInvoiceId ? <p>Replacement for invoice {record.replacesInvoiceId}. {record.correctionReason}</p> : null}
+          {record.payments?.length ? <ul>
+            {record.payments.map((entry) => <li key={entry.id}>
+              {documentDate(entry.paidOn)} · {entry.status === "voided" ? "Voided receipt" : entry.kind === "receipt" ? "Receipt" : entry.kind === "reversal" ? "Reversal" : "Refund"}
+              {" · "}{money(entry.amount)} · {paymentMethodLabels[entry.method]}{entry.reference ? ` · ${entry.reference}` : ""}
+              {entry.reason ? <div>{entry.reason}</div> : null}
+            </li>)}
+          </ul> : null}
+        </section>
+      ) : null}
       <div className="document-actions" data-print-exclude>
-        {isQuote || allowedPaymentStatuses(record as Invoice).length ? (
+        {isQuote && onStatusChange ? (
         <label className="compact-select">
-          <span className="sr-only">
-            {isQuote ? "Quote status" : "Payment status"}
-          </span>
+          <span className="sr-only">Quote status</span>
           <select
-            value={status}
+            value={record.status}
             onChange={(event) => onStatusChange?.(event.target.value)}
           >
-            {(isQuote
-              ? ["Draft", "Sent", "Accepted", "Declined", "Expired", "Void"]
-              : allowedPaymentStatuses(record as Invoice)
-            ).map((option) => (
+            {quoteStatusOptions(record.status).map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
@@ -331,6 +343,11 @@ export function DocumentViewDialog({
           {onEdit ? (
             <Button variant="secondary" icon={Pencil} onClick={onEdit}>
               Edit draft
+            </Button>
+          ) : null}
+          {isQuote && onRevise ? (
+            <Button variant="secondary" icon={Pencil} onClick={onRevise}>
+              Create revision
             </Button>
           ) : null}
           <Button variant="secondary" icon={Printer} onClick={printDocument}>
@@ -346,12 +363,11 @@ export function DocumentViewDialog({
               Create invoice
             </Button>
           ) : null}
-          {!isQuote && canMarkPaid(record as Invoice) ? (
-            <Button
-              onClick={() => onStatusChange?.("Paid")}
-            >
-              Mark paid
-            </Button>
+          {(paid || correctable) && onRecordPayment ? (
+            <Button onClick={onRecordPayment}>{paid ? "Record payment" : "Correct payment"}</Button>
+          ) : null}
+          {!isQuote && onReplace && canVoidInvoice(record) ? (
+            <Button variant="secondary" onClick={onReplace}>Create replacement</Button>
           ) : null}
           {!isQuote && canFinalizeInvoice(record as Invoice) ? (
             <Button variant="secondary" icon={FileCheck2} onClick={onFinalize}>
@@ -375,4 +391,10 @@ export function DocumentViewDialog({
       </div>
     </div>
   );
+}
+
+function quoteStatusOptions(status: Quote["status"]): Quote["status"][] {
+  if (status === "Draft") return [status, "Sent", "Accepted", "Void"];
+  if (status === "Sent") return [status, "Accepted", "Declined", "Expired", "Void"];
+  return status === "Void" ? [status] : [status, "Void"];
 }

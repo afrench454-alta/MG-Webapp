@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { CheckCircle2, Sparkles } from "lucide-react";
 import "./console.css";
 import {
@@ -41,18 +41,23 @@ import type {
 import type {
   DeleteJobRequestAction,
   SaveJobRequestAction,
+  SetJobRequestClosedAction,
 } from "./data/job-request-contract";
 import type {
+  AddJobNoteAction,
   DeleteInvoiceAction,
   DeleteJobAction,
   DeleteJobPhotoAction,
   DeleteQuoteAction,
   FinalizeInvoiceAction,
+  InvoicePaymentInput,
   VoidInvoiceAction,
   MarkInvoiceSentAction,
   SaveInvoiceAction,
   SaveQuoteAction,
+  ReviseQuoteAction,
   ScheduleJobAction,
+  ScheduleJobInput,
   UpdateInvoicePaymentAction,
   UpdateJobAction,
   UpdateJobAssignmentsAction,
@@ -62,7 +67,7 @@ import type {
 import type { SendQuestionnaireAction } from "./data/questionnaire-contract";
 import type { EstimateJobAction } from "./data/estimator-contract";
 import type { AskJosephAction } from "./data/joseph-contract";
-import { asJobRecurrence, buildNextDemoJob, clearJobSchedule, applyJobSchedule, describeJobUpdate, scheduledStartPayload, formatBrisbaneSchedule } from "./data/job-recurrence";
+import { asJobRecurrence, buildNextDemoJob, clearJobSchedule, describeJobUpdate, scheduledStartPayload, formatBrisbaneSchedule } from "./data/job-recurrence";
 import { parseClientImportText, planClientImport } from "./data/client-import";
 import type {
   InviteTeamAction,
@@ -72,8 +77,11 @@ import type {
 } from "./data/team-contract";
 
 import { Dialog } from "./components/dialog";
+import { Button } from "./components/ui-elements";
 import { Sidebar } from "./components/sidebar";
 import { MobileDock } from "./components/mobile-dock";
+import { usePhoneLayout } from "./components/phone-shell";
+import { consoleLocation, writeConsoleLocation } from "./data/console-location";
 import { DashboardView } from "./views/dashboard-view";
 import { ClientsView } from "./views/clients-view";
 import { RequestsView } from "./views/requests-view";
@@ -81,16 +89,19 @@ import { QuestionnairesView } from "./views/questionnaires-view";
 import { QuotesView } from "./views/quotes-view";
 import { ScheduleView } from "./views/schedule-view";
 import { JobBoardView } from "./views/job-board-view";
+import { TodayView } from "./views/today-view";
 import { JosephView } from "./views/joseph-view";
 import { InvoicesView } from "./views/invoices-view";
 import { TopCommandBar } from "./components/top-command-bar";
 import { AlertsDrawer } from "./components/alerts-drawer";
+import { operationalAlerts } from "./data/operational-alerts";
 import { SettingsView } from "./views/settings-view";
 import { isLiveInvoice, isLiveQuote } from "./data/list-filters";
 
 import { ClientFormDialog } from "./dialogs/client-form-dialog";
 import { QuoteFormDialog, type QuoteDraft } from "./dialogs/quote-form-dialog";
-import { InvoiceFormDialog, type InvoiceDraft } from "./dialogs/invoice-form-dialog";
+import { InvoiceFormDialog, invoiceDraftActionInput, type InvoiceDraft } from "./dialogs/invoice-form-dialog";
+import { InvoicePaymentDialog } from "./dialogs/invoice-payment-dialog";
 import { JobDetailsDialog } from "./dialogs/job-details-dialog";
 import { DocumentViewDialog } from "./dialogs/document-view-dialog";
 import { EstimatorDialog } from "./dialogs/estimator-dialog";
@@ -109,31 +120,39 @@ import {
   assertJobCanBeDeleted,
 } from "./data/operations-rules";
 import {
-  applyInvoicePayment,
+  applyInvoicePaymentEntry,
   finalizeInvoiceRecord,
-  invoiceDisplayStatus,
   markInvoiceSent,
   voidInvoice,
 } from "./data/invoice-lifecycle";
+import { resolveDemoInlineClient } from "./data/inline-client";
+import { demoWorkCustomer } from "./data/demo-work";
 import {
   canCreateInvoiceFromQuote,
+  draftInvoiceFromJob,
   draftInvoiceFromQuote,
   draftInvoiceFromRecord,
+  draftInvoiceFromRequest,
+  draftReplacementInvoice,
+  invoiceConflict,
   liveInvoiceForQuote,
 } from "./data/quote-invoice";
 import { formatServiceTitle, isServiceCategory, parseServiceTitle } from "./data/service-catalog";
-import { formatJobDisplayName, formatSiteTitle, formatSubmissionScope, defaultDateTimeLocal } from "./data/work-identity";
+import { brisbaneDateKey, formatJobDisplayName, formatSiteTitle, formatSubmissionScope } from "./data/work-identity";
 
 export type DialogState =
   | { type: "estimator"; jobRequestId?: string }
   | { type: "client"; client?: Client; returnTo?: DialogState }
   | { type: "delete-client"; client: Client }
   | { type: "delete-request"; request: JobRequest }
+  | { type: "close-request"; request: JobRequest }
+  | { type: "request-visits"; request: JobRequest }
   | { type: "delete-quote"; quote: Quote }
   | { type: "delete-job"; job: Job }
   | { type: "delete-invoice"; record: Invoice }
   | { type: "quote-form"; prefill?: Partial<QuoteDraft> }
-  | { type: "invoice-form"; quote?: Quote; invoice?: Invoice }
+  | { type: "invoice-form"; quote?: Quote; invoice?: Invoice; job?: Job; request?: JobRequest; replacement?: Invoice }
+  | { type: "invoice-payment"; record: Invoice }
   | { type: "send-questionnaire"; questionnaireId?: string }
   | { type: "public-questionnaire"; questionnaire: Questionnaire }
   | { type: "submission"; submission: QuestionnaireSubmission }
@@ -155,6 +174,7 @@ export type ConsoleAppProps = {
   businessDetails?: BusinessProfile;
   initialInvoices?: Invoice[];
   dataMode?: "demo" | "live";
+  sessionDemo?: "populated" | "field";
   dataLoadError?: string;
   signedInEmail?: string;
   actorId?: string;
@@ -166,12 +186,15 @@ export type ConsoleAppProps = {
   onPreviewClientImport?: PreviewClientImportAction;
   onCommitClientImport?: CommitClientImportAction;
   onSaveJobRequest?: SaveJobRequestAction;
+  onSetJobRequestClosed?: SetJobRequestClosedAction;
   onDeleteJobRequest?: DeleteJobRequestAction;
   onSaveQuote?: SaveQuoteAction;
+  onReviseQuote?: ReviseQuoteAction;
   onUpdateQuoteStatus?: UpdateQuoteStatusAction;
   onDeleteQuote?: DeleteQuoteAction;
   onScheduleJob?: ScheduleJobAction;
   onUpdateJob?: UpdateJobAction;
+  onAddJobNote?: AddJobNoteAction;
   onUpdateJobAssignments?: UpdateJobAssignmentsAction;
   onUploadJobPhoto?: UploadJobPhotoAction;
   onDeleteJobPhoto?: DeleteJobPhotoAction;
@@ -204,6 +227,7 @@ export function ConsoleApp({
   businessDetails,
   initialInvoices: providedInvoices,
   dataMode = "demo",
+  sessionDemo,
   dataLoadError,
   signedInEmail = "ops@fieldcentral.local",
   actorId,
@@ -215,12 +239,15 @@ export function ConsoleApp({
   onPreviewClientImport,
   onCommitClientImport,
   onSaveJobRequest,
+  onSetJobRequestClosed,
   onDeleteJobRequest,
   onSaveQuote,
+  onReviseQuote,
   onUpdateQuoteStatus,
   onDeleteQuote,
   onScheduleJob,
   onUpdateJob,
+  onAddJobNote,
   onUpdateJobAssignments,
   onUploadJobPhoto,
   onDeleteJobPhoto,
@@ -240,11 +267,15 @@ export function ConsoleApp({
   onUpdateBusinessProfile,
   onSignOut,
 }: ConsoleAppProps = {}) {
-  const [active, setActive] = useState<ConsoleRoute>("dashboard");
+  const phoneLayout = usePhoneLayout();
+  const [active, setActiveView] = useState<ConsoleRoute | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined);
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [demoLoaded, setDemoLoaded] = useState(!sessionDemo);
+  const draftDirty = useRef(false);
+  const currentLocation = useRef("");
   const [clients, setClients] = useState<Client[]>(() =>
     structuredClone(initialClients ?? clientsSeed),
   );
@@ -294,11 +325,108 @@ export function ConsoleApp({
     "settings",
   ];
   const currentRoute =
-    !canOperateOffice && officeRoutes.includes(active) ? "dashboard" : active;
+    active && (canOperateOffice || !officeRoutes.includes(active))
+      ? active
+      : phoneLayout ? "today" : "dashboard";
+  const demoKey = sessionDemo ? `mow-glow-demo-v1:${sessionDemo}:${brisbaneDateKey()}` : "";
+  const guardedDraft = Boolean(dialog && ["client", "request", "quote-form", "invoice-form", "invoice-payment", "schedule"].includes(dialog.type));
+
+  const restoreDemo = useEffectEvent(() => {
+    try {
+      const stored = window.sessionStorage.getItem(demoKey);
+      if (stored) {
+        const value = JSON.parse(stored) as { clients: Client[]; jobs: Job[]; requests: JobRequest[]; quotes: Quote[]; invoices: Invoice[] };
+        setClients(value.clients);
+        setJobs(value.jobs);
+        setJobRequests(value.requests);
+        setQuotes(value.quotes);
+        setInvoiceRecords(value.invoices);
+      }
+    } catch {
+      // Use the supplied fixture when browser storage is unavailable.
+    }
+    setDemoLoaded(true);
+  });
+
+  useEffect(() => {
+    if (demoKey) queueMicrotask(() => restoreDemo());
+  }, [demoKey]);
+
+  useEffect(() => {
+    if (!demoKey || !demoLoaded) return;
+    try {
+      window.sessionStorage.setItem(demoKey, JSON.stringify({
+        clients, requests: jobRequests, jobs, quotes, invoices: invoiceRecords,
+      }));
+    } catch {
+      // Keep the current demo visit usable without browser storage.
+    }
+  }, [clients, demoKey, demoLoaded, invoiceRecords, jobRequests, jobs, quotes]);
+
+  useEffect(() => {
+    draftDirty.current = false;
+  }, [dialog?.type]);
+
+  const setActive = (route: ConsoleRoute) => {
+    setActiveView(route);
+    setDialog(null);
+    writeConsoleLocation(route);
+  };
+
+  const openRecord = (route: ConsoleRoute, id: string, details?: DialogState) => {
+    setActiveView(route);
+    if (details) setDialog(details);
+    writeConsoleLocation(route, id);
+  };
+
+  const restoreLocation = useEffectEvent(() => {
+    if (guardedDraft && draftDirty.current && !window.confirm("Discard your unsaved changes?")) {
+      if (currentLocation.current) window.history.pushState(null, "", currentLocation.current);
+      return;
+    }
+    currentLocation.current = window.location.href;
+    const { view, record } = consoleLocation(new URLSearchParams(window.location.search));
+    setActiveView(view);
+    setDialog(null);
+    if (!view || !record || (!canOperateOffice && officeRoutes.includes(view))) return;
+    if (view === "jobs" || view === "today" || view === "schedule") {
+      const job = jobs.find((candidate) => candidate.id === record);
+      if (job) setDialog({ type: "job", job });
+    } else if (view === "clients") {
+      const client = clients.find((candidate) => candidate.id === record);
+      if (client) setSelectedClientId(client.id);
+    } else if (view === "quotes") {
+      const quote = quotes.find((candidate) => candidate.id === record);
+      if (quote) setDialog({ type: "quote-document", quote });
+    } else if (view === "invoices") {
+      const invoice = invoiceRecords.find((candidate) => candidate.id === record);
+      if (invoice) setDialog({ type: "invoice-document", record: invoice });
+    } else if (view === "questionnaires") {
+      const submission = questionnaireSubmissions.find((candidate) => candidate.id === record);
+      if (submission) setDialog({ type: "submission", submission });
+    }
+  });
+
+  useEffect(() => {
+    if (!demoLoaded) return;
+    const onPopState = () => restoreLocation();
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (draftDirty.current) event.preventDefault();
+    };
+    const timer = window.setTimeout(onPopState, 0);
+    window.addEventListener("popstate", onPopState);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [demoLoaded]);
 
   useEffect(() => {
     if (dataMode !== "demo") return;
     const params = new URLSearchParams(window.location.search);
+    if (consoleLocation(params).view) return;
     const previewType = params.get("documentPreview");
     const requestedId = params.get("documentId");
     const requestedRows = Number(params.get("documentRows"));
@@ -342,7 +470,7 @@ export function ConsoleApp({
     const nextRoute = previewRoute;
     const nextDialog = previewDialog;
     const timer = window.setTimeout(() => {
-      setActive(nextRoute);
+      setActiveView(nextRoute);
       setDialog(nextDialog);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -360,7 +488,13 @@ export function ConsoleApp({
       operationMutationPending
     )
       return;
+    if (guardedDraft && draftDirty.current && !window.confirm("Discard your unsaved changes?")) return;
+    draftDirty.current = false;
     setDialog(null);
+    if (consoleLocation(new URLSearchParams(window.location.search)).record) {
+      writeConsoleLocation(currentRoute, undefined, true);
+      currentLocation.current = window.location.href;
+    }
     setClientMutationError("");
     setOperationMutationError("");
   };
@@ -383,7 +517,7 @@ export function ConsoleApp({
     setClientMutationError("");
 
     if (dataMode === "demo") {
-      upsertClient(saved);
+      upsertClient({ ...saved, properties: saved.properties.map((site) => ({ ...site, id: site.id || crypto.randomUUID() })) });
       closeClientDialog();
       showToast("Client saved.");
       return;
@@ -450,17 +584,32 @@ export function ConsoleApp({
   const persistJobRequest = async (draft: JobRequestDraft) => {
     setRequestMutationError("");
 
-    const selectedClient = clients.find(
+    let selectedClient = clients.find(
       (client) => client.id === draft.clientId,
     );
-    const selectedProperty = selectedClient?.properties.find(
+    let selectedProperty = selectedClient?.properties.find(
       (property, index) =>
         (property.id || `${draft.clientId}-property-${index}`) ===
         draft.propertyId,
     );
 
     if (dataMode === "demo") {
-      const createdId = `request-${Date.now()}`;
+      if (draft.inlineClient) {
+        try {
+          const resolved = resolveDemoInlineClient(draft.inlineClient, clients);
+          selectedClient = resolved.client;
+          selectedProperty = resolved.property;
+        } catch (error) {
+          setRequestMutationError(error instanceof Error ? error.message : "Could not add the client.");
+          return;
+        }
+      }
+      if (!selectedClient || !selectedProperty) {
+        setRequestMutationError("Choose a client and service address.");
+        return;
+      }
+      const createdId = crypto.randomUUID();
+      if (draft.inlineClient) upsertClient(selectedClient);
       setJobRequests((current) => [
         {
           id: createdId,
@@ -471,7 +620,7 @@ export function ConsoleApp({
           category: formatServiceTitle(draft.category, draft.serviceDetail),
           scope: draft.scope,
           status: "New",
-          created: "05 Aug 2026",
+          created: brisbaneDateKey(),
         },
         ...current,
       ]);
@@ -501,6 +650,7 @@ export function ConsoleApp({
         setRequestMutationError(result.message);
         return;
       }
+      if (result.client) upsertClient(result.client);
       setJobRequests((current) => [result.request, ...current]);
       if (draft.questionnaireResponseId) {
         setQuestionnaireSubmissions((current) =>
@@ -517,6 +667,42 @@ export function ConsoleApp({
       setRequestMutationError(
         "The job request could not be saved. Try again.",
       );
+    } finally {
+      setRequestMutationPending(false);
+    }
+  };
+
+  const setRequestClosed = async (request: JobRequest, closed: boolean) => {
+    setRequestMutationError("");
+    if (!canManageRequests) return;
+    if (dataMode === "live" && !onSetJobRequestClosed) {
+      setRequestMutationError("Live request updates are unavailable.");
+      return;
+    }
+    try {
+      setRequestMutationPending(true);
+      if (dataMode === "live" && onSetJobRequestClosed) {
+        const result = await onSetJobRequestClosed({ id: request.id, closed });
+        if (!result.ok) {
+          setRequestMutationError(result.message);
+          return;
+        }
+        setJobRequests((current) => current.map((item) => item.id === request.id ? result.request : item));
+      } else if (closed && request.status !== "Closed" && request.status !== "Rejected") {
+        const previousStatus = request.status;
+        setJobRequests((current) => current.map((item) => item.id === request.id ? {
+          ...item, status: "Closed", previousStatus,
+        } : item));
+      } else if (!closed && request.status === "Closed") {
+        const stage = request.previousStatus ?? (jobs.some((job) => job.jobRequestId === request.id && job.status === "scheduled") ? "Scheduled" : "Qualified");
+        setJobRequests((current) => current.map((item) => item.id === request.id ? {
+          ...item, status: stage, previousStatus: null,
+        } : item));
+      }
+      setDialog(null);
+      showToast(closed ? "Job request closed." : "Job request reopened.");
+    } catch {
+      setRequestMutationError("The request could not be updated. Try again.");
     } finally {
       setRequestMutationPending(false);
     }
@@ -674,10 +860,11 @@ export function ConsoleApp({
       try {
         result = await onUpdateJob({
         id: updated.id,
+        updatedAt: previous?.updatedAt,
         status: updated.status,
         notes: updated.notes,
         recurrence: asJobRecurrence(updated.recurrence),
-        scheduledStart: scheduledStartPayload(updated),
+        scheduledStart: previous?.dateKey !== updated.dateKey ? scheduledStartPayload(updated) : undefined,
       });
       } catch {
         setOperationMutationError("A network error occurred. Please try again.");
@@ -697,7 +884,7 @@ export function ConsoleApp({
         }
         return replaced;
       });
-      setDialog({ type: "job", job: updated });
+      setDialog((current) => current?.type === "job" && current.job.id === updated.id ? { type: "job", job: updated } : current);
       showToast(
         result.nextJob
           ? `Job completed. Next ${updated.recurrence.toLowerCase()} visit booked for ${result.nextJob.date}.`
@@ -708,7 +895,7 @@ export function ConsoleApp({
     const becameComplete =
       updated.status === "completed" && previous?.status !== "completed";
     const nextJob = becameComplete
-      ? buildNextDemoJob(updated, `job-${Date.now()}`)
+      ? buildNextDemoJob(updated, crypto.randomUUID())
       : null;
     setJobs((current) => {
       const replaced = current.map((job) => (job.id === updated.id ? updated : job));
@@ -717,7 +904,7 @@ export function ConsoleApp({
       }
       return replaced;
     });
-    setDialog({ type: "job", job: updated });
+    setDialog((current) => current?.type === "job" && current.job.id === updated.id ? { type: "job", job: updated } : current);
     showToast(
       nextJob
         ? `Job completed. Next ${updated.recurrence.toLowerCase()} visit booked for ${nextJob.date}.`
@@ -853,22 +1040,87 @@ export function ConsoleApp({
 
   const moveJob = (id: string, status: JobStatus) => {
     const target = jobs.find((job) => job.id === id);
-    if (!target) {
-      setJobs((current) =>
-        current.map((job) => (job.id === id ? { ...job, status } : job)),
-      );
-      showToast(`Job moved to ${status.replace("-", " ")}.`);
-      return;
-    }
+    if (!target || operationMutationPending || target.status === status ||
+      target.status === "completed" || target.status === "cancelled") return;
     if (status === "unscheduled") {
       void updateJob(clearJobSchedule({ ...target, status: "unscheduled" }));
       return;
     }
     if (status === "scheduled" && !target.dateKey) {
-      void updateJob(applyJobSchedule(target, defaultDateTimeLocal(), "scheduled"));
+      openRecord(currentRoute, target.id, { type: "job", job: target });
       return;
     }
     void updateJob({ ...target, status });
+  };
+
+  const addJobNote = async (job: Job, noteId: string, body: string) => {
+    setOperationMutationError("");
+    try {
+      setOperationMutationPending(true);
+      let updated = job;
+      if (dataMode === "live") {
+        if (!onAddJobNote) throw new Error("Live job notes are unavailable.");
+        const result = await onAddJobNote({ jobId: job.id, noteId, body });
+        if (!result.ok) throw new Error(result.message);
+        updated = result.job;
+      } else if (!job.fieldNotes?.some((note) => note.id === noteId)) {
+        updated = { ...job, fieldNotes: [...job.fieldNotes ?? [], {
+          id: noteId, body, author: teamMembers.find((member) => member.id === actorId)?.name || "Operator",
+          created: brisbaneDateKey(),
+        }] };
+      }
+      setJobs((current) => current.map((item) => item.id === job.id ? updated : item));
+      setDialog({ type: "job", job: updated });
+      showToast("Note saved.");
+      return true;
+    } catch (error) {
+      setOperationMutationError(error instanceof Error ? error.message : "The note could not be saved.");
+      return false;
+    } finally {
+      setOperationMutationPending(false);
+    }
+  };
+
+  const quoteJobAction = (job: Job) => {
+    if (!canOperateOffice) return;
+    const quote = quotes.find((item) => item.id === job.quoteId);
+    if (quote) return {
+      label: "View quote",
+      run: () => openRecord("quotes", quote.id, { type: "quote-document", quote }),
+    };
+    if (job.status === "cancelled") return;
+    return {
+      label: "Create quote",
+      run: () => setDialog({ type: "quote-form", prefill: {
+        jobRequestId: job.jobRequestId ?? undefined,
+        clientId: job.jobRequestId ? undefined : job.clientId,
+        propertyId: job.jobRequestId ? undefined : job.serviceAddressId ?? undefined,
+        scope: job.scope,
+      } }),
+    };
+  };
+
+  const viewInvoice = (record: Invoice) => openRecord("invoices", record.id, { type: "invoice-document", record });
+  const findInvoiceForJob = (job: Job) => invoiceConflict({
+    jobId: job.id, requestId: job.jobRequestId ?? undefined, quoteId: job.quoteId ?? undefined,
+  }, invoiceRecords);
+  const invoiceJob = (job: Job) => {
+    if (!canOperateOffice || job.status !== "completed") return;
+    const existing = findInvoiceForJob(job);
+    if (existing) viewInvoice(existing);
+    else setDialog({ type: "invoice-form", job });
+  };
+
+  const requestInvoiceAction = (request: JobRequest) => {
+    if (request.status === "Rejected") return;
+    const existing = invoiceRecords.find((record) =>
+      record.documentStatus !== "Void" && !record.jobId && record.requestId === request.id);
+    if (existing) return { label: "View invoice", run: () => viewInvoice(existing) };
+    const visits = jobs.filter((job) => job.jobRequestId === request.id && job.status !== "cancelled");
+    if (visits.length) return {
+      label: "View visits", run: () => setDialog({ type: "request-visits", request }),
+    };
+    return { label: "Create invoice", run: () => setDialog({ type: "invoice-form", request }) };
   };
 
   const updateQuoteStatus = async (
@@ -920,322 +1172,200 @@ export function ConsoleApp({
     showToast(`Quote marked ${status.toLowerCase()}.`);
   };
 
-  const updateInvoicePaymentStatus = async (
-    invoiceId: string,
-    status: Invoice["paymentStatus"],
-  ) => {
+  const persistInvoicePayment = async (input: InvoicePaymentInput) => {
     setOperationMutationError("");
-    if (dataMode === "live") {
-      if (!onUpdateInvoicePayment) {
-        setOperationMutationError("Live invoice updates are not available.");
-        return;
-      }
-      setOperationMutationError("");
-      setOperationMutationPending(true);
-      let result;
-      try {
-        result = await onUpdateInvoicePayment(invoiceId, status);
-      } catch {
-        setOperationMutationError("A network error occurred. Please try again.");
-        setOperationMutationPending(false);
-        return;
-      }
-      setOperationMutationPending(false);
-      if (!result.ok) {
-        setOperationMutationError(result.message);
-        return;
-      }
-      setInvoiceRecords((current) =>
-        current.map((record) =>
-          record.id === invoiceId ? result.invoice : record,
-        ),
-      );
-      setDialog((current) =>
-        current?.type === "invoice-document" &&
-        current.record.id === invoiceId
-          ? { ...current, record: result.invoice }
-          : current,
-      );
-      showToast(`Invoice payment status set to ${status.toLowerCase()}.`);
-      return;
-    }
+    const invoice = invoiceRecords.find((record) => record.id === input.invoiceId);
+    if (!canOperateOffice || !invoice || operationMutationPending) return;
     try {
-      setInvoiceRecords((current) =>
-        current.map((record) =>
-          record.id === invoiceId ? applyInvoicePayment(record, status) : record,
-        ),
-      );
-      setDialog((current) => {
-        if (current?.type === "invoice-document" && current.record.id === invoiceId) {
-          return { ...current, record: applyInvoicePayment(current.record, status) };
-        }
-        return current;
-      });
+      setOperationMutationPending(true);
+      let saved: Invoice;
+      if (dataMode === "live") {
+        if (!onUpdateInvoicePayment) throw new Error("Live payment recording is unavailable.");
+        const result = await onUpdateInvoicePayment(input);
+        if (!result.ok) throw new Error(result.message);
+        saved = result.invoice;
+      } else {
+        saved = applyInvoicePaymentEntry(invoice, input);
+      }
+      setInvoiceRecords((current) => current.map((record) => record.id === saved.id ? saved : record));
+      setDialog({ type: "invoice-document", record: saved });
+      showToast(input.kind === "receipt" ? "Payment recorded." : "Payment correction recorded.");
     } catch (error) {
-      setOperationMutationError(
-        error instanceof OperationsRuleError
-          ? error.message
-          : "The invoice payment could not be updated.",
-      );
-      return;
+      setOperationMutationError(error instanceof Error ? error.message : "The payment could not be saved. Try again.");
+    } finally {
+      setOperationMutationPending(false);
     }
-    showToast(`Invoice payment status set to ${status.toLowerCase()}.`);
   };
-
   const persistQuote = async (draft: QuoteDraft) => {
-    if (dataMode === "demo") {
-      setQuotes((current) => {
-        if (draft.id) {
-          return current.map((quote) =>
-            quote.id === draft.id
-              ? {
-                  ...quote,
-                  jobRequestId: draft.jobRequestId,
-                  scope: draft.scope,
-                  items: draft.items,
-                  clientNotes: draft.clientNotes,
-                  internalNotes: draft.internalNotes,
-                }
-              : quote,
-          );
-        }
-        const demoDocId = `QT-2026-${1000 + current.length + 1}`;
-        return [
-          {
-            id: demoDocId,
-            documentNumber: demoDocId,
-            client: "Northside Studio",
-            address: "7 McCauley Drive, Booie",
-            issued: "05 Aug 2026",
-            expires: "19 Aug 2026",
-            validDays: 14,
-            status: "Draft",
-            discount: 0,
-            taxRate: 0,
-            ...draft,
-          },
-          ...current,
-        ];
-      });
-      setDialog(null);
+    setOperationMutationError("");
+    if (operationMutationPending) return;
+    try {
+      setOperationMutationPending(true);
+      let quote: Quote;
+      if (dataMode === "demo") {
+        const { request, client, property, createdClient } = demoWorkCustomer(draft, clients, jobRequests);
+        if (!client) throw new Error("Choose a client or job request.");
+        const stored = quotes.find((record) => record.id === draft.id);
+        if (draft.id && stored?.status !== "Draft") throw new Error("Only draft quotes can be edited.");
+        const issueDate = draft.issueDate ?? brisbaneDateKey();
+        const validUntil = draft.validUntil;
+        const id = draft.id ?? crypto.randomUUID();
+        quote = {
+          ...stored, ...draft, id, documentNumber: stored?.documentNumber,
+          clientId: client.id, client: client.name, address: property?.address ?? "",
+          serviceAddressId: property?.id, jobRequestId: request?.id,
+          status: "Draft", issueDate, validUntil,
+          issued: issueDate, expires: validUntil ?? "", validDays: validUntil
+            ? Math.round((Date.parse(validUntil) - Date.parse(issueDate)) / 86_400_000) : 0,
+          updatedAt: new Date().toISOString(),
+        };
+        if (createdClient) upsertClient(createdClient);
+      } else {
+        if (!onSaveQuote) throw new Error("Live quote saving is unavailable.");
+        const result = await onSaveQuote({
+          ...draft,
+          items: draft.items.map((item) => ({ ...item, quantity: Number(item.quantity), rate: Number(item.rate) })),
+        });
+        if (!result.ok) throw new Error(result.message);
+        if (result.client) upsertClient(result.client);
+        quote = result.quote;
+      }
+      setQuotes((current) => [quote, ...current.filter((item) => item.id !== quote.id)]);
       setActive("quotes");
       showToast(draft.id ? "Draft quote updated." : "Quote saved as draft.");
-      return;
+    } catch (error) {
+      setOperationMutationError(error instanceof Error ? error.message : "The quote could not be saved.");
+    } finally {
+      setOperationMutationPending(false);
     }
-    if (!onSaveQuote) {
-      setOperationMutationError("Live quote saving is not available.");
-      return;
-    }
-    setOperationMutationPending(true);
-    const result = await onSaveQuote({
-      ...draft,
-      items: draft.items.map((item) => ({
-        ...item,
-        quantity: Number(item.quantity),
-        rate: Number(item.rate),
-      })),
-    });
-    setOperationMutationPending(false);
-    if (!result.ok) {
-      setOperationMutationError(result.message);
-      return;
-    }
-    setQuotes((current) => {
-      const exists = current.some((quote) => quote.id === result.quote.id);
-      return exists
-        ? current.map((quote) =>
-            quote.id === result.quote.id ? result.quote : quote,
-          )
-        : [result.quote, ...current];
-    });
-    setDialog(null);
-    setActive("quotes");
-    showToast(draft.id ? "Draft quote updated." : "Quote saved as draft.");
   };
 
+  const reviseQuote = async (quote: Quote) => {
+    setOperationMutationError("");
+    try {
+      setOperationMutationPending(true);
+      let revision: Quote;
+      if (dataMode === "live") {
+        if (!onReviseQuote) throw new Error("Live quote revisions are unavailable.");
+        const result = await onReviseQuote(quote.id);
+        if (!result.ok) throw new Error(result.message);
+        revision = result.quote;
+      } else {
+        revision = {
+          ...quote, id: crypto.randomUUID(), documentNumber: undefined, status: "Draft",
+          revisionOfQuoteId: quote.id, issuerSnapshot: undefined, updatedAt: new Date().toISOString(),
+        };
+      }
+      setQuotes((current) => [revision, ...current.filter((item) => item.id !== revision.id)]);
+      openRecord("quotes", revision.id, { type: "quote-document", quote: revision });
+      showToast("Quote revision saved as a draft.");
+    } catch (error) {
+      setOperationMutationError(error instanceof Error ? error.message : "Could not create a revision.");
+    } finally {
+      setOperationMutationPending(false);
+    }
+  };
   const persistInvoice = async (draft: InvoiceDraft) => {
-    if (dataMode === "demo") {
-      const client = clients.find((item) => item.id === draft.clientId);
-      const property = client?.properties.find((item) => item.id === draft.propertyId);
-      const dueDays = Number(draft.dueDays) || 0;
-      const issuedAt = new Date();
-      const dueAt = new Date(issuedAt);
-      dueAt.setDate(dueAt.getDate() + dueDays);
-      const formatDisplay = (value: Date) =>
-        new Intl.DateTimeFormat("en-AU", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          timeZone: "Australia/Brisbane",
-        }).format(value);
-      const formatIso = (value: Date) =>
-        new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Brisbane" }).format(value);
-      setInvoiceRecords((current) => {
-        if (draft.id) {
-          return current.map((record) =>
-            record.id === draft.id
-              ? {
-                  ...record,
-                  clientId: draft.clientId,
-                  serviceAddressId: draft.propertyId,
-                  extraPropertyIds: draft.extraPropertyIds,
-                  jobId: draft.jobId,
-                  quoteId: draft.quoteId,
-                  client: client?.name || record.client,
-                  address: property?.address || record.address,
-                  notes: draft.notes,
-                  items: draft.items,
-                }
-              : record,
-          );
+    setOperationMutationError("");
+    if (!canOperateOffice || operationMutationPending) return;
+    try {
+      setOperationMutationPending(true);
+      let saved: Invoice;
+      if (dataMode === "demo") {
+        const prior = invoiceRecords.find((record) => record.id === draft.id);
+        const existing = invoiceConflict(draft, invoiceRecords);
+        if (existing) {
+          viewInvoice(existing);
+          return;
         }
-        const demoDocId = `INV-2026-${2000 + current.length + 1}`;
-        return [
-          {
-            id: demoDocId,
-            documentNumber: demoDocId,
-            clientId: draft.clientId,
-            serviceAddressId: draft.propertyId,
-            extraPropertyIds: draft.extraPropertyIds,
-            jobId: draft.jobId,
-            quoteId: draft.quoteId,
-            client: client?.name || "Client",
-            address: property?.address || "No billing address",
-            issued: formatDisplay(issuedAt),
-            due: formatDisplay(dueAt),
-            dueDate: formatIso(dueAt),
-            documentStatus: "Draft",
-            paymentStatus: "Unpaid",
-            notes: draft.notes,
-            discount: 0,
-            taxRate: 0,
-            items: draft.items,
-          },
-          ...current,
-        ];
-      });
-      setDialog(null);
+        if (draft.id && (!prior || prior.documentStatus !== "Draft" || (prior.draftVersion ?? 1) !== draft.expectedVersion)) {
+          throw new Error("This draft has changed. Open the latest version before editing.");
+        }
+        if (draft.requestId && !draft.jobId && !draft.quoteId &&
+          jobs.some((job) => job.jobRequestId === draft.requestId && job.status !== "cancelled")) {
+          throw new Error("Choose a completed visit from the request.");
+        }
+        const { client, property, createdClient } = demoWorkCustomer(draft, clients, jobRequests);
+        if (!client) throw new Error("Choose a client or add a new one.");
+        const extraProperties = client.properties.filter((item) => item.id && draft.extraPropertyIds?.includes(item.id));
+        const date = draft.issueDate ?? brisbaneDateKey();
+        const id = prior?.id ?? crypto.randomUUID();
+        saved = {
+          ...prior,
+          id, documentNumber: prior?.documentNumber, clientId: client.id,
+          serviceAddressId: property?.id, extraPropertyIds: draft.extraPropertyIds,
+          jobId: draft.jobId, quoteId: draft.quoteId, requestId: draft.requestId,
+          client: client.name, address: property?.address ?? "",
+          issued: date, issueDate: date, due: draft.dueDate ?? "", dueDate: draft.dueDate || null,
+          serviceDate: draft.serviceDate, draftVersion: (prior?.draftVersion ?? (prior ? 1 : 0)) + 1,
+          documentStatus: "Draft", paymentStatus: "Unpaid",
+          notes: draft.notes, internalNotes: draft.internalNotes, terms: draft.terms,
+          paymentInstructions: draft.paymentInstructions, billingName: draft.billingName, billingAddress: draft.billingAddress,
+          recipientName: draft.recipientName, recipientEmail: draft.recipientEmail, reference: draft.reference,
+          scope: draft.scope?.split("\n").filter(Boolean), items: draft.items,
+          serviceAddresses: [property, ...extraProperties].flatMap((site) => site ? [site.address] : []),
+          replacesInvoiceId: draft.replacesInvoiceId ?? prior?.replacesInvoiceId,
+          correctionReason: draft.correctionReason ?? prior?.correctionReason,
+        };
+        if (createdClient) upsertClient(createdClient);
+      } else {
+        if (!onSaveInvoice) throw new Error("Live invoice saving is unavailable.");
+        const result = await onSaveInvoice(invoiceDraftActionInput(draft));
+        if (!result.ok) throw new Error(result.message);
+        if (result.client) upsertClient(result.client);
+        saved = result.invoice;
+      }
+      setInvoiceRecords((current) => [saved, ...current.filter((record) => record.id !== saved.id)]);
       setActive("invoices");
       showToast(draft.id ? "Draft invoice updated." : "Invoice saved as draft.");
-      return;
+    } catch (error) {
+      setOperationMutationError(error instanceof Error ? error.message : "The invoice could not be saved.");
+    } finally {
+      setOperationMutationPending(false);
     }
-    if (!onSaveInvoice) {
-      setOperationMutationError("Live invoice saving is not available.");
-      return;
-    }
-    setOperationMutationPending(true);
-    const result = await onSaveInvoice({
-      ...draft,
-      dueDays: Number(draft.dueDays),
-      items: draft.items.map((item) => ({
-        ...item,
-        quantity: Number(item.quantity),
-        rate: Number(item.rate),
-      })),
-    });
-    setOperationMutationPending(false);
-    if (!result.ok) {
-      setOperationMutationError(result.message);
-      return;
-    }
-    setInvoiceRecords((current) => {
-      const exists = current.some((record) => record.id === result.invoice.id);
-      return exists
-        ? current.map((record) =>
-            record.id === result.invoice.id ? result.invoice : record,
-          )
-        : [result.invoice, ...current];
-    });
-    setDialog(null);
-    setActive("invoices");
-    showToast(draft.id ? "Draft invoice updated." : "Invoice saved as draft.");
   };
-
-  const persistScheduledJob = async (draft: {
-    jobRequestId: string;
-    scheduledStart: string;
-    profileIds?: string[];
-  }) => {
-    if (dataMode === "demo") {
-      const request = jobRequests.find((item) => item.id === draft.jobRequestId);
-      if (request) {
+  const persistScheduledJob = async (draft: ScheduleJobInput) => {
+    setOperationMutationError("");
+    if (operationMutationPending) return;
+    try {
+      setOperationMutationPending(true);
+      let job: Job;
+      if (dataMode === "demo") {
+        const { request, client, property, createdClient } = demoWorkCustomer(draft, clients, jobRequests);
+        const category = request?.category ?? draft.category;
+        if (!client || !property || !category) throw new Error("Choose a client, service address and service.");
         const schedule = formatBrisbaneSchedule(draft.scheduledStart);
-        const assigned = (draft.profileIds || []).map((id) => {
-          const member = teamMembers.find((item) => item.id === id);
-          return member?.name || "Team member";
-        });
-        const job: Job = {
-          id: `job-${Date.now()}`,
-          displayName: formatJobDisplayName({
-            client: request.client,
-            address: request.address,
-            category: request.category,
-            date: schedule.date,
-          }),
-          client: request.client,
-          property: request.address,
-          address: request.address,
-          category: request.category,
-          scope: request.scope,
-          date: schedule.date,
-          time: schedule.time,
-          dateKey: schedule.dateKey,
-          clientId: request.clientId,
-          serviceAddressId: request.propertyId,
-          jobRequestId: request.id,
-          status: "scheduled",
-          notes: "",
-          recurrence: "One-off",
-          assigneeIds: draft.profileIds || [],
-          assignees: assigned,
-          photos: [],
+        job = {
+          id: crypto.randomUUID(),
+          displayName: formatJobDisplayName({ client: client.name, address: property.address, category, date: schedule.date }),
+          client: client.name, property: property.name, address: property.address, category,
+          scope: request?.scope ?? draft.scope ?? "", ...schedule,
+          clientId: client.id, serviceAddressId: property.id, jobRequestId: request?.id,
+          status: "scheduled", notes: "", recurrence: "One-off", photos: [],
+          assigneeIds: draft.profileIds ?? [],
+          assignees: teamMembers.filter((member) => draft.profileIds?.includes(member.id)).map((member) => member.name),
         };
-        setJobs((current) => [...current, job]);
-        setJobRequests((current) =>
-          current.map((item) =>
-            item.id === request.id
-              ? markRequestScheduled(item, schedule.date)
-              : item,
-          ),
-        );
+        if (createdClient) upsertClient(createdClient);
+      } else {
+        if (!onScheduleJob) throw new Error("Live job scheduling is unavailable.");
+        const result = await onScheduleJob(draft);
+        if (!result.ok) throw new Error(result.message);
+        if (result.client) upsertClient(result.client);
+        job = result.job;
+      }
+      setJobs((current) => [...current.filter((item) => item.id !== job.id), job]);
+      if (draft.jobRequestId) {
+        setJobRequests((current) => current.map((item) => item.id === draft.jobRequestId
+          ? markRequestScheduled(item, job.date) : item));
       }
       setDialog(null);
       showToast("Job scheduled.");
-      return;
-    }
-    if (!onScheduleJob) {
-      setOperationMutationError("Live job scheduling is not available.");
-      return;
-    }
-    setOperationMutationPending(true);
-      let result;
-      try {
-        result = await onScheduleJob(draft);
-      } catch {
-        setOperationMutationError("A network error occurred. Please try again.");
-        setOperationMutationPending(false);
-        return;
-      }
+    } catch (error) {
+      setOperationMutationError(error instanceof Error ? error.message : "The job could not be scheduled.");
+    } finally {
       setOperationMutationPending(false);
-      if (!result.ok) {
-      setOperationMutationError(result.message);
-      return;
     }
-    setJobs((current) => [...current, result.job]);
-    setJobRequests((current) =>
-      current.map((item) =>
-        item.id === draft.jobRequestId
-          ? markRequestScheduled(
-              item,
-              formatBrisbaneSchedule(draft.scheduledStart).date,
-            )
-          : item,
-      ),
-    );
-    setDialog(null);
-    showToast("Job scheduled.");
   };
-
   const finalizeInvoice = async (record: Invoice) => {
     if (dataMode === "live") {
       if (!onFinalizeInvoice) {
@@ -1245,7 +1375,7 @@ export function ConsoleApp({
       setOperationMutationPending(true);
       let result;
       try {
-        result = await onFinalizeInvoice(record.id);
+        result = await onFinalizeInvoice(record.id, record.draftVersion ?? 1);
       } catch {
         setOperationMutationError("A network error occurred. Please try again.");
         setOperationMutationPending(false);
@@ -1270,9 +1400,12 @@ export function ConsoleApp({
       return;
     }
     try {
-      const issued = finalizeInvoiceRecord(record);
+      const issued = finalizeInvoiceRecord(record, businessDetailsState);
+      const original = invoiceRecords.find((item) => item.id === issued.replacesInvoiceId);
+      if (issued.replacesInvoiceId && !original) throw new OperationsRuleError("The original invoice is unavailable.");
+      const retired = original ? voidInvoice(original) : undefined;
       setInvoiceRecords((current) =>
-        current.map((item) => (item.id === issued.id ? issued : item)),
+        current.map((item) => item.id === issued.id ? issued : item.id === retired?.id ? retired : item),
       );
       setDialog((current) =>
         current?.type === "invoice-document" && current.record.id === record.id
@@ -1394,6 +1527,19 @@ export function ConsoleApp({
 
   const renderView = () => {
     switch (currentRoute) {
+      case "today":
+        return (
+          <TodayView
+            jobs={jobs}
+            canManage={canOperateOffice}
+            currentMemberId={actorId}
+            onJob={(job) => openRecord("today", job.id, { type: "job", job })}
+            onMove={moveJob}
+            onDraftInvoiceForJob={canOperateOffice ? invoiceJob : undefined}
+            onSchedule={canOperateOffice ? () => setDialog({ type: "schedule" }) : undefined}
+            onAllJobs={() => setActive("jobs")}
+          />
+        );
       case "clients":
         return (
           <ClientsView
@@ -1465,10 +1611,14 @@ export function ConsoleApp({
                 },
               })
             }
-            onDelete={(request) => {
-              setRequestMutationError("");
-              setDialog({ type: "delete-request", request });
+            onSetClosed={(request, closed) => {
+              if (closed) {
+                setRequestMutationError("");
+                setDialog({ type: "close-request", request });
+              } else void setRequestClosed(request, false);
             }}
+            stageError={requestMutationError}
+            invoiceAction={canOperateOffice ? requestInvoiceAction : undefined}
             canManage={canManageRequests}
           />
         );
@@ -1497,13 +1647,20 @@ export function ConsoleApp({
             quotes={quotes}
             invoices={invoiceRecords}
             onNew={() => setDialog({ type: "quote-form" })}
-            onView={(quote) => setDialog({ type: "quote-document", quote })}
+            onView={(quote) => openRecord("quotes", quote.id, { type: "quote-document", quote })}
             onEdit={(quote) =>
               setDialog({
                 type: "quote-form",
                 prefill: {
                   id: quote.id,
-                  jobRequestId: quote.jobRequestId || "",
+                  jobRequestId: quote.jobRequestId ?? undefined,
+                  clientId: quote.jobRequestId ? undefined : quote.clientId,
+                  propertyId: quote.jobRequestId ? undefined : quote.serviceAddressId ?? undefined,
+                  issueDate: quote.issueDate,
+                  validUntil: quote.validUntil,
+                  updatedAt: quote.updatedAt,
+                  reference: quote.reference,
+                  terms: quote.terms,
                   scope: quote.scope,
                   items: quote.items,
                   clientNotes: quote.clientNotes,
@@ -1522,7 +1679,7 @@ export function ConsoleApp({
             jobs={jobs}
             canSchedule={canOperateOffice}
             onSchedule={() => setDialog({ type: "schedule" })}
-            onJob={(job) => setDialog({ type: "job", job })}
+            onJob={(job) => openRecord("schedule", job.id, { type: "job", job })}
           />
         );
       case "jobs":
@@ -1532,9 +1689,13 @@ export function ConsoleApp({
             teamMembers={teamMembers}
             currentMemberId={actorId}
             preferMine={isTechnician}
-            canDelete={canOperateOffice}
-            onJob={(job) => setDialog({ type: "job", job })}
+            canManage={canOperateOffice}
+            phone={phoneLayout}
+            invoices={canOperateOffice ? invoiceRecords : []}
+            onJob={(job) => openRecord("jobs", job.id, { type: "job", job })}
             onMove={moveJob}
+            onDraftInvoiceForJob={canOperateOffice ? invoiceJob : undefined}
+            onViewInvoiceForJob={canOperateOffice ? invoiceJob : undefined}
             onDelete={(job) => setDialog({ type: "delete-job", job })}
           />
         );
@@ -1546,14 +1707,11 @@ export function ConsoleApp({
             records={invoiceRecords}
             pending={operationMutationPending}
             onNew={() => setDialog({ type: "invoice-form" })}
-            onView={(record) =>
-              setDialog({ type: "invoice-document", record })
-            }
+            onView={viewInvoice}
             onEdit={(record) =>
               setDialog({ type: "invoice-form", invoice: record })
             }
-            onPaymentStatusChange={updateInvoicePaymentStatus}
-            onFinalize={finalizeInvoice}
+            onRecordPayment={(record) => setDialog({ type: "invoice-payment", record })}
             onMarkSent={markInvoiceSentRecord}
             onVoid={voidIssuedInvoiceRecord}
             onDelete={(record) =>
@@ -1752,26 +1910,16 @@ export function ConsoleApp({
   ).length;
   const liveQuotesList = quotes.filter(isLiveQuote);
   const liveInvoicesList = invoiceRecords.filter(isLiveInvoice);
-  const actionableAlertsCount =
-    (canOperateOffice
-      ? liveInvoicesList.filter(
-          (inv) => invoiceDisplayStatus(inv) === "Overdue",
-        ).length +
-        questionnaireSubmissions.filter((sub) => !sub.jobRequestId).length +
-        liveQuotesList.filter((q) => ["Draft", "Sent"].includes(q.status))
-          .length
-      : 0) +
-    jobs.filter(
-      (job) =>
-        job.status === "on-hold" ||
-        ((job.status === "scheduled" || job.status === "in-progress") &&
-          job.assigneeIds.length === 0),
-    ).length +
-    jobRequests.filter((req) => req.status === "New").length;
+  const alerts = operationalAlerts({
+    canManage: canOperateOffice, actorId, jobs, requests: jobRequests, quotes,
+    invoices: invoiceRecords, submissions: questionnaireSubmissions,
+  });
 
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" onChangeCapture={() => {
+      if (guardedDraft) { draftDirty.current = true; currentLocation.current = window.location.href; }
+    }}>
       {dataLoadError ? (
         <div className="mx-4 mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
           {dataLoadError}
@@ -1809,7 +1957,7 @@ export function ConsoleApp({
           onClick={() => setMobileOpen(false)}
         />
       ) : null}
-      <div className="app-main">
+      <div className={phoneLayout ? "app-main app-main--field" : "app-main"}>
         <TopCommandBar
           businessDetails={businessDetailsState}
           clients={clients}
@@ -1817,7 +1965,7 @@ export function ConsoleApp({
           jobRequests={jobRequests}
           quotes={quotes}
           invoices={invoiceRecords}
-          alertCount={actionableAlertsCount}
+          alertCount={alerts.filter((item) => item.urgent).length}
           alertsOpen={alertsOpen}
           canManage={canOperateOffice}
           onOpenMobileNav={() => setMobileOpen(true)}
@@ -1825,12 +1973,12 @@ export function ConsoleApp({
           onNavigate={setActive}
           onSelectClient={(client) => {
             setSelectedClientId(client.id);
-            setActive("clients");
+            openRecord("clients", client.id);
           }}
-          onSelectJob={(job) => setDialog({ type: "job", job })}
-          onSelectQuote={(quote) => setDialog({ type: "quote-document", quote })}
+          onSelectJob={(job) => openRecord("jobs", job.id, { type: "job", job })}
+          onSelectQuote={(quote) => openRecord("quotes", quote.id, { type: "quote-document", quote })}
           onSelectInvoice={(record) =>
-            setDialog({ type: "invoice-document", record })
+            openRecord("invoices", record.id, { type: "invoice-document", record })
           }
           onNewClient={() => {
             setClientMutationError("");
@@ -1861,7 +2009,6 @@ export function ConsoleApp({
         <MobileDock
           active={currentRoute}
           menuOpen={mobileOpen}
-          canManage={canOperateOffice}
           onNavigate={(route) => {
             setActive(route);
             setMobileOpen(false);
@@ -1873,22 +2020,17 @@ export function ConsoleApp({
       <AlertsDrawer
         open={alertsOpen}
         onClose={() => setAlertsOpen(false)}
-        jobs={jobs}
-        jobRequests={jobRequests}
-        quotes={quotes}
-        invoices={invoiceRecords}
-        submissions={questionnaireSubmissions}
-        canManage={canOperateOffice}
-        onNavigate={setActive}
-        onOpenJob={(job) => setDialog({ type: "job", job })}
-        onOpenQuote={(quote) => setDialog({ type: "quote-document", quote })}
-        onOpenInvoice={(record) =>
-          setDialog({ type: "invoice-document", record })
-        }
-        onOpenSubmission={(submission) =>
-          setDialog({ type: "submission", submission })
-        }
-        onScheduleJob={() => setDialog({ type: "schedule" })}
+        items={alerts}
+        onOpen={({ target }) => {
+          setAlertsOpen(false);
+          switch (target.type) {
+            case "job": openRecord("jobs", target.record.id, { type: "job", job: target.record }); break;
+            case "invoice": openRecord("invoices", target.record.id, { type: "invoice-document", record: target.record }); break;
+            case "quote": openRecord("quotes", target.record.id, { type: "quote-document", quote: target.record }); break;
+            case "request": setActive("requests"); break;
+            case "submission": openRecord("questionnaires", target.record.id, { type: "submission", submission: target.record }); break;
+          }
+        }}
       />
 
       {dialog?.type === "estimator" ? (
@@ -1968,6 +2110,33 @@ export function ConsoleApp({
         </Dialog>
       ) : null}
 
+      {dialog?.type === "close-request" ? (
+        <Dialog title="Close job request" onClose={closeDialog}>
+          <p>Close the request for {formatSiteTitle(dialog.request)}? You can reopen it from Closed.</p>
+          {requestMutationError ? <p role="alert">{requestMutationError}</p> : null}
+          <div className="dialog-actions">
+            <Button type="button" variant="secondary" onClick={closeDialog}>Back</Button>
+            <Button type="button" disabled={requestMutationPending} onClick={() => void setRequestClosed(dialog.request, true)}>Close request</Button>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {dialog?.type === "request-visits" ? (
+        <Dialog title="Visits for this request" onClose={closeDialog}>
+          <div className="field-job-list">
+            {jobs.filter((job) => job.jobRequestId === dialog.request.id && job.status !== "cancelled").map((job) => (
+              <div key={job.id}>
+                <p>{job.displayName} · {job.status.replaceAll("-", " ")}</p>
+                <Button type="button" variant="secondary" onClick={() => openRecord("jobs", job.id, { type: "job", job })}>Open visit</Button>
+                {job.status === "completed" ? (
+                  <Button type="button" onClick={() => invoiceJob(job)}>{findInvoiceForJob(job) ? "View invoice" : "Create invoice"}</Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </Dialog>
+      ) : null}
+
       {dialog?.type === "delete-quote" ? (
         <Dialog title="Delete quote" onClose={closeDialog}>
           <ConfirmRecordDeleteDialog
@@ -2016,6 +2185,9 @@ export function ConsoleApp({
           <QuoteFormDialog
             key={dialog.prefill?.id || dialog.prefill?.jobRequestId || "new-quote"}
             requests={jobRequests}
+            clients={clients}
+            quotes={quotes}
+            invoices={invoiceRecords}
             prefill={dialog.prefill}
             onClose={closeDialog}
             onSave={persistQuote}
@@ -2029,7 +2201,9 @@ export function ConsoleApp({
       {dialog?.type === "invoice-form" ? (
         <Dialog
           title={
-            dialog.invoice
+            dialog.replacement
+              ? "Replacement invoice"
+              : dialog.invoice
               ? "Edit Invoice"
               : dialog.quote
                 ? "Invoice from quote"
@@ -2039,22 +2213,37 @@ export function ConsoleApp({
           wide
         >
           <InvoiceFormDialog
-            key={dialog.invoice?.id || dialog.quote?.id || "new-invoice"}
+            key={dialog.invoice?.id || dialog.quote?.id || dialog.job?.id || dialog.request?.id || dialog.replacement?.id || "new-invoice"}
             clients={clients}
             jobs={jobs}
+            requests={jobRequests}
+            quotes={quotes}
+            invoices={invoiceRecords}
             prefill={
-              dialog.invoice
+              dialog.replacement
+                ? draftReplacementInvoice(dialog.replacement)
+                : dialog.invoice
                 ? draftInvoiceFromRecord(dialog.invoice)
                 : dialog.quote
                   ? draftInvoiceFromQuote(dialog.quote, clients, jobs)
-                  : undefined
+                  : dialog.job
+                    ? draftInvoiceFromJob(dialog.job)
+                    : dialog.request ? draftInvoiceFromRequest(dialog.request) : undefined
             }
             sourceQuote={dialog.quote}
+            onViewExisting={viewInvoice}
             onClose={closeDialog}
             onSave={persistInvoice}
             pending={operationMutationPending}
             error={operationMutationError}
           />
+        </Dialog>
+      ) : null}
+
+      {dialog?.type === "invoice-payment" ? (
+        <Dialog title="Record payment" onClose={closeDialog}>
+          <InvoicePaymentDialog record={dialog.record} pending={operationMutationPending}
+            error={operationMutationError} onClose={closeDialog} onSave={persistInvoicePayment} />
         </Dialog>
       ) : null}
 
@@ -2083,6 +2272,7 @@ export function ConsoleApp({
         <Dialog title="Schedule Job" onClose={closeDialog} wide>
           <ScheduleFormDialog
             requests={jobRequests}
+            clients={clients}
             jobs={jobs}
             teamMembers={teamMembers}
             onClose={closeDialog}
@@ -2096,17 +2286,25 @@ export function ConsoleApp({
       {dialog?.type === "job" ? (
         <Dialog title={dialog.job.displayName} onClose={closeDialog} wide>
           <JobDetailsDialog
+            key={dialog.job.id}
             job={dialog.job}
             jobs={jobs}
             teamMembers={teamMembers}
             canAssign={canOperateOffice}
             canDelete={canOperateOffice}
+            canWork={canOperateOffice || Boolean(actorId && dialog.job.assigneeIds.includes(actorId))}
             onClose={closeDialog}
             onUpdate={updateJob}
             onAssign={(profileIds) => void assignJob(dialog.job, profileIds)}
             onUploadPhoto={(file) => void uploadPhoto(dialog.job, file)}
             onDeletePhoto={(photo) => void removePhoto(dialog.job, photo)}
             onDelete={(job) => setDialog({ type: "delete-job", job })}
+            onAddNote={(noteId, body) => addJobNote(dialog.job, noteId, body)}
+            invoiceAction={canOperateOffice && dialog.job.status === "completed" ? {
+              label: findInvoiceForJob(dialog.job) ? "View invoice" : "Create invoice",
+              run: () => invoiceJob(dialog.job),
+            } : undefined}
+            quoteAction={quoteJobAction(dialog.job)}
             pending={operationMutationPending}
             error={operationMutationError}
           />
@@ -2128,21 +2326,23 @@ export function ConsoleApp({
             onStatusChange={(status) =>
               updateQuoteStatus(dialog.quote.id, status as Quote["status"])
             }
+            onRevise={["Sent", "Accepted"].includes(dialog.quote.status) ? () => void reviseQuote(dialog.quote) : undefined}
             onCreateInvoice={
               canCreateInvoiceFromQuote(dialog.quote) &&
-              !liveInvoiceForQuote(dialog.quote, invoiceRecords)
+              !liveInvoiceForQuote(dialog.quote, invoiceRecords, jobs)
                 ? () => setDialog({ type: "invoice-form", quote: dialog.quote })
                 : undefined
             }
             onViewInvoice={
-              liveInvoiceForQuote(dialog.quote, invoiceRecords)
+              liveInvoiceForQuote(dialog.quote, invoiceRecords, jobs)
                 ? () => {
                     const existing = liveInvoiceForQuote(
                       dialog.quote,
                       invoiceRecords,
+                      jobs,
                     );
                     if (existing) {
-                      setDialog({ type: "invoice-document", record: existing });
+                      viewInvoice(existing);
                     }
                   }
                 : undefined
@@ -2154,7 +2354,14 @@ export function ConsoleApp({
                       type: "quote-form",
                       prefill: {
                         id: dialog.quote.id,
-                        jobRequestId: dialog.quote.jobRequestId || "",
+                        jobRequestId: dialog.quote.jobRequestId ?? undefined,
+                        clientId: dialog.quote.jobRequestId ? undefined : dialog.quote.clientId,
+                        propertyId: dialog.quote.jobRequestId ? undefined : dialog.quote.serviceAddressId ?? undefined,
+                        issueDate: dialog.quote.issueDate,
+                        validUntil: dialog.quote.validUntil,
+                        updatedAt: dialog.quote.updatedAt,
+                        reference: dialog.quote.reference,
+                        terms: dialog.quote.terms,
                         scope: dialog.quote.scope,
                         items: dialog.quote.items,
                         clientNotes: dialog.quote.clientNotes,
@@ -2179,12 +2386,8 @@ export function ConsoleApp({
             record={dialog.record}
             profile={businessDetailsState}
             onClose={closeDialog}
-            onStatusChange={(status) =>
-              updateInvoicePaymentStatus(
-                dialog.record.id,
-                status as Invoice["paymentStatus"],
-              )
-            }
+            onRecordPayment={() => setDialog({ type: "invoice-payment", record: dialog.record })}
+            onReplace={() => setDialog({ type: "invoice-form", replacement: dialog.record })}
             onFinalize={() => void finalizeInvoice(dialog.record)}
             onMarkSent={() => void markInvoiceSentRecord(dialog.record)}
             onVoid={() => void voidIssuedInvoiceRecord(dialog.record)}

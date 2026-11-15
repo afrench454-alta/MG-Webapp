@@ -186,7 +186,9 @@ test("contracts: invoiceDraftSchema validates single and multi-property invoices
   const validInvoice = {
     clientId: VALID_UUID,
     propertyId: ANOTHER_UUID,
-    dueDays: 7,
+    idempotencyKey: ANOTHER_UUID,
+    issueDate: "2026-08-21",
+    dueDate: "2026-08-28",
     notes: "Payment due upon completion",
     items: [
       { description: "Mowing & Edging", quantity: 1, rate: 120 },
@@ -205,6 +207,7 @@ test("contracts: invoiceDraftSchema validates single and multi-property invoices
   const editableDraft = invoiceDraftSchema.safeParse({
     ...validInvoice,
     id: VALID_UUID,
+    expectedVersion: 1,
   });
   assert.equal(editableDraft.success, true);
 });

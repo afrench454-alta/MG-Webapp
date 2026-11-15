@@ -4,12 +4,14 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Save } from "lucide-react";
 import type { Client, JobRequestDraft } from "../domain";
+import type { InlineClientInput } from "../data/inline-client";
 import {
   detailsForCategory,
   serviceCatalog,
   summarizeServiceCategory,
 } from "../data/service-catalog";
 import { Button, Field } from "../components/ui-elements";
+import { InlineClientFields } from "../components/inline-client-fields";
 
 export function RequestFormDialog({
   clients,
@@ -27,6 +29,7 @@ export function RequestFormDialog({
   error?: string;
 }) {
   const [clientId, setClientId] = useState(prefill?.clientId || "");
+  const [inlineClient, setInlineClient] = useState<InlineClientInput | undefined>(prefill?.inlineClient);
   const selectedClient = clients.find((client) => client.id === clientId);
   const [propertyId, setPropertyId] = useState(
     prefill?.propertyId || selectedClient?.properties[0]?.id || "",
@@ -37,13 +40,19 @@ export function RequestFormDialog({
   const [serviceDetail, setServiceDetail] = useState(prefill?.serviceDetail || "");
   const [scope, setScope] = useState(prefill?.scope || "");
   const details = detailsForCategory(category);
+  const selectClient = (client: Client | undefined) => {
+    setClientId(client?.id || "");
+    setPropertyId(client?.properties[0]?.id || "");
+    setInlineClient(undefined);
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!clientId || !propertyId || !scope) return;
+    if ((!inlineClient && (!clientId || !propertyId)) || !scope.trim()) return;
     void onSave({
-      clientId,
-      propertyId,
+      clientId: inlineClient ? undefined : clientId,
+      propertyId: inlineClient ? undefined : propertyId,
+      inlineClient,
       category,
       serviceDetail: serviceDetail || undefined,
       scope,
@@ -53,17 +62,12 @@ export function RequestFormDialog({
 
   return (
     <form className="form-stack" onSubmit={submit} aria-busy={pending}>
+      <fieldset className="form-stack" disabled={pending}>
+      {!inlineClient ? <>
       <Field label="Client" required>
         <select
           value={clientId}
-          onChange={(event) => {
-            const nextClientId = event.target.value;
-            const nextClient = clients.find(
-              (client) => client.id === nextClientId,
-            );
-            setClientId(nextClientId);
-            setPropertyId(nextClient?.properties[0]?.id || "");
-          }}
+          onChange={(event) => selectClient(clients.find((client) => client.id === event.target.value))}
           required
           disabled={pending}
         >
@@ -75,6 +79,9 @@ export function RequestFormDialog({
           ))}
         </select>
       </Field>
+      </> : null}
+      <InlineClientFields value={inlineClient} onChange={setInlineClient} requireSite clients={clients} onSelectExisting={selectClient} />
+      </fieldset>
       <Field label="Property" required>
         <select
           value={propertyId}
@@ -132,7 +139,7 @@ export function RequestFormDialog({
           </select>
         </Field>
       </div>
-      <Field label="Scope summary" required>
+      <Field label="Job Request" required>
         <textarea
           rows={4}
           value={scope}

@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useMemo, memo } from "react";
-import type { ChangeEvent } from "react";
-import { Ban, Check, ChevronDown, Eye, Pencil, Plus, Search, Send, Trash2, FileCheck2 } from "lucide-react";
-import { money, quoteTotals, type Invoice } from "../domain";
+import { Ban, DollarSign, Eye, Pencil, Plus, Search, Send, Trash2, FileCheck2 } from "lucide-react";
+import { money, type Invoice } from "../domain";
 import {
-  allowedPaymentStatuses,
+  availableInvoiceReceipts,
   canDeleteInvoice,
   canFinalizeInvoice,
-  canMarkPaid,
+  canRecordPayment,
   canMarkSent,
   canVoidInvoice,
+  invoiceAmounts,
   invoiceDisplayStatus,
 } from "../data/invoice-lifecycle";
 import {
@@ -36,8 +36,7 @@ const InvoiceRow = memo(function InvoiceRow({
   pending,
   onView,
   onEdit,
-  onPaymentStatusChange,
-  onFinalize,
+  onRecordPayment,
   onMarkSent,
   onVoid,
   onDelete,
@@ -46,22 +45,15 @@ const InvoiceRow = memo(function InvoiceRow({
   pending: boolean;
   onView: (record: Invoice) => void;
   onEdit: (record: Invoice) => void;
-  onPaymentStatusChange: (id: string, status: Invoice["paymentStatus"]) => void;
-  onFinalize: (record: Invoice) => void;
+  onRecordPayment: (record: Invoice) => void;
   onMarkSent: (record: Invoice) => void;
   onVoid: (record: Invoice) => void;
   onDelete: (record: Invoice) => void;
 }) {
-  const totals = quoteTotals(record.items);
+  const { total, amountPaid, balanceDue } = invoiceAmounts(record);
   const display = invoiceDisplayStatus(record);
-  const paymentOptions = allowedPaymentStatuses(record);
-
-  const handlePaymentChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    onPaymentStatusChange(
-      record.id,
-      event.target.value as Invoice["paymentStatus"],
-    );
-  };
+  const canCollect = canRecordPayment(record);
+  const canCorrect = availableInvoiceReceipts(record).length > 0;
 
   return (
     <article className="record-row">
@@ -71,41 +63,20 @@ const InvoiceRow = memo(function InvoiceRow({
           <Badge tone={invoiceDisplayTone(display)}>{display}</Badge>
         </div>
         <strong className="record-client">{formatSiteTitle(record)}</strong>
-        <p>
-          Issued {record.issued} · Due {record.due}
-        </p>
+        <p>{record.documentStatus === "Draft" ? "Issue date" : "Issued"} {record.issued} · Due {record.due}</p>
+        {record.duplicateSource ? <p>Shared work link · Review historical invoices</p> : null}
       </div>
       <div className="record-row__actions">
         <div className="amount-block">
-          <strong>{money(totals.total)}</strong>
-          <small>NO GST</small>
+          <strong>{money(total)}</strong>
+          {record.documentStatus !== "Draft" && record.documentStatus !== "Void" ? (
+            <small>Received {money(amountPaid)} · Balance {money(balanceDue)}</small>
+          ) : null}
         </div>
-        {paymentOptions.length ? (
-          <label className="compact-select">
-            <span className="sr-only">
-              Payment status for {record.documentNumber || record.id}
-            </span>
-            <select
-              aria-label={`Payment status for ${record.documentNumber || record.id}`}
-              value={record.paymentStatus}
-              onChange={handlePaymentChange}
-              disabled={pending}
-            >
-              {paymentOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </label>
-        ) : (
-          <span className="record-payment-locked">{record.paymentStatus}</span>
-        )}
         <Button variant="secondary" icon={Eye} onClick={() => onView(record)} disabled={pending}>
           View
         </Button>
-        {canDeleteInvoice(record) ? (
+        {canFinalizeInvoice(record) ? (
           <Button
             variant="secondary"
             icon={Pencil}
@@ -115,19 +86,14 @@ const InvoiceRow = memo(function InvoiceRow({
             Edit
           </Button>
         ) : null}
-        {canMarkPaid(record) ? (
-          <Button
-            variant="primary"
-            icon={Check}
-            onClick={() => onPaymentStatusChange(record.id, "Paid")}
-            disabled={pending}
-          >
-            Mark paid
+        {canCollect || canCorrect ? (
+          <Button icon={DollarSign} onClick={() => onRecordPayment(record)} disabled={pending}>
+            {canCollect ? "Record payment" : "Correct payment"}
           </Button>
         ) : null}
         {canFinalizeInvoice(record) ? (
-          <Button variant="secondary" icon={FileCheck2} onClick={() => onFinalize(record)} disabled={pending}>
-            Issue
+          <Button variant="secondary" icon={FileCheck2} onClick={() => onView(record)} disabled={pending}>
+            Review draft
           </Button>
         ) : null}
         {canMarkSent(record) ? (
@@ -160,8 +126,7 @@ export function InvoicesView({
   onNew,
   onView,
   onEdit,
-  onPaymentStatusChange,
-  onFinalize,
+  onRecordPayment,
   onMarkSent,
   onVoid,
   onDelete,
@@ -171,11 +136,7 @@ export function InvoicesView({
   onNew: () => void;
   onView: (record: Invoice) => void;
   onEdit: (record: Invoice) => void;
-  onPaymentStatusChange: (
-    invoiceId: string,
-    status: Invoice["paymentStatus"],
-  ) => void;
-  onFinalize: (record: Invoice) => void;
+  onRecordPayment: (record: Invoice) => void;
   onMarkSent: (record: Invoice) => void;
   onVoid: (record: Invoice) => void;
   onDelete: (record: Invoice) => void;
@@ -208,22 +169,13 @@ export function InvoicesView({
 
   const outstanding = useMemo(() => {
     return records
-      .filter((record) => matchesInvoiceFilter(record, "open"))
-      .reduce(
-        (sum, record) =>
-          sum + quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0).total,
-        0,
-      );
+      .filter((record) => record.documentStatus !== "Draft" && record.documentStatus !== "Void")
+      .reduce((sum, record) => sum + invoiceAmounts(record).balanceDue, 0);
   }, [records]);
 
   const paid = useMemo(() => {
     return records
-      .filter((record) => invoiceDisplayStatus(record) === "Paid")
-      .reduce(
-        (sum, record) =>
-          sum + quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0).total,
-        0,
-      );
+      .reduce((sum, record) => sum + invoiceAmounts(record).amountPaid, 0);
   }, [records]);
 
   return (
@@ -231,14 +183,14 @@ export function InvoicesView({
       <PageHeader
         eyebrow="Billing"
         title="Invoices"
-        subtitle="Mark paid records a payment and issues a draft in one step. Void unpaid issued invoices. Delete drafts only."
+        subtitle="Create drafts, issue invoices and record payments received."
       >
         <div className="billing-summary">
           <span>
             Outstanding: <strong>{money(outstanding)}</strong>
           </span>
           <span>
-            Paid: <strong className="success-text">{money(paid)}</strong>
+            Received: <strong className="success-text">{money(paid)}</strong>
           </span>
         </div>
         <Button icon={Plus} onClick={onNew} disabled={pending}>
@@ -277,8 +229,7 @@ export function InvoicesView({
             pending={pending}
             onView={onView}
             onEdit={onEdit}
-            onPaymentStatusChange={onPaymentStatusChange}
-            onFinalize={onFinalize}
+            onRecordPayment={onRecordPayment}
             onMarkSent={onMarkSent}
             onVoid={onVoid}
             onDelete={onDelete}

@@ -28,12 +28,16 @@ export function JobDetailsDialog({
   teamMembers,
   canAssign = true,
   canDelete = true,
+  canWork = true,
   onClose,
   onUpdate,
   onAssign,
   onUploadPhoto,
   onDeletePhoto,
   onDelete,
+  onAddNote,
+  invoiceAction,
+  quoteAction,
   pending,
   error,
 }: {
@@ -42,47 +46,61 @@ export function JobDetailsDialog({
   teamMembers: TeamMember[];
   canAssign?: boolean;
   canDelete?: boolean;
+  canWork?: boolean;
   onClose: () => void;
   onUpdate: (job: Job) => void;
   onAssign: (profileIds: string[]) => void;
   onUploadPhoto: (file: File) => void;
   onDeletePhoto: (photo: JobPhoto) => void;
   onDelete: (job: Job) => void;
+  onAddNote?: (noteId: string, body: string) => Promise<boolean>;
+  invoiceAction?: { label: string; run: () => void };
+  quoteAction?: { label: string; run: () => void };
   pending: boolean;
   error: string;
 }) {
-  const [notes, setNotes] = useState(job.notes || "");
-  const [recurrence, setRecurrence] = useState(job.recurrence || "One-off");
-  const [assigneeIds, setAssigneeIds] = useState(job.assigneeIds || []);
+  const [fieldNote, setFieldNote] = useState("");
+  const [noteId, setNoteId] = useState<string>();
+  const assigneeIds = job.assigneeIds;
+  const active = job.status !== "completed" && job.status !== "cancelled";
+  const canStart = canWork && active && job.status !== "in-progress";
+  const canHold = canWork && active && (canAssign || job.status === "in-progress") && job.status !== "on-hold";
+  const canComplete = canWork && active && (canAssign || ["in-progress", "on-hold"].includes(job.status));
 
-  const canReschedule =
-    canAssign && job.status !== "completed" && job.status !== "cancelled";
-
-  const snapshot = { ...job, notes, recurrence };
+  const canReschedule = canAssign && active;
 
   const updateStatus = (status: JobStatus) =>
     onUpdate(
       status === "unscheduled"
-        ? clearJobSchedule({ ...snapshot, status: "unscheduled" })
-        : { ...snapshot, status },
+        ? clearJobSchedule({ ...job, status: "unscheduled" })
+        : { ...job, status },
     );
 
   const persistSchedule = (dateKey: string) => {
     if (!dateKey) {
-      onUpdate(clearJobSchedule(snapshot));
+      onUpdate(clearJobSchedule(job));
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateKey)) return;
     if (dateKey === job.dateKey && job.status !== "unscheduled") return;
-    onUpdate(applyJobSchedule(snapshot, dateKey));
+    onUpdate(applyJobSchedule(job, dateKey));
   };
 
   const toggleAssignee = (profileId: string) => {
     const next = assigneeIds.includes(profileId)
       ? assigneeIds.filter((id) => id !== profileId)
       : [...assigneeIds, profileId];
-    setAssigneeIds(next);
     onAssign(next);
+  };
+
+  const saveNote = async () => {
+    if (!onAddNote || !fieldNote.trim()) return;
+    const id = noteId ?? crypto.randomUUID();
+    setNoteId(id);
+    if (await onAddNote(id, fieldNote.trim())) {
+      setFieldNote("");
+      setNoteId(undefined);
+    }
   };
 
   const serviceType = displayServiceDetail(job.category);
@@ -145,7 +163,7 @@ export function JobDetailsDialog({
                 variant="secondary"
                 type="button"
                 icon={CalendarOff}
-                onClick={() => onUpdate(clearJobSchedule(snapshot))}
+                onClick={() => onUpdate(clearJobSchedule(job))}
                 disabled={pending}
               >
                 Clear from calendar
@@ -155,33 +173,32 @@ export function JobDetailsDialog({
         </div>
       ) : null}
       <div className="status-actions">
-        <Button icon={PlayCircle} onClick={() => updateStatus("in-progress")}>
-          Start
-        </Button>
-        <Button
-          variant="secondary"
-          icon={PauseCircle}
-          onClick={() => updateStatus("on-hold")}
-        >
-          Hold
-        </Button>
-        <Button
-          variant="success"
-          icon={CheckCircle2}
-          onClick={() => updateStatus("completed")}
-        >
-          Complete
-        </Button>
+        {canStart ? <Button icon={PlayCircle} disabled={pending} onClick={() => updateStatus("in-progress")}>Start</Button> : null}
+        {canHold ? <Button variant="secondary" icon={PauseCircle} disabled={pending} onClick={() => updateStatus("on-hold")}>Hold</Button> : null}
+        {canComplete ? <Button variant="success" icon={CheckCircle2} disabled={pending} onClick={() => updateStatus("completed")}>Complete</Button> : null}
+        {canAssign && active ? (
+          <Button variant="secondary" disabled={pending} onClick={() => {
+            if (window.confirm("Cancel this job? Its history will be kept.")) updateStatus("cancelled");
+          }}>Cancel job</Button>
+        ) : null}
+        {invoiceAction ? <Button disabled={pending} onClick={invoiceAction.run}>{invoiceAction.label}</Button> : null}
+        {quoteAction ? <Button variant="secondary" disabled={pending} onClick={quoteAction.run}>{quoteAction.label}</Button> : null}
       </div>
-      <Field label="On-site notes">
-        <textarea
-          rows={6}
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          onBlur={() => onUpdate({ ...job, notes, recurrence })}
-        />
-      </Field>
-      {canAssign ? (
+      {job.notes ? <p className="muted-copy">{job.notes}</p> : null}
+      {job.fieldNotes?.length ? (
+        <ul className="field-notes" aria-label="On-site notes">
+          {job.fieldNotes.map((note) => <li key={note.id}><p>{note.body}</p><small>{note.author} · {note.created}</small></li>)}
+        </ul>
+      ) : null}
+      {canWork && onAddNote ? (
+        <>
+          <Field label="On-site note">
+            <textarea rows={3} value={fieldNote} onChange={(event) => { setFieldNote(event.target.value); setNoteId(undefined); }} disabled={pending} />
+          </Field>
+          <Button variant="secondary" type="button" disabled={!fieldNote.trim() || pending} onClick={() => void saveNote()}>Save note</Button>
+        </>
+      ) : null}
+      {canAssign && active ? (
       <section className="assignment-section">
         <div>
           <p className="eyebrow">Assigned team</p>
@@ -239,15 +256,15 @@ export function JobDetailsDialog({
             : "This job is unassigned."}
         </p>
       )}
-      {canAssign ? (
+      {canAssign && active ? (
       <div className="recurrence-row">
         <RotateCcw aria-hidden="true" size={18} />
         <Field label="Recurring">
           <select
-            value={recurrence}
+            value={job.recurrence || "One-off"}
+            disabled={pending}
             onChange={(event) => {
-              setRecurrence(event.target.value);
-              onUpdate({ ...job, notes, recurrence: event.target.value });
+              onUpdate({ ...job, recurrence: event.target.value });
             }}
           >
             <option>One-off</option>
@@ -269,7 +286,7 @@ export function JobDetailsDialog({
               : "No photos yet."}
           </em>
         </div>
-        <label className="photo-upload">
+        {canWork ? <label className="photo-upload">
           <Camera aria-hidden="true" size={19} />{" "}
           {pending ? "Uploading…" : "Add photo"}
           <input
@@ -282,7 +299,7 @@ export function JobDetailsDialog({
               event.target.value = "";
             }}
           />
-        </label>
+        </label> : null}
       </div>
       {job.photos.length ? (
         <div className="photo-grid">
@@ -299,13 +316,13 @@ export function JobDetailsDialog({
               </a>
               <div>
                 <span>{photo.caption || photo.name}</span>
-                <IconButton
+                {canWork ? <IconButton
                   label={`Delete ${photo.name}`}
                   icon={Trash2}
                   tone="danger"
                   onClick={() => onDeletePhoto(photo)}
                   disabled={pending}
-                />
+                /> : null}
               </div>
             </article>
           ))}
@@ -317,7 +334,7 @@ export function JobDetailsDialog({
         </p>
       ) : null}
       <div className="dialog-actions dialog-actions--split">
-        {canDelete ? (
+        {canDelete && job.status === "scheduled" && !job.notes.trim() && !job.photos.length && !job.fieldNotes?.length ? (
           <Button
             variant="danger"
             icon={Trash2}

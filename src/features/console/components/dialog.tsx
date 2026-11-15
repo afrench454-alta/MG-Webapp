@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useId, useRef } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { IconButton } from "./ui-elements";
+import { useModalFocus } from "./use-modal-focus";
 
 export type DialogProps = {
   title: string;
@@ -16,88 +17,32 @@ export type DialogProps = {
 };
 
 export function Dialog({
-  title,
-  titleIcon: TitleIcon,
-  onClose,
-  children,
-  wide = false,
-  document: isDocument = false,
+  title, titleIcon: TitleIcon, onClose, children, wide = false, document: isDocument = false,
 }: DialogProps) {
-  const panelRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
-
-      // Accessible Focus Trap within dialog
-      if (event.key === "Tab" && panelRef.current) {
-        const focusable = panelRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-        if (focusable.length > 0) {
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }
-      }
-    };
-
-    window.addEventListener("keydown", onKey);
-
-    // Initial focus on first input/button
-    const firstInteractive = panelRef.current?.querySelector<HTMLElement>(
-      "input, select, textarea, button",
-    );
-    firstInteractive?.focus();
-
-    // Prevent background scroll
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-      previous?.focus?.();
-    };
-  }, [onClose]);
+  const panel = useRef<HTMLElement>(null);
+  const titleId = useId();
+  useModalFocus(panel, true, onClose);
 
   return (
-    <div
-      className="dialog-backdrop"
-      onMouseDown={(event: MouseEvent<HTMLDivElement>) =>
-        event.target === event.currentTarget && onClose()
-      }
-      role="presentation"
-    >
+    <div className="dialog-backdrop" onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
       <section
         className={`dialog ${wide ? "dialog--wide" : ""} ${isDocument ? "dialog--document" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="dialog-title"
-        ref={panelRef}
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        ref={panel}
       >
         <div className="dialog__accent" aria-hidden="true" />
         <div className="dialog__header">
-          <h2 id="dialog-title">
+          <h2 id={titleId}>
             {TitleIcon ? <TitleIcon aria-hidden="true" size={19} /> : null}
             {title}
           </h2>
           <div className="dialog__header-controls">
-            <kbd className="dialog__esc-pill" aria-hidden="true">
-              ESC
-            </kbd>
+            <kbd className="dialog__esc-pill" aria-hidden="true">ESC</kbd>
             <IconButton label="Close dialog" icon={X} onClick={onClose} />
           </div>
         </div>

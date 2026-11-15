@@ -215,3 +215,55 @@ html[data-phone="true"] .dialog {
     transform: none;
   }
 }
+/* Field lists share the job card with the desktop board. */
+.field-job-list {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-block: 16px 24px;
+}
+
+.field-job-list .job-card,
+.field-job-list .job-card__open {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.field-job-list .job-card__open {
+  padding: 12px;
+}
+
+.field-job-list .job-card__field-footer {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.field-job-list .job-card__action-btn,
+.field-job-list .job-card__map-link,
+.job-status-filter select {
+  min-height: 44px;
+}
+
+.job-status-filter {
+  display: grid;
+  gap: 4px;
+}
+
+.job-status-filter select {
+  max-width: 100%;
+}
+
+.app-main--field .top-command-bar__quick-wrap {
+  display: none;
+}
+
+.inline-client-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.inline-client-fields__matches {
+  display: grid;
+  gap: 8px;
+}

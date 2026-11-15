@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MapPin, Plus, ReceiptText, Search, Trash2 } from "lucide-react";
+import { MapPin, Plus, ReceiptText, Search } from "lucide-react";
 import type { JobRequest } from "../domain";
 import {
   countMatching,
@@ -16,7 +16,6 @@ import {
   Button,
   EmptyState,
   FilterGroup,
-  IconButton,
   matchesText,
   PageHeader,
 } from "../components/ui-elements";
@@ -25,13 +24,18 @@ export function RequestsView({
   requests,
   onCreate,
   onQuote,
-  onDelete,
+  onSetClosed,
+  stageError,
+  invoiceAction,
   canManage,
 }: {
   requests: JobRequest[];
   onCreate: () => void;
   onQuote: (request: JobRequest) => void;
-  onDelete: (request: JobRequest) => void;
+  onDelete?: (request: JobRequest) => void;
+  onSetClosed?: (request: JobRequest, closed: boolean) => void;
+  stageError?: string;
+  invoiceAction?: (request: JobRequest) => { label: string; run: () => void } | undefined;
   canManage: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -59,7 +63,6 @@ export function RequestsView({
       <PageHeader
         eyebrow="Intake"
         title="Job Requests"
-        subtitle="Each request is a client at a property — not just a service type."
       >
         {canManage ? (
           <Button icon={Plus} onClick={onCreate}>
@@ -91,9 +94,11 @@ export function RequestsView({
           />
         </div>
       </section>
+      {stageError ? <p className="form-error" role="alert">{stageError}</p> : null}
       {visible.length ? (
         visible.map((request) => {
           const serviceType = displayServiceDetail(request.category);
+          const invoice = invoiceAction?.(request);
           return (
           <article className="request-card" key={request.id}>
             <div className="request-card__main">
@@ -106,7 +111,7 @@ export function RequestsView({
               <p className="location-line">
                 <MapPin aria-hidden="true" size={17} /> {request.address}
               </p>
-              <p className="request-scope">{request.scope}</p>
+              <p className="request-scope"><strong>Job Request</strong><br />{request.scope}</p>
               <p className="request-dates">
                 Created {request.created}
                 {request.scheduled ? ` · Scheduled ${request.scheduled}` : ""}
@@ -116,19 +121,17 @@ export function RequestsView({
             <div className="request-card__actions">
               {canManage ? (
                 <>
-              <Button
-                variant="secondary"
-                icon={ReceiptText}
-                onClick={() => onQuote(request)}
-              >
-                Create quote
-              </Button>
-                <IconButton
-                  label={`Delete request for ${formatSiteTitle(request)}`}
-                  icon={Trash2}
-                  tone="danger"
-                  onClick={() => onDelete(request)}
-                />
+                  {invoice ? <Button variant="secondary" onClick={invoice.run}>{invoice.label}</Button> : null}
+                  {request.status !== "Closed" && request.status !== "Rejected" ? (
+                    <Button variant="secondary" icon={ReceiptText} onClick={() => onQuote(request)}>
+                      Create quote
+                    </Button>
+                  ) : null}
+                  {onSetClosed && request.status !== "Rejected" ? (
+                    <Button variant="secondary" onClick={() => onSetClosed(request, request.status !== "Closed")}>
+                      {request.status === "Closed" ? "Reopen request" : "Close request"}
+                    </Button>
+                  ) : null}
                 </>
               ) : null}
             </div>

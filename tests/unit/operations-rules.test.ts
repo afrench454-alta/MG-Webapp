@@ -2,14 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { Invoice, Job } from "../../src/features/console/domain";
-import type { InvoiceDraftInput } from "../../src/features/console/data/operations-contract";
+import { invoiceDraftSchema, type InvoiceDraftInput } from "../../src/features/console/data/operations-contract";
 import {
   assertInvoiceCanBeDeleted,
   assertInvoiceCanBeEdited,
   assertJobCanBeDeleted,
   assertPaymentCanUpdate,
   assertQuoteCanBeEdited,
-  invoiceCreateRpcArgs,
+
 } from "../../src/features/console/data/operations-rules";
 
 const VALID_CLIENT = "123e4567-e89b-12d3-a456-426614174000";
@@ -123,38 +123,29 @@ test("assertPaymentCanUpdate refuses to revive voided invoices", () => {
   );
 });
 
-test("invoiceCreateRpcArgs maps primary property, extras, GST-free line items", () => {
+test("invoice draft accepts no service site and preserves canonical dates and different note fields", () => {
   const input: InvoiceDraftInput = {
     clientId: VALID_CLIENT,
-    propertyId: VALID_PROPERTY,
-    extraPropertyIds: [EXTRA_PROPERTY, VALID_PROPERTY],
-    jobId: VALID_JOB,
-    dueDays: 7,
-    notes: "Due on completion",
-    items: [{ description: "Mowing", quantity: 2, rate: 90 }],
+    idempotencyKey: VALID_JOB,
+    issueDate: "2026-08-05",
+    dueDate: "2026-09-04",
+    serviceDate: "2026-08-04",
+    scope: "Yard cleanup",
+    notes: "Visible",
+    internalNotes: "Internal",
+    terms: "Net 30",
+    items: [{ label: "Front garden", unitLabel: "hour", description: "Mowing", quantity: 1.125, rate: 90.25 }],
   };
-
-  const args = invoiceCreateRpcArgs(input);
-  assert.equal(args.target_client_id, VALID_CLIENT);
-  assert.equal(args.primary_address_id, VALID_PROPERTY);
-  assert.deepEqual(args.service_address_ids, [EXTRA_PROPERTY]);
-  assert.equal(args.target_job_id, VALID_JOB);
-  assert.equal(args.due_days, 7);
-  assert.equal(args.invoice_notes, "Due on completion");
-  assert.deepEqual(args.invoice_items, [
-    { description: "Mowing", quantity: 2, rate: 90 },
-  ]);
+  assert.deepEqual(invoiceDraftSchema.parse(input), input);
 });
 
-test("invoiceCreateRpcArgs omits job id when not set", () => {
-  const input: InvoiceDraftInput = {
-    clientId: VALID_CLIENT,
-    propertyId: VALID_PROPERTY,
-    dueDays: 0,
-    notes: "",
-    items: [{ description: "Call-out", quantity: 1, rate: 50 }],
+test("invoice draft refuses impossible dates, fractional cent rates, and stale draft shapes", () => {
+  const base: InvoiceDraftInput = {
+    clientId: VALID_CLIENT, propertyId: VALID_PROPERTY, extraPropertyIds: [EXTRA_PROPERTY],
+    idempotencyKey: VALID_JOB, issueDate: "2026-08-05", notes: "",
+    items: [{ description: "Mowing", quantity: 2, rate: 90 }],
   };
-  const args = invoiceCreateRpcArgs(input);
-  assert.equal(args.target_job_id, null);
-  assert.deepEqual(args.service_address_ids, []);
+  assert.equal(invoiceDraftSchema.safeParse({ ...base, dueDate: "2026-08-04" }).success, false);
+  assert.equal(invoiceDraftSchema.safeParse({ ...base, items: [{ ...base.items[0], rate: 99.999 }] }).success, false);
+  assert.equal(invoiceDraftSchema.safeParse({ ...base, id: VALID_JOB }).success, false);
 });

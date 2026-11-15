@@ -68,18 +68,29 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Invoices" }).click();
     await expect(page.getByRole("heading", { name: "Invoices" })).toBeVisible();
     await expect(page.getByText("Outstanding:")).toBeVisible();
-    await expect(page.getByText("Paid:")).toBeVisible();
+    await expect(page.getByText("Received:")).toBeVisible();
   });
 
   test("tests invoice lifecycle: finalize draft and status updates", async ({ page }) => {
-    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Invoices" }).click();
-    
-    // Find the first draft invoice's finalize button
-    const issueBtn = page.getByRole("button", { name: "Issue" }).first();
-    if (await issueBtn.isVisible()) {
-      await issueBtn.click();
-      await expect(page.getByText("Invoice issued.")).toBeVisible();
-    }
+    await page.goto("/?demo=populated&view=invoices");
+    await page.getByRole("button", { name: "Review draft" }).click();
+    const issueBtn = page.getByRole("button", { name: "Issue", exact: true });
+    await expect(issueBtn).toBeVisible();
+    await issueBtn.click();
+    await expect(page.getByText("Invoice issued.")).toBeVisible();
+  });
+
+  test("only counts urgent alerts among 51 items and clears a resolved job", async ({ page }) => {
+    await page.goto("/?demo=populated&view=jobs");
+    const alertButton = page.getByRole("button", { name: "Operational alerts" });
+    await expect(alertButton).toHaveText("1");
+    await alertButton.click();
+    await expect(page.getByRole("heading", { name: "Operational alerts (51)" })).toBeVisible();
+    await page.getByRole("button", { name: "Open job", exact: true }).click();
+    await page.getByRole("button", { name: "Close dialog" }).click();
+    const pausedCard = page.getByRole("article").filter({ hasText: "Demo on hold customer" });
+    await pausedCard.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(alertButton).toHaveText("");
   });
 
   test("tests questionnaire intake with no seeded forms", async ({ page }) => {
@@ -141,13 +152,13 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await page.getByRole("button", { name: "New Request" }).click();
     await page.getByLabel(/^Client/).selectOption({ label: "Reschedule Client" });
     await page.getByLabel(/^Property/).selectOption({ label: "9 Test Street, Toowoomba" });
-    await page.getByLabel(/^Scope summary/).fill("Mow and edge the front lawn");
+    await page.getByLabel(/^Job Request/).fill("Mow and edge the front lawn");
     await page.getByRole("button", { name: "Save Request" }).click();
     await expect(page.getByText("Job request created.")).toBeVisible();
 
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Schedule" }).click();
     await page.getByRole("button", { name: "Schedule a job" }).click();
-    await page.getByLabel(/^Job request/).selectOption({ index: 1 });
+    await page.getByLabel(/^Job Request/).selectOption({ index: 1 });
     await page.getByLabel(/^Date & time/).fill("2026-09-20T10:00");
     await page.getByLabel("Schedule Job").getByRole("button", { name: "Schedule", exact: true }).click();
     await expect(page.getByText("Job scheduled.")).toBeVisible();

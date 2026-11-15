@@ -1,23 +1,28 @@
-# Ordered takeover backlog
+# Mow & Glow improvement backlog
 
-These are proposed task boundaries, not authorization to run all work at once. Each implementation task must inspect current code, add relevant acceptance tests, provide a usable preview when possible, and update HANDOFF.
+Use this table as the implementation sequence and verification ledger. The approved plan in the project chat supplies acceptance criteria. The feature worktree starts at `a36602b`. Use synthetic demo data and a disposable authenticated database.
 
-Bootstrap recheck, 9 November 2026: a completed dependency audit now reports 14 vulnerabilities, including a critical Next.js finding. Recommend a focused SEC-01 advisory triage/compatible dependency patch before FIN-01. This supplements the original order below; it does not authorize an upgrade or production release. See TAKEOVER_ASSESSMENT.md and HANDOFF.md for evidence and current verification.
-
-| Order/ID | Scope and deliverable | Main dependencies | Done evidence |
+| Order | Task | Priority | Status and evidence |
 |---|---|---|---|
-| 0 / SETUP | Install context docs safely, validate runnable cloud demo, deterministic fixtures, runtime-alignment plan | GitHub/environment access | Current SHA, check/build/browser baseline with honest blockers; docs-only/config diff |
-| 1 / FIN-01 | Actual payment entry and canonical paid/balance UI; remove synthetic payment inference | Disposable staging for integration | Acceptance 1–5, 15, 35; no duplicate receipts; existing records preserved |
-| 2 / DOC-01 | Preserve scope/units/dates; atomic draft create/update and quote linkage; safe failure handling | FIN-01 test primitives, migration design | Acceptance 8–11, 13, 15–16, 33 |
-| 3 / INV-01 | Direct invoice composer, inline customer, optional site/job, explicit review/issue | Correct persistence/transactions | Acceptance 6–9, 17–18, 24; no fabricated upstream records |
-| 4 / QUO-01 | Request-independent quotes, editable dates/terms/reference | Shared composer/customer primitives | Acceptance 10, 19, 21, 34 |
-| 5 / HIST-01 | Issued/accepted snapshots and linked correction/revision workflow, DB lifecycle invariants | Owner accounting-policy decision; existing-data strategy | Acceptance 12–14, 16, 35; original preserved |
-| 6 / JOB-01 | Direct job/finished-work entry and simpler board views on existing statuses | Shared entity selection; recurrence tests | Acceptance 20–23, 26; no historical-status deletion |
-| 7 / NAV-01 | Durable routes, consistent Create entry points, clearer nav/action hierarchy | Current view/record links and user feedback | Acceptance 25, 30, 33; old links handled |
-| 8 / A11Y-01 | Shared modal, field/picker, focus/error semantics and measured mobile/contrast fixes | Browser environment/fixtures | Acceptance 26–34 across key states |
-| 9 / AI-01 | Server-verifiable AI action confirmation; scoped action previews and privacy/cost controls | Typed transaction layer | Acceptance 35–36; model cannot self-approve |
-| 10 / OPS-01 | Supported runtime, accurate docs/lockfile policy, CI integration/axe checks, measured loading, offline clarity | Runtime choice and staging | Acceptance 37–40, environment reproducibility |
+| 1 | SETUP / SEC-01 / OPS-01 | P0 | Sign-in fix `7e68253` and dependency update `52b4a0e` applied in separate commits. Node 24 CI, manager/technician fixtures and report-only CSP added. Runtime audit clear; nine tooling findings remain. |
+| 2 | MOB-01 / NAV-01 | P1 | Today, Jobs and More for phone; search and alerts; bookmarkable view and record. Implemented for local review. |
+| 3 | MOB-02 / MOB-03 / JOB-03 | P1 | Today and all job statuses reachable on phone, shared contextual card actions and desktop board. Implemented for local review. |
+| 4 | JOB-04 / REQ-01 / REQ-03 | P1 | Valid transitions, atomic recurrence, close and reopen requests, preserve intake. Implemented for local review. |
+| 5 | FIN-01 / DOC-01 | P0 | Explicit ledger payments, atomic document editing and stable totals, dates and fields. Required before new billing paths. Implemented for local review. |
+| 6 | JOB-01 / JOB-02 / INV-01 / QUO-01 / REQ-02 | P1 | Shared client selection, inline creation, calendar booking and optional-quote paths. Job Request is the visible invoice work field. Implemented for local review. |
+| 7 | HIST-01 | P1 | Editable drafts, issued snapshots and linked replacements or revisions. Paid-document content correction awaits accounting policy. Implemented for local review. |
+| 8 | NOT-01 | P1 | Shared role-filtered alerts and badge based on outstanding actionable work. Implemented for local review. |
+| 9 | A11Y-01 / AI-01 | P1 | Accessible control states, draft recovery and server-verified Joseph approval. Implemented for local review. |
 
-P1 security/integrity work such as AI confirmation or lifecycle invariants can be pulled forward if those features are actively used; do not interpret table order as “safe to ignore until later.” Address inexpensive shared accessibility repairs within affected tasks instead of deferring all accessibility.
+## Workflow rules
 
-No estimates are promised before authenticated workflow tests and staging schema verification. Prefer small compatibility-preserving PRs. Keep schema changes additive, document backfill behavior, verify deployed old/new code compatibility, and write a concrete release/rollback plan before touching production.
+- Keep the current job data for visits. Invoices can originate from a request with no non-cancelled visits, a completed visit, an accepted quote or standalone entry. Lock and validate related sources together, reuse existing invoices, and keep legacy duplicates for review.
+- New drafts may use a name-only client. Scheduling needs a service address. Delivery needs the chosen contact method.
+- Completed and Cancelled are terminal during ordinary job operations. Closing a request preserves its relationships and prior status.
+- Run lint, typecheck, unit and migration checks, production build, Playwright, both dependency audits, and fresh and legacy-shaped database integration tests. Record any unavailable verification. Retain a clickable demo and a previous verified revision. Keep changes out of production.
+
+## Superpowers checkpoint
+
+Planning and implementation are recorded in this backlog. The managed worktree is the current review target. Superpowers stage: implementation and final review completed for the demo. Release verification remains open. SQL scenarios cover direct booking, job request state, ledger amounts and replay, immutable issued records, source collisions, and explicit Joseph confirmation. Keep remaining deployment verification open until it runs on a full disposable Supabase stack and an actual iOS device.
+
+- Acceptance evidence: lint and TypeScript checks, 150 unit tests, production build, 18 Chromium tests, plus all 16 migrations and three SQL suites in disposable Postgres. The browser suite covered rescheduling, phone status filters and bookmarks, a 51-item alert list with one urgent item, and report-only CSP. Preview: http://127.0.0.1:3002/?demo=populated.

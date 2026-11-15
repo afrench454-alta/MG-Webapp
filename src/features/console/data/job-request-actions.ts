@@ -8,9 +8,11 @@ import { requireBusinessContext } from "@/lib/supabase/business";
 import {
   type DeleteJobRequestActionResult,
   type JobRequestActionResult,
+  jobRequestClosedSchema,
   jobRequestDraftSchema,
 } from "./job-request-contract";
-import { deleteJobRequest, saveJobRequest } from "./job-request-repository";
+import { getClientById } from "./client-repository";
+import { deleteJobRequest, saveJobRequest, setJobRequestClosed } from "./job-request-repository";
 
 function safeActionMessage(error: unknown, fallback: string): string {
   if (error instanceof z.ZodError) return "The saved job request data was invalid.";
@@ -33,14 +35,30 @@ export async function saveJobRequestAction(input: unknown): Promise<JobRequestAc
   try {
     const context = await requireBusinessContext(["owner", "co_owner"]);
     const request = await saveJobRequest(context, parsed.data);
+    const client = parsed.data.inlineClient && request.clientId
+      ? await getClientById(context, request.clientId)
+      : undefined;
     revalidatePath("/");
-    return { ok: true, request };
+    return { ok: true, request, client };
   } catch (error) {
     console.error("Job request save failed", error);
     return {
       ok: false,
       message: safeActionMessage(error, "The job request could not be saved. Try again."),
     };
+  }
+}
+
+export async function setJobRequestClosedAction(input: unknown): Promise<JobRequestActionResult> {
+  const parsed = jobRequestClosedSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "The job request change was invalid." };
+  try {
+    const context = await requireBusinessContext(["owner", "co_owner"]);
+    const request = await setJobRequestClosed(context, parsed.data.id, parsed.data.closed);
+    revalidatePath("/");
+    return { ok: true, request };
+  } catch (error) {
+    return { ok: false, message: safeActionMessage(error, "The job request stage could not be updated. Try again.") };
   }
 }
 

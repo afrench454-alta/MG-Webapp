@@ -1,8 +1,10 @@
 import type { ServiceCategory } from "./data/service-catalog";
+import type { InlineClientInput } from "./data/inline-client";
 
 export type { ServiceCategory } from "./data/service-catalog";
 
 export type ConsoleRoute =
+  | "today"
   | "dashboard"
   | "joseph"
   | "clients"
@@ -59,6 +61,13 @@ export function formatLineQuantity(
 
 export type Quote = {
   id: string;
+  updatedAt?: string;
+  issueDate?: string;
+  validUntil?: string | null;
+  reference?: string;
+  terms?: string;
+  revisionOfQuoteId?: string | null;
+  issuerSnapshot?: Pick<BusinessProfile, "name" | "abn" | "email" | "phone" | "website">;
   documentNumber?: string;
   clientId?: string;
   serviceAddressId?: string | null;
@@ -77,7 +86,55 @@ export type Quote = {
   items: LineItem[];
 };
 
+export type InvoicePaymentMethod = "cash" | "bank_transfer" | "card_external" | "cheque" | "other";
+
+export type InvoicePayment = {
+  id: string;
+  idempotencyKey?: string;
+  kind: "receipt" | "reversal" | "refund";
+  status: "recorded" | "voided" | "refunded";
+  amount: number;
+  paidOn: string;
+  method: InvoicePaymentMethod;
+  reference?: string;
+  receiptId?: string;
+  reason?: string;
+};
+
+export type InvoiceSnapshot = {
+  clientName: string;
+  billingName?: string;
+  billingAddress?: string;
+  recipientName?: string;
+  recipientEmail?: string;
+  serviceAddresses: string[];
+  issuer: BusinessProfile;
+};
+
 export type Invoice = {
+  requestId?: string | null;
+  issueDate?: string;
+  draftVersion?: number;
+  subtotal?: number;
+  taxTotal?: number;
+  total?: number;
+  amountPaid?: number;
+  balanceDue?: number;
+  payments?: InvoicePayment[];
+  duplicateSource?: boolean;
+  replacesInvoiceId?: string | null;
+  correctionReason?: string;
+  snapshot?: InvoiceSnapshot | null;
+  billingName?: string;
+  billingAddress?: string;
+  recipientName?: string;
+  recipientEmail?: string;
+  reference?: string;
+  serviceDate?: string | null;
+  serviceAddresses?: string[];
+  terms?: string;
+  internalNotes?: string;
+  paymentInstructions?: string;
   id: string;
   documentNumber?: string;
   clientId?: string;
@@ -127,6 +184,8 @@ export const invoiceTerms = "Invoices due upon completion have a grace period of
 
 export type Job = {
   id: string;
+  updatedAt?: string;
+  quoteId?: string | null;
   displayName: string;
   clientId?: string;
   serviceAddressId?: string | null;
@@ -145,7 +204,10 @@ export type Job = {
   assigneeIds: string[];
   assignees: string[];
   photos: JobPhoto[];
+  fieldNotes?: JobFieldNote[];
 };
+
+export type JobFieldNote = { id: string; body: string; author: string; created: string };
 
 export type TeamMember = {
   id: string;
@@ -211,6 +273,7 @@ export type JobRequest = {
   category: string;
   scope: string;
   status: "New" | "Qualified" | "Quoting" | "Scheduled" | "Closed" | "Rejected";
+  previousStatus?: "New" | "Qualified" | "Quoting" | "Scheduled" | null;
   created: string;
   scheduled?: string;
   visit?: string;
@@ -228,8 +291,9 @@ export function markRequestScheduled(
 }
 
 export type JobRequestDraft = {
-  clientId: string;
-  propertyId: string;
+  clientId?: string;
+  propertyId?: string;
+  inlineClient?: InlineClientInput;
   category: ServiceCategory;
   serviceDetail?: string;
   scope: string;

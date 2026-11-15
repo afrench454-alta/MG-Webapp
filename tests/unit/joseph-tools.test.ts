@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { JOSEPH_SUGGESTIONS, stripJosephWake } from "../../src/features/console/data/joseph-contract";
+import { approveJosephRequestSchema, JOSEPH_SUGGESTIONS, runJosephNextStopRequestSchema, stripJosephWake } from "../../src/features/console/data/joseph-contract";
 import {
   parseToolArguments,
   resolveJosephConfig,
@@ -45,3 +45,20 @@ test("Joseph suggestions send a real prompt, not the short label", () => {
   }
 });
 
+
+test("the next-stop request rejects a caller-supplied confirmation flag", () => {
+  const parsed = runJosephNextStopRequestSchema.safeParse({
+    chip: "on-my-way",
+    jobId: "22222222-2222-4222-8222-222222222222",
+    confirm: true,
+  });
+  assert.equal(parsed.success, false);
+});
+
+test("approval accepts only an opaque proposal token from the signed-in browser", () => {
+  const token = "22222222-2222-4222-8222-222222222222";
+  assert.deepEqual(approveJosephRequestSchema.parse({ token }), { token });
+  assert.equal(approveJosephRequestSchema.safeParse({ token, jobId: token }).success, false);
+  assert.equal(approveJosephRequestSchema.safeParse({ token, action: "create_quote_from_request" }).success, false);
+  assert.equal(approveJosephRequestSchema.safeParse({ confirm: true }).success, false);
+});

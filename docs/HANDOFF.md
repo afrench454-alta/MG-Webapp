@@ -68,3 +68,14 @@ Run bootstrap prompt, check current SHA and preserve any newer instructions, ins
 - Production actions explicitly authorized/performed:
 
 Do not store secrets, real customer names, payment account details or sensitive test traces here. A handoff is a factual checkpoint, not proof the current checkout still matches it.
+
+## Workflow demo checkpoint — 16 November 2026
+
+The feature implementation was transferred into the app-managed worktree from the original isolated branch. The original checkout still contains the sign-in and dependency commits. The managed review branch uses those two commits as its base.
+
+- Phone Today/Jobs/More, job status filters and record bookmarks, request close/reopen, direct work and billing entry, invoice ledger and snapshots, role-filtered alerts, and reviewed Joseph actions are available in the synthetic preview.
+- Use `/?demo=populated` for the manager walkthrough or `/?demo=field` for the technician walkthrough. Record changes in these modes are scoped to the browser tab.
+- All 16 migrations and the three SQL suites ran on disposable Postgres via PGlite with local Auth/Storage shims. This verified business rules, grants, RLS, rollback, and replay in PostgreSQL. Full Supabase Auth, PostgREST/Storage transport and multi-connection race testing still require a disposable Supabase stack.
+- Runtime dependency audit found zero findings. Full audit found seven moderate and two high findings in development tooling. The CSP remains report-only pending verification with the authenticated app.
+- Rollback for the demo is to use the previously verified branch/base and reset only the disposable database. For any future release, rehearse application rollback against the new schema before promoting. New financial write RPCs replace prior direct writes by design, so returning to the old billing application would leave those writes unavailable. Preserve newly recorded payments, audit history and issued snapshots. A release rollback should use a forward compatibility fix or a tested restore in an isolated target before any production action.
+- Paid-document content adjustments await accounting policy. Existing invoices with no recoverable issued snapshot are marked as legacy in the document UI.

@@ -13,6 +13,7 @@ export type JobRecurrence = (typeof JOB_RECURRENCE_VALUES)[number];
 
 const BRISBANE_OFFSET = "+10:00";
 const DEFAULT_DURATION_MS = 60 * 60 * 1000;
+const BRISBANE_OFFSET_MS = 10 * DEFAULT_DURATION_MS;
 
 export function asJobRecurrence(value: string): JobRecurrence {
   return JOB_RECURRENCE_VALUES.find((item) => item === value) ?? "One-off";
@@ -88,7 +89,14 @@ export function nextScheduledIso(
   if (label === "Weekly") next.setUTCDate(next.getUTCDate() + 7);
   else if (label === "Fortnightly") next.setUTCDate(next.getUTCDate() + 14);
   else if (label === "Four-weekly") next.setUTCDate(next.getUTCDate() + 28);
-  else next.setUTCMonth(next.getUTCMonth() + 1);
+  else {
+    const local = new Date(start.getTime() + BRISBANE_OFFSET_MS);
+    const day = local.getUTCDate();
+    local.setUTCMonth(local.getUTCMonth() + 1, 1);
+    const lastDay = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + 1, 0)).getUTCDate();
+    local.setUTCDate(Math.min(day, lastDay));
+    return new Date(local.getTime() - BRISBANE_OFFSET_MS).toISOString();
+  }
   return next.toISOString();
 }
 
@@ -188,6 +196,8 @@ export function buildNextDemoJob(job: Job, nextId: string): Job | null {
     time: schedule.time,
     dateKey: schedule.dateKey,
     photos: [],
+    fieldNotes: [],
+    quoteId: undefined,
     displayName: formatJobDisplayName({
       client: job.client,
       address: job.address,

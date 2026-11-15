@@ -83,13 +83,14 @@ test("invoice groups keep unpaid work together and paid work together", () => {
   const draft = invoice({ documentStatus: "Draft" });
   const overdue = invoice({ dueDate: "2020-01-01" });
   const paid = invoice({ paymentStatus: "Paid" });
-  const refunded = invoice({ paymentStatus: "Refunded" });
+  const refunded = invoice({ paymentStatus: "Refunded", total: 80, amountPaid: 0, balanceDue: 80 });
 
   assert.equal(matchesInvoiceFilter(draft, "open"), true);
   assert.equal(matchesInvoiceFilter(overdue, "open"), true);
   assert.equal(matchesInvoiceFilter(paid, "open"), false);
   assert.equal(matchesInvoiceFilter(paid, "paid"), true);
-  assert.equal(matchesInvoiceFilter(refunded, "paid"), true);
+  assert.equal(matchesInvoiceFilter(refunded, "paid"), false);
+  assert.equal(matchesInvoiceFilter(refunded, "open"), true);
   assert.equal(matchesInvoiceFilter(draft, "live"), true);
   assert.equal(matchesInvoiceFilter(paid, "voided"), false);
 });

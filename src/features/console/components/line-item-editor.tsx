@@ -3,6 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { History, Plus, Sparkles, Trash2 } from "lucide-react";
 import { money, quoteTotals, type LineItem } from "../domain";
+import { invoiceLineTotal } from "../data/invoice-lifecycle";
 import type { RateChipOption } from "../data/form-options";
 import { Button, IconButton } from "./ui-elements";
 
@@ -17,11 +18,15 @@ export function LineItemEditor({
   setItems,
   rateChips = [],
   onApplyRateChip,
+  invoice = false,
+  disabled = false,
 }: {
   items: LineItem[];
   setItems: Dispatch<SetStateAction<LineItem[]>>;
   rateChips?: RateChipOption[];
   onApplyRateChip?: (chip: RateChipOption) => void;
+  invoice?: boolean;
+  disabled?: boolean;
 }) {
   const applyChip = (chip: RateChipOption) => {
     setItems((current) => {
@@ -95,7 +100,7 @@ export function LineItemEditor({
   };
 
   return (
-    <section className="line-items-section">
+    <fieldset className="line-items-section" disabled={disabled} aria-label="Line items">
       <div className="nested-section__header">
         <h3>
           Line Items <span aria-hidden="true">*</span>
@@ -172,21 +177,28 @@ export function LineItemEditor({
               }
               placeholder="Description"
               required
+              maxLength={1000}
             />
             <div className="line-item-qty">
               <input
                 aria-label={`Item ${index + 1} quantity`}
                 type="number"
                 inputMode="decimal"
-                min="0"
-                step="0.25"
+                min={invoice ? "0.001" : "0"}
+                step={invoice ? "0.001" : "0.25"}
                 value={item.quantity}
                 onChange={(event) =>
                   update(index, "quantity", event.target.value)
                 }
                 required
               />
-              <select
+              {invoice ? <input
+                aria-label={`Item ${index + 1} unit`}
+                value={item.unitLabel || ""}
+                onChange={(event) => update(index, "unitLabel", event.target.value)}
+                placeholder="Unit"
+                maxLength={32}
+              /> : <select
                 aria-label={`Item ${index + 1} unit`}
                 value={item.unitLabel || ""}
                 onChange={(event) =>
@@ -198,7 +210,7 @@ export function LineItemEditor({
                     {unit || "qty"}
                   </option>
                 ))}
-              </select>
+              </select>}
             </div>
             <input
               aria-label={`Item ${index + 1} unit price`}
@@ -211,7 +223,7 @@ export function LineItemEditor({
               required
             />
             <output aria-label={`Item ${index + 1} total`}>
-              {money(Number(item.quantity || 0) * Number(item.rate || 0))}
+              {money(invoice ? invoiceLineTotal(item) : Number(item.quantity || 0) * Number(item.rate || 0))}
             </output>
             <IconButton
               label={`Remove line item ${index + 1}`}
@@ -219,11 +231,20 @@ export function LineItemEditor({
               tone="danger"
               type="button"
               onClick={() => removeItem(index)}
+              disabled={invoice && items.length < 2}
             />
+            {invoice ? <input
+              className="line-item-row__description"
+              aria-label={`Item ${index + 1} label`}
+              value={item.label ?? ""}
+              onChange={(event) => update(index, "label", event.target.value)}
+              placeholder="Optional line label"
+              maxLength={160}
+            /> : null}
           </div>
         );
       })}
-    </section>
+    </fieldset>
   );
 }
 

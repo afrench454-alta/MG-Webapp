@@ -1,5 +1,4 @@
 import type { Invoice, Job, Quote } from "../domain";
-import type { InvoiceDraftInput } from "./operations-contract";
 
 export class OperationsRuleError extends Error {
   constructor(message: string) {
@@ -59,24 +58,4 @@ export function assertPaymentCanUpdate(
   if (invoice.documentStatus === "Void" || invoice.paymentStatus === "Refunded") {
     throw new OperationsRuleError(VOID_PAYMENT_BLOCKED);
   }
-}
-
-export function invoiceCreateRpcArgs(input: InvoiceDraftInput) {
-  const extras = (input.extraPropertyIds ?? []).filter(
-    (id) => id !== input.propertyId,
-  );
-
-  return {
-    target_client_id: input.clientId,
-    primary_address_id: input.propertyId,
-    service_address_ids: extras,
-    target_job_id: input.jobId ?? null,
-    due_days: input.dueDays,
-    invoice_notes: input.notes,
-    invoice_items: input.items.map((item) => ({
-      description: item.description,
-      quantity: item.quantity,
-      rate: item.rate,
-    })),
-  };
 }

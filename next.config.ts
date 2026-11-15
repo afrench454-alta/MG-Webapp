@@ -1,5 +1,6 @@
 import os from "os";
 import type { NextConfig } from "next";
+import { reportOnlyContentPolicy } from "./src/lib/content-security-policy";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -9,6 +10,10 @@ const lanIps = Object.values(os.networkInterfaces())
   .map((iface) => iface.address);
 
 const securityHeaders = [
+  {
+    key: "Content-Security-Policy-Report-Only",
+    value: reportOnlyContentPolicy(supabaseUrl, process.env.NODE_ENV === "development"),
+  },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

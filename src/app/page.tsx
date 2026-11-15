@@ -2,14 +2,16 @@ import { redirect } from "next/navigation";
 
 import { signOutAction } from "@/app/actions/auth";
 import { ConsoleApp } from "@/features/console/console-app";
+import { populatedDemo } from "@/features/console/data/demo-fixtures";
 import "@/features/console/console-desktop-nav.css";
 import "@/features/console/console-phone.css";
 import { archiveClientAction, commitClientImportAction, previewClientImportAction, saveClientAction } from "@/features/console/data/client-actions";
 import { listClients } from "@/features/console/data/client-repository";
-import { deleteJobRequestAction, saveJobRequestAction } from "@/features/console/data/job-request-actions";
+import { deleteJobRequestAction, saveJobRequestAction, setJobRequestClosedAction } from "@/features/console/data/job-request-actions";
 import { listJobRequests } from "@/features/console/data/job-request-repository";
 import { deleteInvoiceAction, deleteJobAction, deleteJobPhotoAction, deleteQuoteAction, finalizeInvoiceAction, markInvoiceSentAction, saveInvoiceAction, saveQuoteAction, scheduleJobAction, updateInvoicePaymentAction, updateJobAction, updateJobAssignmentsAction, updateQuoteStatusAction, uploadJobPhotoAction, voidInvoiceAction } from "@/features/console/data/operations-actions";
 import { listInvoices, listJobs, listQuotes } from "@/features/console/data/operations-repository";
+import { addJobNoteAction, reviseQuoteAction } from "@/features/console/data/operations-actions";
 import { estimateJobAction } from "@/features/console/data/estimator-actions";
 import { askJosephAction } from "@/features/console/data/joseph-actions";
 import { sendQuestionnaireAction } from "@/features/console/data/questionnaire-actions";
@@ -43,8 +45,10 @@ async function loadHomeSlice<T>(label: string, task: Promise<T>, fallback: T): P
   }
 }
 
-export default async function Home() {
+export default async function Home({ searchParams }: PageProps<"/">) {
   if (!isSupabaseConfigured()) {
+    const { demo } = await searchParams;
+    if (demo === "populated" || demo === "field") return <ConsoleApp sessionDemo={demo} {...populatedDemo(undefined, demo === "field")} />;
     return <ConsoleApp />;
   }
 
@@ -104,12 +108,15 @@ export default async function Home() {
       onPreviewClientImport={previewClientImportAction}
       onCommitClientImport={commitClientImportAction}
       onSaveJobRequest={saveJobRequestAction}
+      onSetJobRequestClosed={setJobRequestClosedAction}
       onDeleteJobRequest={deleteJobRequestAction}
       onSaveQuote={saveQuoteAction}
+      onReviseQuote={reviseQuoteAction}
       onUpdateQuoteStatus={updateQuoteStatusAction}
       onDeleteQuote={deleteQuoteAction}
       onScheduleJob={scheduleJobAction}
       onUpdateJob={updateJobAction}
+      onAddJobNote={addJobNoteAction}
       onUpdateJobAssignments={updateJobAssignmentsAction}
       onUploadJobPhoto={uploadJobPhotoAction}
       onDeleteJobPhoto={deleteJobPhotoAction}

@@ -1,12 +1,34 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+
+function hasPhonePointer() {
+  const shortSide = Math.min(window.screen.width || 0, window.screen.height || 0);
+  return shortSide > 0 && shortSide <= 926 &&
+    window.matchMedia("(pointer: coarse)").matches;
+}
+
+function subscribeToPhoneLayout(onChange: () => void) {
+  const coarse = window.matchMedia("(pointer: coarse)");
+  coarse.addEventListener("change", onChange);
+  window.addEventListener("resize", onChange);
+  return () => {
+    coarse.removeEventListener("change", onChange);
+    window.removeEventListener("resize", onChange);
+  };
+}
+
+export function usePhoneLayout() {
+  return useSyncExternalStore(
+    subscribeToPhoneLayout,
+    () => window.matchMedia("(max-width: 760px)").matches || hasPhonePointer(),
+    () => false,
+  );
+}
 
 function applyPhoneAttr() {
   const root = document.documentElement;
-  const shortSide = Math.min(window.screen.width || 0, window.screen.height || 0);
-  const coarse = window.matchMedia("(pointer: coarse)").matches;
-  if (coarse && shortSide <= 926) root.setAttribute("data-phone", "true");
+  if (hasPhonePointer()) root.setAttribute("data-phone", "true");
   else root.removeAttribute("data-phone");
 }
 

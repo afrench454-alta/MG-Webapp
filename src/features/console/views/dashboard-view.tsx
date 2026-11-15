@@ -33,7 +33,7 @@ import {
   type Quote,
   type TeamMember,
 } from "../domain";
-import { invoiceDisplayStatus } from "../data/invoice-lifecycle";
+import { invoiceAmounts, invoiceDisplayStatus } from "../data/invoice-lifecycle";
 import { isLiveInvoice, isLiveQuote } from "../data/list-filters";
 import { displayServiceCategory } from "../data/service-catalog";
 import { formatSiteTitle } from "../data/work-identity";
@@ -94,24 +94,9 @@ export function DashboardView({
     ["Draft", "Sent"].includes(quote.status),
   );
   const unpaidTotal = liveInvoices
-    .filter(
-      (record) =>
-        record.paymentStatus !== "Paid" && record.paymentStatus !== "Refunded",
-    )
-    .reduce(
-      (sum, record) =>
-        sum +
-        quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0).total,
-      0,
-    );
-  const paidTotal = liveInvoices
-    .filter((record) => record.paymentStatus === "Paid")
-    .reduce(
-      (sum, record) =>
-        sum +
-        quoteTotals(record.items, record.discount ?? 0, record.taxRate ?? 0).total,
-      0,
-    );
+    .filter((record) => record.documentStatus !== "Draft")
+    .reduce((sum, record) => sum + invoiceAmounts(record).balanceDue, 0);
+  const paidTotal = invoices.reduce((sum, record) => sum + invoiceAmounts(record).amountPaid, 0);
 
   const currentMember =
     teamMembers.find((member) => member.id === currentMemberId) ||
@@ -286,11 +271,7 @@ export function DashboardView({
   if (canManage) {
     for (const inv of liveInvoices) {
       if (invoiceDisplayStatus(inv) === "Overdue") {
-        const total = quoteTotals(
-          inv.items,
-          inv.discount ?? 0,
-          inv.taxRate ?? 0,
-        ).total;
+        const total = invoiceAmounts(inv).balanceDue;
         immediateActions.push({
           id: `act-inv-${inv.id}`,
           tag: "Overdue Invoice",

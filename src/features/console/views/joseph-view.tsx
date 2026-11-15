@@ -7,15 +7,16 @@ import { SendHorizonal } from "lucide-react";
 import {
   type AskJosephAction,
   type JosephMessage,
+  type JosephProposal,
   type RunJosephNextStopAction,
   stripJosephWake,
 } from "../data/joseph-contract";
 import {
+  approveJosephAction,
   getJosephNextStopBriefAction,
   runJosephNextStopAction,
 } from "../data/joseph-actions";
 import {
-  JOSEPH_DRAFT_INVOICE_CONFIRM,
   NEXT_STOP_ACTION_CHIPS,
   buildNextStopBrief,
   canConfirmDraftInvoice,
@@ -53,7 +54,11 @@ export function JosephView({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [invoiceConfirm, setInvoiceConfirm] = useState(false);
+  const [review, setReview] = useState<{
+    proposal: JosephProposal;
+    chip?: NextStopChipId;
+    messageDraft?: string;
+  } | null>(null);
   const [opsOverlay, setOpsOverlay] = useState<NextStopOpsOverlay | null>(null);
   const [seenBriefJobId, setSeenBriefJobId] = useState<string | undefined>();
   const [loadedJobs, setLoadedJobs] = useState<Job[]>([]);
@@ -66,6 +71,7 @@ export function JosephView({
   >();
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const reviewRef = useRef<HTMLHeadingElement>(null);
   const idRef = useRef(0);
 
   const effectiveJobs = jobs.length ? jobs : loadedJobs;
@@ -120,7 +126,7 @@ export function JosephView({
   if (briefJobId !== seenBriefJobId) {
     setSeenBriefJobId(briefJobId);
     setOpsOverlay(null);
-    setInvoiceConfirm(false);
+    setReview(null);
   }
 
   const nextLineId = (role: JosephMessage["role"]) => {
@@ -130,7 +136,7 @@ export function JosephView({
 
   useEffect(() => {
     listRef.current?.lastElementChild?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [messages, pending, invoiceConfirm]);
+  }, [messages, pending]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -138,6 +144,10 @@ export function JosephView({
     el.style.height = "auto";
     el.style.height = `${Math.min(Math.max(el.scrollHeight, 44), 160)}px`;
   }, [draft]);
+
+  useEffect(() => {
+    if (review) reviewRef.current?.focus();
+  }, [review]);
 
   const appendExchange = (userText: string, reply: string) => {
     setMessages((current) => [
@@ -179,6 +189,7 @@ export function JosephView({
       content: text,
     }));
     setDraft("");
+    setReview(null);
     setError("");
     setMessages((current) => [...current, userLine]);
     setPending(true);
@@ -188,6 +199,7 @@ export function JosephView({
         setError(result.message);
         return;
       }
+      if (result.proposal) setReview({ proposal: result.proposal });
       setMessages((current) => [
         ...current,
         {
@@ -200,71 +212,59 @@ export function JosephView({
       setError("Joseph could not be reached. Try again.");
     } finally {
       setPending(false);
-      inputRef.current?.focus();
     }
   };
 
-  const runChip = async (chip: NextStopChipId, confirm = false) => {
-    if (pending) return;
-    if (!brief) {
-      setError("No next stop to act on.");
-      return;
-    }
-
-    const chipLabel =
-      NEXT_STOP_ACTION_CHIPS.find((item) => item.id === chip)?.label ?? chip;
-
-    if (chip === "done-draft-invoice" && !confirm) {
-      if (!canConfirmDraftInvoice(brief)) {
-        setInvoiceConfirm(false);
-        setError("This stop has no accepted quote to invoice from.");
-        appendExchange(
-          chipLabel,
-          "This job has no linked accepted quote, so I cannot draft an invoice from the quote.",
-        );
-        return;
-      }
-      setError("");
-      setInvoiceConfirm(true);
-      return;
-    }
-
-    setInvoiceConfirm(false);
+  const runChip = async (chip: NextStopChipId) => {
+    if (!brief || pending) return;
+    setReview(null);
     setError("");
 
-    if (!runNextStop) {
-      if (chip === "on-my-way" || chip === "running-late") {
-        appendExchange(
-          chipLabel,
-          `${localMessageDraft(chip, brief)}\n\nNot sent.`,
-        );
-        const next = overlayForChip(chip);
-        if (next) setOpsOverlay(next);
-        return;
-      }
-      setError("Joseph is not connected on this deployment yet.");
+    if (chip === "done-draft-invoice" && !canConfirmDraftInvoice(brief)) {
+      setError("This stop has no accepted quote to invoice from.");
       return;
     }
 
     setPending(true);
     try {
-      const result = await runNextStop({
-        chip,
-        jobId: brief.jobId,
-        confirm,
-      });
+      const result = await runNextStop({ chip, jobId: brief.jobId });
       if (!result.ok) {
         setError(result.message);
         return;
       }
-      appendExchange(confirm ? JOSEPH_DRAFT_INVOICE_CONFIRM : chipLabel, result.reply);
-      const next = overlayForChip(chip);
-      if (next) setOpsOverlay(next);
+      if (result.proposal) {
+        const messageDraft = chip === "done-draft-invoice" ? undefined : localMessageDraft(chip, brief);
+        setReview({ proposal: result.proposal, chip, messageDraft });
+      }
+    } catch {
+      setError("Joseph could not prepare that action.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const approve = async () => {
+    if (pending || !review) return;
+    setPending(true);
+    setReview(null);
+    setError("");
+    try {
+      const result = await approveJosephAction({ token: review.proposal.token });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      const reply = review.messageDraft
+        ? `${result.reply}\n\n${review.messageDraft}\n\nNot sent.`
+        : result.reply;
+      appendExchange(review.proposal.title, reply);
+      if (review.chip) setOpsOverlay(overlayForChip(review.chip));
       await refreshBrief();
     } catch {
       setError("Joseph could not finish that action.");
     } finally {
       setPending(false);
+      inputRef.current?.focus();
     }
   };
 
@@ -291,7 +291,7 @@ export function JosephView({
               setMessages([]);
               setDraft("");
               setError("");
-              setInvoiceConfirm(false);
+              setReview(null);
               inputRef.current?.focus();
             }}
           >
@@ -342,6 +342,7 @@ export function JosephView({
             disabled={
               pending ||
               !brief ||
+              (effectiveActorRole === "technician" && item.id !== "on-my-way") ||
               (item.id === "done-draft-invoice" && opsStatus === "Done")
             }
             onClick={() => {
@@ -353,23 +354,35 @@ export function JosephView({
         ))}
       </div>
 
-      {invoiceConfirm && brief ? (
-        <div className="joseph-confirm" role="region" aria-label="Confirm draft invoice">
-          <p>
-            Complete {brief.clientName} at {brief.address} and draft the invoice from the
-            linked quote.
-          </p>
-          <button
-            type="button"
-            className="button button--primary"
-            disabled={pending}
-            onClick={() => {
-              void runChip("done-draft-invoice", true);
-            }}
-          >
-            {JOSEPH_DRAFT_INVOICE_CONFIRM}
-          </button>
-        </div>
+      {review ? (
+        <section className="joseph-confirm" aria-labelledby="joseph-review-title">
+          <div>
+            <h2 id="joseph-review-title" tabIndex={-1} ref={reviewRef}>{review.proposal.title}</h2>
+            <ul>
+              {review.proposal.details.map((detail, index) => <li key={index}>{detail}</li>)}
+            </ul>
+          </div>
+          <div className="joseph-confirm__actions">
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={pending}
+              onClick={() => void approve()}
+            >
+              Confirm change
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => {
+                setReview(null);
+                inputRef.current?.focus();
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </section>
       ) : null}
 
       <div className="joseph-thread" ref={listRef} role="log" aria-live="polite">

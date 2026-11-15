@@ -2,10 +2,8 @@
 
 import {
   ClipboardList,
-  DollarSign,
-  LayoutDashboard,
+  CalendarDays,
   Menu,
-  ReceiptText,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ConsoleRoute } from "../domain";
@@ -14,12 +12,9 @@ const dockItems: Array<{
   id: ConsoleRoute;
   label: string;
   icon: LucideIcon;
-  managersOnly?: boolean;
 }> = [
-  { id: "dashboard", label: "Home", icon: LayoutDashboard },
-  { id: "jobs", label: "Job Board", icon: ClipboardList },
-  { id: "quotes", label: "Quotes", icon: ReceiptText, managersOnly: true },
-  { id: "invoices", label: "Invoices", icon: DollarSign, managersOnly: true },
+  { id: "today", label: "Today", icon: CalendarDays },
+  { id: "jobs", label: "Jobs", icon: ClipboardList },
 ];
 
 export function MobileDock({
@@ -27,20 +22,15 @@ export function MobileDock({
   menuOpen,
   onNavigate,
   onMore,
-  canManage = true,
 }: {
   active: ConsoleRoute;
   menuOpen: boolean;
   onNavigate: (route: ConsoleRoute) => void;
   onMore: () => void;
-  canManage?: boolean;
 }) {
-  const items = canManage
-    ? dockItems
-    : dockItems.filter((item) => !item.managersOnly);
   return (
     <nav className="mobile-dock" aria-label="Quick navigation">
-      {items.map((item) => {
+      {dockItems.map((item) => {
         const Icon = item.icon;
         const selected = !menuOpen && active === item.id;
         return (

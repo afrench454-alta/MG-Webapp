@@ -93,11 +93,26 @@
   background: var(--panel-soft);
 }
 
-.joseph-confirm p {
+.joseph-confirm h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.joseph-confirm ul {
+  max-height: min(30vh, 14rem);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding-inline-start: 20px;
   margin: 0;
   color: var(--ink);
   font-size: 14px;
   line-height: 1.45;
+}
+
+.joseph-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .joseph-confirm .button {

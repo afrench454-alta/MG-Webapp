@@ -2,8 +2,6 @@ import { money, quoteTotals, type Client, type Invoice, type Job, type Quote } f
 import { invoiceDisplayStatus } from "./invoice-lifecycle";
 import { isLiveInvoice } from "./list-filters";
 
-export const JOSEPH_DRAFT_INVOICE_CONFIRM = "Draft invoice";
-
 export const NEXT_STOP_OPS_STATUSES = [
   "Scheduled",
   "En route",
@@ -117,9 +115,11 @@ export function nextStopOpsStatus(
 }
 
 export function linkedAcceptedQuote(job: Job, quotes: Quote[]): Quote | undefined {
-  if (!job.jobRequestId) return undefined;
-  return quotes.find(
-    (quote) => quote.jobRequestId === job.jobRequestId && quote.status === "Accepted",
+  return quotes.find((quote) =>
+    quote.status === "Accepted" &&
+    quote.clientId === job.clientId &&
+    quote.serviceAddressId === job.serviceAddressId &&
+    (job.quoteId ? quote.id === job.quoteId : Boolean(job.jobRequestId) && quote.jobRequestId === job.jobRequestId)
   );
 }
 
@@ -200,7 +200,6 @@ export function nextStopToolCall(
     NextStopBrief,
     "jobId" | "clientName" | "address" | "hasLinkedQuote" | "jobStatus" | "jobNotes"
   >,
-  confirm = false,
 ): NextStopToolCall {
   if (chip === "on-my-way" || chip === "running-late") {
     const overlay = chip === "on-my-way" ? "En route" : "Running late";
@@ -211,13 +210,11 @@ export function nextStopToolCall(
         jobId: brief.jobId,
         status,
         notes: tagJobOpsNotes(brief.jobNotes, overlay),
-        confirm: true,
       },
     };
   }
   const args: Record<string, unknown> = {
     jobId: brief.jobId,
-    confirm,
   };
   return {
     name: "complete_job_and_draft_invoice",
@@ -234,51 +231,6 @@ export function overlayForChip(chip: NextStopChipId): NextStopOpsOverlay | null 
   if (chip === "running-late") return "Running late";
   if (chip === "done-draft-invoice") return "Done";
   return null;
-}
-
-export function formatNextStopToolReply(
-  chip: NextStopChipId,
-  toolText: string,
-  action?: string,
-): string {
-  let payload: Record<string, unknown> = {};
-  try {
-    const parsed: unknown = JSON.parse(toolText);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      payload = parsed as Record<string, unknown>;
-    }
-  } catch {
-    return toolText;
-  }
-
-  if (typeof payload.error === "string") return payload.error;
-
-  if (chip === "on-my-way" || chip === "running-late") {
-    const label = chip === "on-my-way" ? "En route" : "Running late";
-    const draft = typeof payload.draft === "string" ? payload.draft : "";
-    if (!draft) return action || `${label}.`;
-    const preferred = typeof payload.preferred === "string" ? payload.preferred : "Message";
-    const phone = typeof payload.phone === "string" ? payload.phone : "";
-    const email = typeof payload.email === "string" ? payload.email : "";
-    const contact = phone || email;
-    const lines = [
-      `${label}.`,
-      draft,
-      `${preferred}${contact ? `: ${contact}` : ""}.`,
-      "Not sent.",
-    ];
-    return lines.filter(Boolean).join("\n");
-  }
-
-  if (payload.needsConfirm === true && typeof payload.preview === "string") {
-    return payload.preview;
-  }
-
-  if (action) return action;
-  const number = typeof payload.invoiceNumber === "string" ? payload.invoiceNumber : "";
-  return number
-    ? `Job completed and invoice ${number} drafted from the linked quote.`
-    : "Job completed and invoice drafted from the linked quote.";
 }
 
 export function localMessageDraft(

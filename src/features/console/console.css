@@ -1892,7 +1892,15 @@ textarea {
   min-width: 0;
 }
 
-.line-item-qty select {
+.line-items-section {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.line-item-qty select,
+.line-item-qty input[placeholder="Unit"] {
   width: 100%;
   min-height: 44px;
   padding: 8px 6px;
@@ -2357,6 +2365,25 @@ html[data-theme="dark"] .document-view {
 .document-payment dt,
 .document-payment dd {
   margin: 0;
+}
+
+.document-multiline {
+  white-space: pre-line;
+}
+
+.document-sheet :is(p, dd, td, .document-address) {
+  overflow-wrap: anywhere;
+}
+
+.invoice-payment-history {
+  margin-block: 1rem;
+}
+
+.invoice-client-add {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .document-table {

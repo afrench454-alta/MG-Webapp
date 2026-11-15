@@ -3,12 +3,10 @@ import assert from "node:assert/strict";
 
 import type { Client, Invoice, Job, Quote } from "../../src/features/console/domain";
 import {
-  JOSEPH_DRAFT_INVOICE_CONFIRM,
   NEXT_STOP_ACTION_CHIPS,
   NEXT_STOP_OPS_STATUSES,
   buildNextStopBrief,
   canConfirmDraftInvoice,
-  formatNextStopToolReply,
   linkedAcceptedQuote,
   nextStopOpsStatus,
   nextStopToolCall,
@@ -278,10 +276,9 @@ test("action chips are On my way, Running late, and Done → Draft invoice", () 
     NEXT_STOP_ACTION_CHIPS.map((chip) => chip.label),
     ["On my way", "Running late", "Done → Draft invoice"],
   );
-  assert.equal(JOSEPH_DRAFT_INVOICE_CONFIRM, "Draft invoice");
 });
 
-test("On my way persists En route via update_job_status, not draft-only", () => {
+test("On my way proposes En route via the job status tool", () => {
   const brief = buildNextStopBrief({
     jobs: [job()],
     clients: [client()],
@@ -294,14 +291,14 @@ test("On my way persists En route via update_job_status, not draft-only", () => 
   assert.equal(onMyWay.name, "update_job_status");
   assert.equal(onMyWay.args.jobId, JOB_ID);
   assert.equal(onMyWay.args.status, "in-progress");
-  assert.equal(onMyWay.args.confirm, true);
+  assert.equal("confirm" in onMyWay.args, false);
   assert.equal(String(onMyWay.args.notes), tagJobOpsNotes(brief.jobNotes, "En route"));
   assert.match(String(onMyWay.args.notes), /\[\[joseph-ops:en-route\]\]/);
   assert.match(String(onMyWay.args.notes), /Gate code 4451/);
   assert.equal("sent" in onMyWay.args, false);
 });
 
-test("Running late persists Running late via update_job_status and keeps scheduled", () => {
+test("Running late proposes preserving the scheduled status", () => {
   const brief = buildNextStopBrief({
     jobs: [job()],
     clients: [client()],
@@ -313,7 +310,7 @@ test("Running late persists Running late via update_job_status and keeps schedul
   const runningLate = nextStopToolCall("running-late", brief);
   assert.equal(runningLate.name, "update_job_status");
   assert.equal(runningLate.args.status, "scheduled");
-  assert.equal(runningLate.args.confirm, true);
+  assert.equal("confirm" in runningLate.args, false);
   assert.match(String(runningLate.args.notes), /\[\[joseph-ops:running-late\]\]/);
   assert.match(String(runningLate.args.notes), /Gate code 4451/);
 });
@@ -350,16 +347,11 @@ test("Done → Draft invoice wires complete_job_and_draft_invoice from the linke
   assert.ok(brief);
   assert.equal(canConfirmDraftInvoice(brief), true);
 
-  const preview = nextStopToolCall("done-draft-invoice", brief, false);
+  const preview = nextStopToolCall("done-draft-invoice", brief);
   assert.equal(preview.name, "complete_job_and_draft_invoice");
   assert.equal(preview.args.jobId, JOB_ID);
-  assert.equal(preview.args.confirm, false);
+  assert.equal("confirm" in preview.args, false);
   assert.equal("rate" in preview.args, false);
-
-  const confirmed = nextStopToolCall("done-draft-invoice", brief, true);
-  assert.equal(confirmed.name, "complete_job_and_draft_invoice");
-  assert.equal(confirmed.args.confirm, true);
-  assert.equal("rate" in confirmed.args, false);
 });
 
 test("Done → Draft invoice does not confirm without a linked accepted quote", () => {
@@ -372,32 +364,4 @@ test("Done → Draft invoice does not confirm without a linked accepted quote", 
   assert.ok(brief);
   assert.equal(brief.hasLinkedQuote, false);
   assert.equal(canConfirmDraftInvoice(brief), false);
-});
-
-test("message tool replies stay drafts and invoice replies mention the quote", () => {
-  const message = formatNextStopToolReply(
-    "on-my-way",
-    JSON.stringify({
-      draft: "Hi Northside Studio, I'm on my way — Mow & Glow Property Services",
-      preferred: "SMS",
-      phone: "+61 400 000 000",
-      sent: false,
-    }),
-  );
-  assert.match(message, /Not sent/);
-  assert.match(message, /on my way/);
-  assert.match(message, /En route/);
-
-  const statusOnly = formatNextStopToolReply(
-    "running-late",
-    JSON.stringify({ id: JOB_ID, client: "Northside Studio", status: "scheduled" }),
-  );
-  assert.match(statusOnly, /Running late/);
-
-  const invoiceReply = formatNextStopToolReply(
-    "done-draft-invoice",
-    JSON.stringify({ invoiceNumber: "INV-0041", jobStatus: "completed" }),
-    "Completed Northside Studio and drafted invoice INV-0041.",
-  );
-  assert.match(invoiceReply, /INV-0041/);
 });

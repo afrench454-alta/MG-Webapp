@@ -14,6 +14,7 @@ const jobRequestRowSchema = z.object({
   client_id: z.uuid().nullable(),
   service_address_id: z.uuid().nullable(),
   status: z.enum(["new", "qualified", "quoting", "scheduled", "closed", "rejected"]),
+  previous_open_status: z.enum(["new", "qualified", "quoting", "scheduled"]).nullable(),
   title: z.string(),
   description: z.string().nullable(),
   created_at: z.string(),
@@ -21,18 +22,12 @@ const jobRequestRowSchema = z.object({
   client_addresses: z.object({ line_1: z.string(), label: z.string().nullable() }).nullable(),
 });
 
-const addressRowSchema = z.object({
-  id: z.uuid(),
-  client_id: z.uuid(),
-  line_1: z.string(),
-  label: z.string().nullable(),
-});
-
 const JOB_REQUEST_SELECT = `
   id,
   client_id,
   service_address_id,
   status,
+  previous_open_status,
   title,
   description,
   created_at,
@@ -71,6 +66,8 @@ function mapStatus(status: z.infer<typeof jobRequestRowSchema>["status"]): JobRe
   }
 }
 
+const openStatuses = { new: "New", qualified: "Qualified", quoting: "Quoting", scheduled: "Scheduled" } as const;
+
 function mapJobRequest(rowValue: unknown): JobRequest {
   const row = jobRequestRowSchema.parse(rowValue);
 
@@ -83,6 +80,7 @@ function mapJobRequest(rowValue: unknown): JobRequest {
     category: row.title,
     scope: row.description || "",
     status: mapStatus(row.status),
+    previousStatus: row.previous_open_status ? openStatuses[row.previous_open_status] : null,
     created: formatDate(row.created_at),
   };
 }
@@ -101,46 +99,40 @@ export async function listJobRequests(context: BusinessContext): Promise<JobRequ
   return (data || []).map(mapJobRequest);
 }
 
+async function getJobRequest(context: BusinessContext, id: string): Promise<JobRequest> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("job_requests").select(JOB_REQUEST_SELECT)
+    .eq("business_id", context.businessId).eq("id", id).single();
+  if (error) throw new Error(error.message);
+  return mapJobRequest(data);
+}
+
 export async function saveJobRequest(
   context: BusinessContext,
   input: JobRequestMutationInput,
 ): Promise<JobRequest> {
   const supabase = await createClient();
-  const { data: addressData, error: addressError } = await supabase
-    .from("client_addresses")
-    .select("id, client_id, line_1, label")
-    .eq("business_id", context.businessId)
-    .eq("id", input.propertyId)
-    .eq("client_id", input.clientId)
-    .single();
+  const { data, error } = await supabase.rpc("save_work_request", {
+    target_business_id: context.businessId,
+    draft: { ...input, title: formatServiceTitle(input.category, input.serviceDetail) },
+  });
+  if (error) throw new Error(error.message);
+  return getJobRequest(context, z.uuid().parse(data));
+}
 
-  if (addressError) {
-    throw new Error(`Unable to verify the service address: ${addressError.message}`);
-  }
-
-  const address = addressRowSchema.parse(addressData);
-  const { data, error } = await supabase
-    .from("job_requests")
-    .insert({
-      business_id: context.businessId,
-      client_id: input.clientId,
-      service_address_id: input.propertyId,
-      status: "new",
-      title: formatServiceTitle(input.category, input.serviceDetail),
-      description: input.scope,
-      source: input.questionnaireResponseId ? "questionnaire" : "manual",
-      questionnaire_response_id: input.questionnaireResponseId || null,
-      created_by: context.actorId,
-      service_address_snapshot: {
-        label: address.label,
-        line_1: address.line_1,
-      },
-    })
-    .select(JOB_REQUEST_SELECT)
-    .single();
-
-  if (error) throw new Error(`Unable to save the job request: ${error.message}`);
-  return mapJobRequest(data);
+export async function setJobRequestClosed(
+  context: BusinessContext,
+  id: string,
+  closed: boolean,
+): Promise<JobRequest> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_work_request_closed", {
+    target_business_id: context.businessId,
+    target_request_id: id,
+    is_closed: closed,
+  });
+  if (error) throw new Error(error.message);
+  return getJobRequest(context, z.uuid().parse(data));
 }
 
 export async function deleteJobRequest(

@@ -115,7 +115,7 @@ export function QuotesView({
                 </div>
                 <strong className="record-client">{formatSiteTitle(quote)}</strong>
                 <p>
-                  Issued {quote.issued} · Expires {quote.expires}
+                  Issued {quote.issued} · {quote.validUntil === null ? "No expiry" : `Expires ${quote.expires}`}
                 </p>
               </div>
               <div className="record-row__actions">
@@ -155,12 +155,14 @@ export function QuotesView({
                     Create invoice
                   </Button>
                 ) : null}
-                <IconButton
-                  label={`Delete ${quote.documentNumber || quote.id}`}
-                  icon={Trash2}
-                  tone="danger"
-                  onClick={() => onDelete(quote)}
-                />
+                {quote.status === "Draft" ? (
+                  <IconButton
+                    label={`Delete ${quote.documentNumber || quote.id}`}
+                    icon={Trash2}
+                    tone="danger"
+                    onClick={() => onDelete(quote)}
+                  />
+                ) : null}
               </div>
             </article>
           );

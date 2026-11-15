@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireBusinessContext } from "@/lib/supabase/business";
+import { createClient } from "@/lib/supabase/server";
 
 import {
+  approveJosephRequestSchema,
   askJosephRequestSchema,
   runJosephNextStopRequestSchema,
   type AskJosephResult,
@@ -28,11 +30,10 @@ import {
 import {
   buildNextStopBrief,
   canConfirmDraftInvoice,
-  formatNextStopToolReply,
-  nextStopMessageIntent,
   nextStopToolCall,
 } from "./joseph-next-stop";
 import { listClients } from "./client-repository";
+import { josephMutationName, proposeJosephMutation } from "./joseph-confirmation";
 import { listInvoices, listJobs, listQuotes } from "./operations-repository";
 
 const MAX_TOOL_ROUNDS = 4;
@@ -64,7 +65,6 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
   ];
 
   const actions: string[] = [];
-  let mutated = false;
 
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
@@ -89,7 +89,6 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
         if (!reply) {
           return { ok: false, message: JOSEPH_UNAVAILABLE };
         }
-        if (mutated) revalidatePath("/");
         return { ok: true, reply, actions };
       }
 
@@ -101,6 +100,11 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
 
       for (const call of result.toolCalls) {
         try {
+          const mutation = josephMutationName.safeParse(call.function.name);
+          if (mutation.success) {
+            const proposal = await proposeJosephMutation(context, mutation.data, call.function.arguments);
+            return { ok: true, reply: "Review the proposed change below.", actions: [], proposal };
+          }
           const executed = await executeJosephTool(
             context,
             call.function.name,
@@ -108,7 +112,6 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
           );
           if (executed.action) {
             actions.push(executed.action);
-            mutated = true;
           }
           history.push({
             role: "tool",
@@ -134,8 +137,6 @@ export async function askJosephAction(input: unknown): Promise<AskJosephResult> 
     console.error("Joseph failed", error);
     return { ok: false, message: "Joseph could not finish that request." };
   }
-
-  if (mutated) revalidatePath("/");
   return {
     ok: false,
     message: "Joseph needed too many steps. Try a shorter request.",
@@ -173,52 +174,49 @@ export async function runJosephNextStopAction(input: unknown): Promise<AskJoseph
     return { ok: false, message: "That next stop is no longer current." };
   }
 
-  if (parsed.data.chip === "done-draft-invoice") {
-    if (!canConfirmDraftInvoice(brief)) {
-      return { ok: false, message: "This stop has no accepted quote to invoice from." };
-    }
-    if (!parsed.data.confirm) {
-      return {
-        ok: true,
-        reply: `Complete ${brief.clientName} at ${brief.address} and draft the invoice from the linked quote.`,
-        actions: [],
-      };
-    }
+  if (parsed.data.chip === "done-draft-invoice" && !canConfirmDraftInvoice(brief)) {
+    return { ok: false, message: "This stop has no accepted quote to invoice from." };
   }
 
-  const call = nextStopToolCall(parsed.data.chip, brief, parsed.data.confirm === true);
+  const call = nextStopToolCall(parsed.data.chip, brief);
   try {
-    const executed = await executeJosephTool(context, call.name, JSON.stringify(call.args));
-    revalidatePath("/");
-    const actions = executed.action ? [executed.action] : [];
-    let reply = formatNextStopToolReply(parsed.data.chip, executed.text, executed.action);
-
-    if (parsed.data.chip === "on-my-way" || parsed.data.chip === "running-late") {
-      try {
-        const drafted = await executeJosephTool(
-          context,
-          "draft_client_message",
-          JSON.stringify({
-            query: brief.clientName,
-            intent: nextStopMessageIntent(parsed.data.chip, brief),
-          }),
-        );
-        reply = formatNextStopToolReply(parsed.data.chip, drafted.text, executed.action);
-        if (drafted.action) actions.push(drafted.action);
-      } catch {
-        // Status already persisted; message draft is optional.
-      }
-    }
-
-    return { ok: true, reply, actions };
+    const proposal = await proposeJosephMutation(
+      context,
+      josephMutationName.parse(call.name),
+      JSON.stringify(call.args),
+      { chip: parsed.data.chip, quoteId: brief.quoteId },
+    );
+    return { ok: true, reply: "Review the proposed change below.", actions: [], proposal };
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? "Those details were not valid."
-        : error instanceof Error
-          ? error.message
-          : "The action failed.";
+    const message = error instanceof z.ZodError
+      ? "Those details were not valid."
+      : error instanceof Error ? error.message : "The action could not be prepared.";
     return { ok: false, message };
+  }
+}
+
+export async function approveJosephAction(input: unknown): Promise<AskJosephResult> {
+  const parsed = approveJosephRequestSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Choose a proposed change to approve." };
+
+  try {
+    const context = await requireBusinessContext();
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("approve_joseph_action", {
+      target_business_id: context.businessId,
+      proposal_token: parsed.data.token,
+    });
+    if (error) {
+      const message = error.code === "P0001"
+        ? error.message
+        : "Joseph could not apply that change. Review a new proposal and try again.";
+      return { ok: false, message };
+    }
+    const reply = z.string().parse(data);
+    revalidatePath("/");
+    return { ok: true, reply, actions: [reply] };
+  } catch {
+    return { ok: false, message: "Joseph could not apply that change." };
   }
 }
 

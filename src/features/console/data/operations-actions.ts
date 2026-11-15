@@ -7,8 +7,9 @@ import { requireBusinessContext } from "@/lib/supabase/business";
 
 import {
   invoiceDraftSchema,
-  invoicePaymentStatusSchema,
+  invoicePaymentSchema,
   jobAssignmentsSchema,
+  jobNoteSchema,
   jobUpdateSchema,
   quoteDraftSchema,
   quoteStatusSchema,
@@ -20,6 +21,7 @@ import {
   type QuoteActionResult,
 } from "./operations-contract";
 import {
+  addJobNote,
   createInvoice,
   createQuote,
   deleteInvoice,
@@ -28,6 +30,7 @@ import {
   deleteQuote,
   finalizeInvoice,
   markInvoiceAsSent,
+  reviseQuote,
   scheduleJob,
   updateInvoice,
   updateInvoicePayment,
@@ -39,6 +42,7 @@ import {
   voidIssuedInvoice,
 } from "./operations-repository";
 import { OperationsRuleError } from "./operations-rules";
+import { getClientById } from "./client-repository";
 
 function failure(error: unknown, fallback: string) {
   if (error instanceof z.ZodError) return "Check the details and try again.";
@@ -60,17 +64,30 @@ const manager = () => requireBusinessContext(["owner", "co_owner"]);
 
 export async function saveQuoteAction(input: unknown): Promise<QuoteActionResult> {
   const parsed = quoteDraftSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, message: failure(parsed.error, "Quote details are invalid.") };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Quote details are invalid." };
   try {
     const context = await manager();
     const quote = parsed.data.id
       ? await updateQuote(context, parsed.data)
       : await createQuote(context, parsed.data);
+    const client = parsed.data.inlineClient && quote.clientId ? await getClientById(context, quote.clientId) : undefined;
     revalidatePath("/");
-    return { ok: true, quote };
+    return { ok: true, quote, client };
   } catch (error) {
     console.error("Quote save failed", error);
     return { ok: false, message: failure(error, "The quote could not be saved.") };
+  }
+}
+
+export async function reviseQuoteAction(id: string): Promise<QuoteActionResult> {
+  const parsed = idSchema.safeParse(id);
+  if (!parsed.success) return { ok: false, message: "The quote identifier was invalid." };
+  try {
+    const quote = await reviseQuote(await manager(), parsed.data);
+    revalidatePath("/");
+    return { ok: true, quote };
+  } catch (error) {
+    return { ok: false, message: failure(error, "The revision could not be created.") };
   }
 }
 
@@ -101,11 +118,13 @@ export async function deleteQuoteAction(id: string): Promise<DeleteActionResult>
 
 export async function scheduleJobAction(input: unknown): Promise<JobActionResult> {
   const parsed = scheduleJobSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, message: failure(parsed.error, "Schedule details are invalid.") };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Schedule details are invalid." };
   try {
-    const job = await scheduleJob(await manager(), parsed.data);
+    const context = await manager();
+    const job = await scheduleJob(context, parsed.data);
+    const client = parsed.data.inlineClient && job.clientId ? await getClientById(context, job.clientId) : undefined;
     revalidatePath("/");
-    return { ok: true, job };
+    return { ok: true, job, client };
   } catch (error) {
     return { ok: false, message: failure(error, "The job could not be scheduled.") };
   }
@@ -147,6 +166,18 @@ export async function updateJobAssignmentsAction(input: unknown): Promise<JobAct
   }
 }
 
+export async function addJobNoteAction(input: unknown): Promise<JobActionResult> {
+  const parsed = jobNoteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "The note is invalid." };
+  try {
+    const job = await addJobNote(await requireBusinessContext(), parsed.data);
+    revalidatePath("/");
+    return { ok: true, job };
+  } catch (error) {
+    return { ok: false, message: failure(error, "The field note could not be saved.") };
+  }
+}
+
 export async function uploadJobPhotoAction(formData: FormData): Promise<JobPhotoActionResult> {
   const jobId = idSchema.safeParse(formData.get("jobId"));
   const caption = z.string().trim().max(500).safeParse(formData.get("caption") || "");
@@ -185,25 +216,27 @@ export async function deleteJobPhotoAction(jobId: string, photoId: string): Prom
 
 export async function saveInvoiceAction(input: unknown): Promise<InvoiceActionResult> {
   const parsed = invoiceDraftSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, message: failure(parsed.error, "Invoice details are invalid.") };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invoice details are invalid." };
   try {
     const context = await manager();
     const invoice = parsed.data.id
       ? await updateInvoice(context, parsed.data)
       : await createInvoice(context, parsed.data);
     revalidatePath("/");
-    return { ok: true, invoice };
+    const client = parsed.data.inlineClient && invoice.clientId ? await getClientById(context, invoice.clientId) : undefined;
+    return { ok: true, invoice, client };
   } catch (error) {
     return { ok: false, message: failure(error, "The invoice could not be saved.") };
   }
 }
 
-export async function updateInvoicePaymentAction(id: string, status: unknown): Promise<InvoiceActionResult> {
-  const parsedId = idSchema.safeParse(id);
-  const parsedStatus = invoicePaymentStatusSchema.safeParse(status);
-  if (!parsedId.success || !parsedStatus.success) return { ok: false, message: "The invoice update was invalid." };
+export async function updateInvoicePaymentAction(input: unknown): Promise<InvoiceActionResult> {
+  const parsed = invoicePaymentSchema.safeParse(input);
+  if (!parsed.success || !idSchema.safeParse(parsed.data.invoiceId).success) {
+    return { ok: false, message: "Check the amount, date, method and any correction details." };
+  }
   try {
-    const invoice = await updateInvoicePayment(await manager(), parsedId.data, parsedStatus.data);
+    const invoice = await updateInvoicePayment(await manager(), parsed.data);
     revalidatePath("/");
     return { ok: true, invoice };
   } catch (error) {
@@ -211,11 +244,11 @@ export async function updateInvoicePaymentAction(id: string, status: unknown): P
   }
 }
 
-export async function finalizeInvoiceAction(id: string): Promise<InvoiceActionResult> {
-  const parsed = idSchema.safeParse(id);
-  if (!parsed.success) return { ok: false, message: "The invoice identifier was invalid." };
+export async function finalizeInvoiceAction(id: string, expectedVersion: number): Promise<InvoiceActionResult> {
+  const parsed = z.tuple([idSchema, z.number().int().positive()]).safeParse([id, expectedVersion]);
+  if (!parsed.success) return { ok: false, message: "Reload the invoice before issuing." };
   try {
-    const invoice = await finalizeInvoice(await manager(), parsed.data);
+    const invoice = await finalizeInvoice(await manager(), ...parsed.data);
     revalidatePath("/");
     return { ok: true, invoice };
   } catch (error) {

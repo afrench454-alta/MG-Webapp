@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { reportOnlyContentPolicy } from "../../src/lib/content-security-policy";
 import { trustedOrigin } from "../../src/lib/trusted-origin";
 
 function headers(map: Record<string, string>): Headers {
@@ -40,4 +41,17 @@ test("trustedOrigin rejects malformed hosts", () => {
     },
   } as Headers;
   assert.equal(trustedOrigin(injected, env), "");
+});
+
+test("the CSP candidate scopes signed photo sources to the configured Supabase origin", () => {
+  const policy = reportOnlyContentPolicy("https://fixtures.supabase.example/storage/path", false);
+  assert.match(policy, /img-src 'self' data: blob: https:\/\/fixtures\.supabase\.example\/storage\/v1\/object\/sign\//);
+  assert.match(policy, /connect-src 'self' https:\/\/fixtures\.supabase\.example(?:;|$)/);
+  assert.match(policy, /form-action 'self'(?:;|$)/);
+  assert.match(policy, /frame-ancestors 'none'(?:;|$)/);
+  assert.doesNotMatch(policy, /unsafe-eval|https:\/\/\*|script-src[^;]+unsafe-inline/);
+});
+
+test("CSP omits malformed or missing service origins", () => {
+  assert.equal(reportOnlyContentPolicy("javascript:alert(1)", false), reportOnlyContentPolicy(undefined, false));
 });
