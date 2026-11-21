@@ -2994,10 +2994,12 @@ html[data-theme="dark"] .document-view {
   .sidebar {
     width: min(320px, 88vw);
     transform: translateX(-102%);
-    box-shadow: var(--shadow-dialog);
     transition: transform 180ms ease;
   }
-  .sidebar--open { transform: translateX(0); }
+  .sidebar--open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-dialog);
+  }
   .sidebar__close { display: inline-grid; }
   .sidebar-nav button { min-height: 44px; }
   .mobile-scrim {
@@ -3768,8 +3770,9 @@ button.submission-row {
 
 .top-command-bar__menu-btn {
   display: none;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
+  flex: none;
   place-items: center;
   padding: 0;
   border: 1px solid var(--border);
@@ -3779,6 +3782,7 @@ button.submission-row {
 }
 
 .top-command-bar__identity {
+  min-width: 0;
   display: grid;
   gap: 1px;
 }
@@ -3796,6 +3800,8 @@ button.submission-row {
   font-family: "Work Sans", sans-serif;
   font-size: 15px;
   font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -5091,16 +5097,22 @@ progress.progress-ring::-moz-progress-bar {
 
 @media (max-width: 760px) {
   .top-command-bar {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 10px 16px;
     gap: 10px;
   }
+  .top-command-bar__identity strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .top-command-bar__search-wrap {
+    grid-column: 1 / -1;
     order: 3;
-    flex: 1 1 100%;
     max-width: none;
   }
-  .top-command-bar__quick-btn span {
+  .top-command-bar__quick-btn span,
+  .top-command-bar__kbd {
     display: none;
   }
   .top-command-bar__quick-btn {
@@ -5127,7 +5139,8 @@ progress.progress-ring::-moz-progress-bar {
 
 /* Phone shell support (html[data-phone="true"]) for Reworked UI Shell */
 html[data-phone="true"] .top-command-bar {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   padding: calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
   gap: 10px;
 }
@@ -5138,14 +5151,20 @@ html[data-phone="true"] .top-command-bar__menu-btn {
 
 html[data-phone="true"] .top-command-bar__status-pill,
 html[data-phone="true"] .top-command-bar__quick-btn span,
+html[data-phone="true"] .top-command-bar__kbd,
 html[data-phone="true"] .suite-context-bar__desc,
 html[data-phone="true"] .dialog__esc-pill {
   display: none;
 }
 
+html[data-phone="true"] .top-command-bar__identity strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 html[data-phone="true"] .top-command-bar__search-wrap {
+  grid-column: 1 / -1;
   order: 3;
-  flex: 1 1 100%;
   max-width: none;
 }
 

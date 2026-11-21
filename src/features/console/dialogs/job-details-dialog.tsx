@@ -1,5 +1,6 @@
 "use client";
 
+import { randomId } from "@/lib/random-id";
 import { useState } from "react";
 import Image from "next/image";
 import {
@@ -95,7 +96,7 @@ export function JobDetailsDialog({
 
   const saveNote = async () => {
     if (!onAddNote || !fieldNote.trim()) return;
-    const id = noteId ?? crypto.randomUUID();
+    const id = noteId ?? randomId();
     setNoteId(id);
     if (await onAddNote(id, fieldNote.trim())) {
       setFieldNote("");

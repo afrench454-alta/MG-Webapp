@@ -28,8 +28,9 @@ From a fresh isolated checkout and stack:
 
 ```sh
 npx --no-install supabase start
-node scripts/check-local-supabase.mjs
+npx --no-install playwright install chromium
+node scripts/check-local-supabase.mjs --browser
 npx --no-install supabase stop
 ```
 
-The first start applies the migrations and seeds the two synthetic tenants. The runner creates a fresh synthetic invoice and ledger entries on every run. Reset or discard that stack after testing. The SQL suites run with psql and roll back their own fixtures. Auth, PostgREST and Storage use the local public key and ordinary signed-in sessions. CI runs the same check in the `supabase-integration` job.
+The first start applies the migrations and seeds the two synthetic tenants. The runner creates a fresh synthetic invoice and ledger entries on every run. Reset or discard that stack after testing. The SQL suites run with psql and roll back their own fixtures. Auth, PostgREST and Storage use the local public key and ordinary signed-in sessions. Omit `--browser` to run just the Auth, HTTP API and SQL checks. The browser pass builds a production-mode app on loopback port 3210 and uses the same seeded identities. It records sanitized CSP event summaries in `test-results/supabase-browser.json`. CI uploads the same report from the `supabase-integration` job.

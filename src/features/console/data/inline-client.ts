@@ -1,3 +1,4 @@
+import { randomId } from "@/lib/random-id";
 import { z } from "zod";
 import type { Client } from "../domain";
 import { normalizePhone } from "./client-import";
@@ -26,13 +27,13 @@ export function resolveDemoInlineClient(input: InlineClientInput, clients: Clien
   const site = details.siteAddress?.trim();
   const property = site
     ? existing?.properties.find((item) => item.address.trim().toLowerCase() === site.toLowerCase()) ??
-      { id: crypto.randomUUID(), name: "Service site", address: site, cadence: "One-off" }
+      { id: randomId(), name: "Service site", address: site, cadence: "One-off" }
     : undefined;
   const client: Client = existing ? {
     ...existing,
     properties: property && !existing.properties.includes(property) ? [...existing.properties, property] : existing.properties,
   } : {
-    id: crypto.randomUUID(),
+    id: randomId(),
     name: details.name,
     status: "Active",
     phone: details.phone || "",

@@ -68,8 +68,19 @@ jobs:
       - name: Start fresh disposable Supabase stack
         run: npx --no-install supabase start
 
-      - name: Verify Auth, PostgREST, Storage and SQL suites
-        run: node scripts/check-local-supabase.mjs
+      - name: Install Chromium for authenticated browser checks
+        run: npx --no-install playwright install --with-deps chromium
+
+      - name: Verify Auth, PostgREST, Storage, SQL and browser workflows
+        run: node scripts/check-local-supabase.mjs --browser
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-browser-results
+          path: test-results/supabase-browser.json
+          if-no-files-found: ignore
 
       - name: Stop disposable stack
         if: always()

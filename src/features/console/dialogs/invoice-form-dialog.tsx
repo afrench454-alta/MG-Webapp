@@ -1,5 +1,6 @@
 "use client";
 
+import { randomId } from "@/lib/random-id";
 import { useRef, useState, type FormEvent } from "react";
 import { Save } from "lucide-react";
 import { invoiceTerms, money, type Client, type Invoice, type Job, type JobRequest, type LineItem, type Quote } from "../domain";
@@ -26,7 +27,7 @@ export type InvoiceDraft = Omit<InvoiceDraftInput, "clientId" | "propertyId" | "
 export function invoiceDraftActionInput(draft: InvoiceDraft): InvoiceDraftInput {
   return {
     ...draft,
-    idempotencyKey: draft.idempotencyKey ?? crypto.randomUUID(),
+    idempotencyKey: draft.idempotencyKey ?? randomId(),
     clientId: draft.clientId || undefined,
     propertyId: draft.propertyId || undefined,
     issueDate: draft.issueDate || brisbaneToday(),
@@ -138,7 +139,7 @@ export function InvoiceFormDialog({
       return;
     }
     const payload = JSON.stringify(draft);
-    if (previousSubmission.current?.payload !== payload) previousSubmission.current = { payload, key: crypto.randomUUID() };
+    if (previousSubmission.current?.payload !== payload) previousSubmission.current = { payload, key: randomId() };
     const submitted = { ...draft, idempotencyKey: previousSubmission.current.key };
     const validated = invoiceDraftActionInput(submitted);
     // Demo fixtures use local IDs. The server validates UUIDs for live submissions.

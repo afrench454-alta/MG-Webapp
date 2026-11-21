@@ -159,6 +159,22 @@ async function run() {
     value(await bucket(owner).remove([object]), "Remove synthetic attachment");
   }
   console.log("PASS Supabase Auth, PostgREST financial permissions and payment persistence, Storage policies, and SQL suites");
+
+  if (process.argv.includes("--browser")) {
+    const playwright = fileURLToPath(new URL("../node_modules/@playwright/test/cli.js", import.meta.url));
+    const result = spawnSync(process.execPath, [playwright, "test", "--config", "playwright.supabase.config.ts"], {
+      cwd: root,
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: endpoint,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publicKey,
+      },
+      stdio: "inherit",
+      timeout: 360_000,
+    });
+    if (result.error) throw result.error;
+    assert.equal(result.status, 0, "Authenticated browser checks failed");
+  }
 }
 
 await run();

@@ -1,5 +1,6 @@
 "use client";
 
+import { randomId } from "@/lib/random-id";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { CheckCircle2, Sparkles } from "lucide-react";
 import "./console.css";
@@ -518,7 +519,7 @@ export function ConsoleApp({
     setClientMutationError("");
 
     if (dataMode === "demo") {
-      upsertClient({ ...saved, properties: saved.properties.map((site) => ({ ...site, id: site.id || crypto.randomUUID() })) });
+      upsertClient({ ...saved, properties: saved.properties.map((site) => ({ ...site, id: site.id || randomId() })) });
       closeClientDialog();
       showToast("Client saved.");
       return;
@@ -609,7 +610,7 @@ export function ConsoleApp({
         setRequestMutationError("Choose a client and service address.");
         return;
       }
-      const createdId = crypto.randomUUID();
+      const createdId = randomId();
       if (draft.inlineClient) upsertClient(selectedClient);
       setJobRequests((current) => [
         {
@@ -900,7 +901,7 @@ export function ConsoleApp({
     const becameComplete =
       updated.status === "completed" && previous?.status !== "completed";
     const nextJob = becameComplete
-      ? buildNextDemoJob(updated, crypto.randomUUID())
+      ? buildNextDemoJob(updated, randomId())
       : null;
     setJobs((current) => {
       const replaced = current.map((job) => (job.id === updated.id ? updated : job));
@@ -967,7 +968,7 @@ export function ConsoleApp({
     setOperationMutationError("");
     if (dataMode === "demo") {
       const photo: JobPhoto = {
-        id: crypto.randomUUID(),
+        id: randomId(),
         name: file.name,
         url: URL.createObjectURL(file),
         caption: "",
@@ -1227,7 +1228,7 @@ export function ConsoleApp({
         if (draft.id && stored?.status !== "Draft") throw new Error("Only draft quotes can be edited.");
         const issueDate = draft.issueDate ?? brisbaneDateKey();
         const validUntil = draft.validUntil;
-        const id = draft.id ?? crypto.randomUUID();
+        const id = draft.id ?? randomId();
         quote = {
           ...stored, ...draft, id, documentNumber: stored?.documentNumber,
           clientId: client.id, client: client.name, address: property?.address ?? "",
@@ -1276,7 +1277,7 @@ export function ConsoleApp({
         revision = result.quote;
       } else {
         revision = {
-          ...quote, id: crypto.randomUUID(), documentNumber: undefined, status: "Draft",
+          ...quote, id: randomId(), documentNumber: undefined, status: "Draft",
           revisionOfQuoteId: quote.id, issuerSnapshot: undefined, updatedAt: new Date().toISOString(),
         };
       }
@@ -1313,7 +1314,7 @@ export function ConsoleApp({
         if (!client) throw new Error("Choose a client or add a new one.");
         const extraProperties = client.properties.filter((item) => item.id && draft.extraPropertyIds?.includes(item.id));
         const date = draft.issueDate ?? brisbaneDateKey();
-        const id = prior?.id ?? crypto.randomUUID();
+        const id = prior?.id ?? randomId();
         saved = {
           ...prior,
           id, documentNumber: prior?.documentNumber, clientId: client.id,
@@ -1360,7 +1361,7 @@ export function ConsoleApp({
         if (!client || !property || !category) throw new Error("Choose a client, service address and service.");
         const schedule = formatBrisbaneSchedule(draft.scheduledStart);
         job = {
-          id: crypto.randomUUID(),
+          id: randomId(),
           displayName: formatJobDisplayName({ client: client.name, address: property.address, category, date: schedule.date }),
           client: client.name, property: property.name, address: property.address, category,
           scope: request?.scope ?? draft.scope ?? "", ...schedule,
@@ -1784,8 +1785,8 @@ export function ConsoleApp({
                 }
                 return result;
               }
-              const id = crypto.randomUUID();
-              const token = `${id.replace(/-/g, "")}${crypto.randomUUID().replace(/-/g, "")}`;
+              const id = randomId();
+              const token = `${id.replace(/-/g, "")}${randomId().replace(/-/g, "")}`;
               setTeamInvitations((current) => [
                 {
                   id,

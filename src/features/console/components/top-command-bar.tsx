@@ -290,7 +290,7 @@ export function TopCommandBar({
               setQuery(event.target.value);
               setSearchOpen(true);
             }}
-            placeholder="Search clients, properties, jobs, quotes, or invoices..."
+            placeholder="Search console"
           />
           {query ? (
             <button
@@ -387,6 +387,7 @@ export function TopCommandBar({
             <button
               type="button"
               className="button button--primary top-command-bar__quick-btn"
+              aria-label="Quick Create"
               aria-expanded={quickCreateOpen}
               onClick={() => setQuickCreateOpen((open) => !open)}
             >

@@ -54,3 +54,34 @@ test.describe("Mow & Glow Console - Mobile", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
   });
 });
+
+test("keeps mobile header controls on one row at the iPhone 12 mini width", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/?demo=populated");
+  const nav = page.getByRole("button", { name: "Open navigation" });
+  const alerts = page.getByRole("button", { name: "Operational alerts" });
+  await expect(nav).toBeVisible();
+  await expect(alerts).toBeVisible();
+  const rows = await Promise.all([nav.boundingBox(), alerts.boundingBox()]);
+  expect(Math.abs(rows[0]!.y + rows[0]!.height / 2 - rows[1]!.y - rows[1]!.height / 2)).toBeLessThan(4);
+  await expect(page.getByRole("button", { name: "Quick Create", exact: true })).toBeVisible();
+  const identity = page.locator(".top-command-bar__identity strong");
+  expect(await identity.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+  await expect(page.locator("#console-sidebar")).toHaveCSS("box-shadow", "none");
+});
+
+test("records a synthetic payment where the browser only exposes getRandomValues", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(crypto, "randomUUID", { value: undefined }));
+  await page.goto("/?demo=populated&view=invoices");
+  const row = page.getByRole("article").filter({ has: page.getByRole("button", { name: "Review draft" }) });
+  await row.getByRole("button", { name: "Review draft" }).click();
+  await page.getByRole("button", { name: "Issue", exact: true }).click();
+  await expect(page.getByText("Invoice issued.")).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Record payment", exact: true }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Amount (AUD)").fill("10");
+  await dialog.getByLabel("Payment method").selectOption("cash");
+  await dialog.getByRole("button", { name: "Record payment", exact: true }).click();
+  await expect(page.getByText("Payment recorded.")).toBeVisible();
+});

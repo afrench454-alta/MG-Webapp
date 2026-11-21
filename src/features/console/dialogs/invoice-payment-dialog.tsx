@@ -1,5 +1,6 @@
 "use client";
 
+import { randomId } from "@/lib/random-id";
 import { useRef, useState, type FormEvent } from "react";
 import { money, type Invoice, type InvoicePaymentMethod } from "../domain";
 import { invoicePaymentSchema, type InvoicePaymentInput } from "../data/invoice-contract";
@@ -42,7 +43,7 @@ export function InvoicePaymentDialog({ record, pending = false, error = "", onSa
       reason: kind === "receipt" ? undefined : reason,
     };
     const fingerprint = JSON.stringify(data);
-    if (previous.current?.fingerprint !== fingerprint) previous.current = { fingerprint, key: crypto.randomUUID() };
+    if (previous.current?.fingerprint !== fingerprint) previous.current = { fingerprint, key: randomId() };
     const parsed = invoicePaymentSchema.safeParse({ ...data, idempotencyKey: previous.current.key });
     if (!parsed.success) {
       setLocalError(parsed.error.issues[0]?.message ?? "Check the payment details.");
