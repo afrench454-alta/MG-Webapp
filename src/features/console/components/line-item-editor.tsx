@@ -2,8 +2,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import { History, Plus, Sparkles, Trash2 } from "lucide-react";
-import { money, quoteTotals, type LineItem } from "../domain";
-import { invoiceLineTotal } from "../data/invoice-lifecycle";
+import { lineItemSubtotal, money, quoteTotals, type LineItem } from "../domain";
 import type { RateChipOption } from "../data/form-options";
 import { Button, IconButton } from "./ui-elements";
 
@@ -223,7 +222,7 @@ export function LineItemEditor({
               required
             />
             <output aria-label={`Item ${index + 1} total`}>
-              {money(invoice ? invoiceLineTotal(item) : Number(item.quantity || 0) * Number(item.rate || 0))}
+              {money(lineItemSubtotal(item))}
             </output>
             <IconButton
               label={`Remove line item ${index + 1}`}

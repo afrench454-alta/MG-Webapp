@@ -44,3 +44,33 @@ jobs:
         run: npx playwright test
         env:
           CI: true
+
+  supabase-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Ensure PostgreSQL client is available
+        run: |
+          if ! command -v psql > /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Start fresh disposable Supabase stack
+        run: npx --no-install supabase start
+
+      - name: Verify Auth, PostgREST, Storage and SQL suites
+        run: node scripts/check-local-supabase.mjs
+
+      - name: Stop disposable stack
+        if: always()
+        run: npx --no-install supabase stop

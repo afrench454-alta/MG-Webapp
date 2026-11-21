@@ -1130,19 +1130,21 @@ export function ConsoleApp({
     return { label: "Create invoice", run: () => setDialog({ type: "invoice-form", request }) };
   };
 
-  const updateQuoteStatus = async (
-    quoteId: string,
-    status: Quote["status"],
-  ) => {
+  const updateQuoteStatus = async (quote: Quote, status: Quote["status"]) => {
+    const quoteId = quote.id;
     if (dataMode === "live") {
       if (!onUpdateQuoteStatus) {
         setOperationMutationError("Live quote updates are not available.");
         return;
       }
+      if (!quote.updatedAt) {
+        setOperationMutationError("Reload the page and review the quote before changing its status.");
+        return;
+      }
       setOperationMutationPending(true);
       let result;
       try {
-        result = await onUpdateQuoteStatus(quoteId, status);
+        result = await onUpdateQuoteStatus({ id: quoteId, status, expectedUpdatedAt: quote.updatedAt });
       } catch {
         setOperationMutationError("A network error occurred. Please try again.");
         setOperationMutationPending(false);
@@ -2350,7 +2352,7 @@ export function ConsoleApp({
             profile={businessDetailsState}
             onClose={closeDialog}
             onStatusChange={(status) =>
-              updateQuoteStatus(dialog.quote.id, status as Quote["status"])
+              updateQuoteStatus(dialog.quote, status as Quote["status"])
             }
             onRevise={["Sent", "Accepted"].includes(dialog.quote.status) ? () => void reviseQuote(dialog.quote) : undefined}
             onCreateInvoice={

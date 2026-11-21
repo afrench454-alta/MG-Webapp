@@ -6,6 +6,7 @@ import {
   businessProfile as defaultBusinessProfile,
   formatLineQuantity,
   invoiceTerms,
+  lineItemSubtotal,
   money,
   quoteTerms,
   quoteTotals,
@@ -15,7 +16,7 @@ import {
 } from "../domain";
 import {
   availableInvoiceReceipts, canFinalizeInvoice, canMarkSent, canRecordPayment, canVoidInvoice,
-  invoiceAmounts, invoiceDisplayStatus, invoiceLineTotal,
+  invoiceAmounts, invoiceDisplayStatus,
 } from "../data/invoice-lifecycle";
 import { paymentMethodLabels } from "./invoice-payment-dialog";
 import { Badge, Button, invoiceDisplayTone, quoteStatusTone } from "../components/ui-elements";
@@ -251,7 +252,7 @@ export function DocumentViewDialog({
                 </td>
                 <td>
                   <AccountingAmount
-                    value={isQuote ? Number(item.quantity) * Number(item.rate) : invoiceLineTotal(item)}
+                    value={lineItemSubtotal(item)}
                   />
                 </td>
               </tr>

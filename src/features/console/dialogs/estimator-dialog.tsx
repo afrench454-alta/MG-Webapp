@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { JobRequest, LineItem } from "../domain";
-import { money, quoteTotals } from "../domain";
+import { lineItemSubtotal, money, quoteTotals } from "../domain";
 import {
   estimateToLineItems,
   type EstimateJobAction,
@@ -202,7 +202,7 @@ export function EstimatorDialog({
                   </small>
                 </span>
                 <strong>
-                  {money(Number(item.quantity) * Number(item.rate))}
+                  {money(lineItemSubtotal(item))}
                 </strong>
               </li>
             ))}

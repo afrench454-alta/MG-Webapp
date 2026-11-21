@@ -344,11 +344,19 @@ export function money(value: number): string {
   return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(value);
 }
 
+function lineSubtotalCents(item: LineItem): number {
+  // Match PostgreSQL three-decimal quantities, two-decimal prices and per-line rounding.
+  const thousandths = Math.round(Number(item.quantity || 0) * 1000);
+  const unitPriceCents = Math.round(Number(item.rate || 0) * 100);
+  return Math.round((thousandths * unitPriceCents) / 1000);
+}
+
+export function lineItemSubtotal(item: LineItem): number {
+  return lineSubtotalCents(item) / 100;
+}
+
 export function quoteTotals(items: LineItem[], discount = 0, taxRate = 0) {
-  const subtotal = items.reduce(
-    (sum, item) => sum + Number(item.quantity || 0) * Number(item.rate || 0),
-    0,
-  );
+  const subtotal = items.reduce((sum, item) => sum + lineSubtotalCents(item), 0) / 100;
   const discountedSubtotal = Math.max(0, subtotal - Math.max(0, discount));
   const tax = discountedSubtotal * Math.max(0, taxRate);
   return { subtotal, discount: Math.max(0, discount), taxRate: Math.max(0, taxRate), tax, total: discountedSubtotal + tax };

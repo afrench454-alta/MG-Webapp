@@ -72,3 +72,20 @@ test("formFieldSchema still coerces a null questionnaire label", () => {
   ]);
   assert.equal(parsed[1]?.label, "Untitled");
 });
+
+import { readBillingRows } from "../../src/features/console/data/billing-rows";
+
+test("billing reads continue after a full PostgREST page and reject a failed page", async () => {
+  const rows = Array.from({ length: 1_001 }, (_, id) => ({ id }));
+  const calls: Array<[number, number]> = [];
+  const result = await readBillingRows(async (from, to) => {
+    calls.push([from, to]);
+    return { data: rows.slice(from, to + 1), error: null };
+  });
+  assert.deepEqual(result, rows);
+  assert.deepEqual(calls, [[0, 999], [1_000, 1_999]]);
+
+  await assert.rejects(readBillingRows(async (from, to) => from === 0
+    ? { data: rows.slice(from, to + 1), error: null }
+    : { data: null, error: { message: "Page failed" } }), /Page failed/);
+});

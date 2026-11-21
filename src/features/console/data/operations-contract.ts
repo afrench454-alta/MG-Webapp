@@ -78,6 +78,11 @@ export const jobNoteSchema = z.object({
 });
 
 export const quoteStatusSchema = z.enum(["Draft", "Sent", "Accepted", "Declined", "Expired", "Void"]);
+export const quoteStatusUpdateSchema = z.object({
+  id: z.uuid(),
+  status: quoteStatusSchema,
+  expectedUpdatedAt: z.iso.datetime({ offset: true }),
+});
 
 export type QuoteDraftInput = z.infer<typeof quoteDraftSchema>;
 export type ScheduleJobInput = z.infer<typeof scheduleJobSchema>;
@@ -96,7 +101,7 @@ export type DeleteQuoteResult = Readonly<{ ok: true; id: string; job?: Job }> | 
 export type JobPhotoActionResult = Readonly<{ ok: true; photo: JobPhoto }> | ActionFailure;
 
 export type SaveQuoteAction = (input: QuoteDraftInput) => Promise<QuoteActionResult>;
-export type UpdateQuoteStatusAction = (id: string, status: z.infer<typeof quoteStatusSchema>) => Promise<QuoteActionResult>;
+export type UpdateQuoteStatusAction = (input: z.infer<typeof quoteStatusUpdateSchema>) => Promise<QuoteActionResult>;
 export type DeleteQuoteAction = (id: string) => Promise<DeleteQuoteResult>;
 export type ReviseQuoteAction = (id: string) => Promise<QuoteActionResult>;
 export type ScheduleJobAction = (input: ScheduleJobInput) => Promise<JobActionResult>;

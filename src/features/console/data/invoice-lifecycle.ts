@@ -1,4 +1,4 @@
-import type { BusinessProfile, Invoice, LineItem } from "../domain";
+import { lineItemSubtotal, type BusinessProfile, type Invoice } from "../domain";
 import { invoicePaymentSchema, type InvoicePaymentInput } from "./invoice-contract";
 import { OperationsRuleError } from "./operations-rules";
 
@@ -10,10 +10,7 @@ function cents(value: number) {
   return Math.round(value * 100);
 }
 
-export function invoiceLineTotal(item: LineItem): number {
-  // Match Postgres round(quantity * unit_price, 2) using thousandths and cents.
-  return Math.round(Math.round(Number(item.quantity || 0) * 1000) * cents(Number(item.rate || 0)) / 1000) / 100;
-}
+export const invoiceLineTotal = lineItemSubtotal;
 
 export function invoiceAmounts(invoice: Invoice) {
   const subtotal = invoice.subtotal ?? invoice.items.reduce((sum, item) => sum + cents(invoiceLineTotal(item)), 0) / 100;

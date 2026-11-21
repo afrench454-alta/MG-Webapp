@@ -121,3 +121,12 @@ test("invoice status transitions: valid tone mappings", () => {
   assert.equal(paymentStatusTone("Refunded"), "neutral");
   assert.equal(paymentStatusTone("Unpaid"), "unpaid");
 });
+
+test("quoteTotals matches PostgreSQL half-cent rounding for each line", () => {
+  const items = [
+    { description: "First fractional line", quantity: 0.5, rate: 0.01 },
+    { description: "Second fractional line", quantity: 0.5, rate: 0.01 },
+  ];
+  assert.equal(quoteTotals(items).subtotal, 0.02);
+  assert.equal(quoteTotals(items).total, 0.02);
+});

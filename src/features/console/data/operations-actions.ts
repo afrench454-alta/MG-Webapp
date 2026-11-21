@@ -12,7 +12,7 @@ import {
   jobNoteSchema,
   jobUpdateSchema,
   quoteDraftSchema,
-  quoteStatusSchema,
+  quoteStatusUpdateSchema,
   scheduleJobSchema,
   type DeleteActionResult,
   type DeleteQuoteResult,
@@ -94,12 +94,12 @@ export async function reviseQuoteAction(id: string): Promise<QuoteActionResult> 
   }
 }
 
-export async function updateQuoteStatusAction(id: string, status: unknown): Promise<QuoteActionResult> {
-  const parsedId = idSchema.safeParse(id);
-  const parsedStatus = quoteStatusSchema.safeParse(status);
-  if (!parsedId.success || !parsedStatus.success) return { ok: false, message: "The quote update was invalid." };
+export async function updateQuoteStatusAction(input: unknown): Promise<QuoteActionResult> {
+  const parsed = quoteStatusUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Reload the page and review the quote before changing its status." };
+  const { id, status, expectedUpdatedAt } = parsed.data;
   try {
-    const quote = await updateQuoteStatus(await manager(), parsedId.data, parsedStatus.data);
+    const quote = await updateQuoteStatus(await manager(), id, status, expectedUpdatedAt);
     revalidatePath("/");
     return { ok: true, quote };
   } catch (error) {

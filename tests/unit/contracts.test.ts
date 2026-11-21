@@ -347,3 +347,12 @@ test("contracts: publicQuestionnaireSubmissionSchema requires name, address, and
     false,
   );
 });
+
+import { quoteStatusUpdateSchema } from "../../src/features/console/data/operations-contract";
+
+test("quote status changes require the exact reviewed timestamp including subsecond precision", () => {
+  const quote = { id: "cb000000-0000-4000-8000-000000000001", status: "Accepted" };
+  assert.equal(quoteStatusUpdateSchema.safeParse(quote).success, false);
+  const expectedUpdatedAt = "2026-11-19T08:05:06.987654+00:00";
+  assert.equal(quoteStatusUpdateSchema.parse({ ...quote, expectedUpdatedAt }).expectedUpdatedAt, expectedUpdatedAt);
+});

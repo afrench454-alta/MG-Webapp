@@ -7,6 +7,7 @@ import type { BusinessContext } from "@/lib/supabase/business";
 import { createClient } from "@/lib/supabase/server";
 
 import type { Invoice, InvoicePayment, Job, JobPhoto, Quote, TeamMember } from "../domain";
+import { readBillingRows } from "./billing-rows";
 import type { InvoicePaymentInput } from "./invoice-contract";
 import type { InvoiceDraftInput, JobAssignmentsInput, JobNoteInput, JobUpdateInput, QuoteDraftInput, ScheduleJobInput } from "./operations-contract";
 import { recurrenceToDb } from "./job-recurrence";
@@ -273,7 +274,29 @@ async function assertTechnicianAssigned(
   }
 }
 
-export async function listQuotes(context: BusinessContext, recordId?: string): Promise<Quote[]> { if (context.role === "technician") return []; const supabase = await createClient(); const quotesQuery = recordId ? supabase.from("quotes").select(QUOTE_SELECT).eq("business_id", context.businessId).eq("id", recordId) : supabase.from("quotes").select(QUOTE_SELECT).eq("business_id", context.businessId); const itemsQuery = recordId ? supabase.from("quote_line_items").select("quote_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId).eq("quote_id", recordId) : supabase.from("quote_line_items").select("quote_id, label, description, quantity, unit_label, unit_price, tax_rate").eq("business_id", context.businessId); const [rowsResult, itemsResult, lookups] = await Promise.all([quotesQuery.order("issue_date", { ascending: false }), itemsQuery.order("position"), loadLookupMaps(context)]); if (rowsResult.error) throw new Error(rowsResult.error.message); if (itemsResult.error) throw new Error(itemsResult.error.message); const rows = z.array(quoteRowSchema).parse(rowsResult.data || []); const items = z.array(quoteItemRowSchema).parse(itemsResult.data || []); const grouped = groupByParent(items, (item) => item.quote_id); return rows.map((row) => mapQuote(row, lookups, grouped.get(row.id) || [])); }
+export async function listQuotes(context: BusinessContext, recordId?: string): Promise<Quote[]> {
+  if (context.role === "technician") return [];
+  const supabase = await createClient();
+  const quotesQuery = supabase.from("quotes").select(QUOTE_SELECT).eq("business_id", context.businessId);
+  const itemsQuery = supabase.from("quote_line_items")
+    .select("quote_id, label, description, quantity, unit_label, unit_price, tax_rate")
+    .eq("business_id", context.businessId);
+  if (recordId) {
+    quotesQuery.eq("id", recordId);
+    itemsQuery.eq("quote_id", recordId);
+  }
+  quotesQuery.order("issue_date", { ascending: false }).order("id");
+  itemsQuery.order("position").order("id");
+  const [quoteRows, itemRows, lookups] = await Promise.all([
+    readBillingRows((from, to) => quotesQuery.range(from, to)),
+    readBillingRows((from, to) => itemsQuery.range(from, to)),
+    loadLookupMaps(context),
+  ]);
+  const rows = z.array(quoteRowSchema).parse(quoteRows);
+  const items = z.array(quoteItemRowSchema).parse(itemRows);
+  const grouped = groupByParent(items, (item) => item.quote_id);
+  return rows.map((row) => mapQuote(row, lookups, grouped.get(row.id) || []));
+}
 export async function listJobs(context: BusinessContext, recordId?: string): Promise<Job[]> {
   const supabase = await createClient();
   const jobsQuery = supabase.from("jobs").select(JOB_SELECT).eq("business_id", context.businessId);
@@ -349,23 +372,24 @@ export async function listInvoices(context: BusinessContext, recordId?: string):
   const extrasQuery = recordId
     ? supabase.from("invoice_service_addresses").select("invoice_id, client_address_id").eq("business_id", context.businessId).eq("invoice_id", recordId)
     : supabase.from("invoice_service_addresses").select("invoice_id, client_address_id").eq("business_id", context.businessId);
-  const paymentBase = supabase.from("payments").select(INVOICE_PAYMENT_SELECT).eq("business_id", context.businessId);
-  const [rowsResult, itemsResult, extrasResult, paymentsResult, lookups] = await Promise.all([
-    invoicesQuery.order("issue_date", { ascending: false }),
-    itemsQuery.order("position"),
-    extrasQuery.order("position"),
-    (recordId ? paymentBase.eq("invoice_id", recordId) : paymentBase).order("paid_at").order("created_at"),
+  const paymentsQuery = supabase.from("payments").select(INVOICE_PAYMENT_SELECT).eq("business_id", context.businessId);
+  if (recordId) paymentsQuery.eq("invoice_id", recordId);
+  invoicesQuery.order("issue_date", { ascending: false }).order("id");
+  itemsQuery.order("position").order("id");
+  extrasQuery.order("position").order("invoice_id").order("client_address_id");
+  paymentsQuery.order("paid_at").order("created_at").order("id");
+  const [invoiceRows, itemRows, addressRows, paymentRows, lookups] = await Promise.all([
+    readBillingRows((from, to) => invoicesQuery.range(from, to)),
+    readBillingRows((from, to) => itemsQuery.range(from, to)),
+    readBillingRows((from, to) => extrasQuery.range(from, to)),
+    readBillingRows((from, to) => paymentsQuery.range(from, to)),
     loadLookupMaps(context),
   ]);
-  if (rowsResult.error) throw new Error(rowsResult.error.message);
-  if (itemsResult.error) throw new Error(itemsResult.error.message);
-  if (extrasResult.error) throw new Error(extrasResult.error.message);
-  if (paymentsResult.error) throw new Error(paymentsResult.error.message);
-  const extras = z.array(z.object({ invoice_id: z.uuid(), client_address_id: z.uuid() })).parse(extrasResult.data || []);
-  const payments = z.array(invoicePaymentRowSchema).parse(paymentsResult.data || []);
+  const extras = z.array(z.object({ invoice_id: z.uuid(), client_address_id: z.uuid() })).parse(addressRows);
+  const payments = z.array(invoicePaymentRowSchema).parse(paymentRows);
   const paymentsByInvoice = groupRows(payments, (row) => row.invoice_id);
-  const rows = z.array(invoiceRowSchema).parse(rowsResult.data || []);
-  const items = z.array(invoiceItemRowSchema).parse(itemsResult.data || []);
+  const rows = z.array(invoiceRowSchema).parse(invoiceRows);
+  const items = z.array(invoiceItemRowSchema).parse(itemRows);
   const grouped = groupByParent(items, (item) => item.invoice_id);
   const extrasByInvoice = groupRows(extras, (row) => row.invoice_id);
   return rows.map((row) =>
@@ -403,7 +427,21 @@ export async function reviseQuote(context: BusinessContext, id: string): Promise
   return getQuote(context, z.uuid().parse(data));
 }
 
-export async function updateQuoteStatus(context: BusinessContext, id: string, status: Quote["status"]): Promise<Quote> { const dbStatus = status === "Accepted" ? "approved" : status === "Declined" ? "declined" : status.toLowerCase(); const supabase = await createClient(); const { error } = await supabase.from("quotes").update({ status: dbStatus }).eq("business_id", context.businessId).eq("id", id); if (error) throw new Error(error.message); return getQuote(context, id); }
+export async function updateQuoteStatus(
+  context: BusinessContext,
+  id: string,
+  status: Quote["status"],
+  expectedUpdatedAt: string,
+): Promise<Quote> {
+  const dbStatus = status === "Accepted" ? "approved" : status.toLowerCase();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("quotes").update({ status: dbStatus })
+    .eq("business_id", context.businessId).eq("id", id).eq("updated_at", expectedUpdatedAt)
+    .select("id").maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("This quote changed or is unavailable. Reload the page and review the quote again.");
+  return getQuote(context, id);
+}
 export async function deleteQuote(context: BusinessContext, id: string): Promise<{ id: string; job?: Job }> {
   const supabase = await createClient();
   const linked = await supabase.from("jobs").select("id").eq("business_id", context.businessId).eq("quote_id", id).maybeSingle();

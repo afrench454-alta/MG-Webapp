@@ -19,3 +19,17 @@ GEMINI_API_KEY or GOOGLE_API_KEY: server-side estimator. XAI_API_KEY: optional p
 ## Tool configuration
 
 Use current installed CLIs and --help; no global unpinned Supabase install. No fabricated .mcp.json or cloud config file is required for this setup. Connect apps through supported ChatGPT/Codex interfaces and scope them to the task/test project. The Codex environment's network policy, variables, access and startup setup are configured in its actual UI; repository scripts do not automatically change those settings.
+
+## Disposable Supabase integration
+
+Install the locked Node dependencies with `npm ci`. Use a supported Docker or Podman host with `psql` on PATH. The runner accepts the loopback endpoints and public key from the pinned CLI's local status only. Never connect the runner to a hosted project, and keep ports 54321 and 54322 local to the disposable host.
+
+From a fresh isolated checkout and stack:
+
+```sh
+npx --no-install supabase start
+node scripts/check-local-supabase.mjs
+npx --no-install supabase stop
+```
+
+The first start applies the migrations and seeds the two synthetic tenants. The runner creates a fresh synthetic invoice and ledger entries on every run. Reset or discard that stack after testing. The SQL suites run with psql and roll back their own fixtures. Auth, PostgREST and Storage use the local public key and ordinary signed-in sessions. CI runs the same check in the `supabase-integration` job.
