@@ -80,27 +80,50 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await expect(page.getByText("Invoice issued.")).toBeVisible();
   });
 
-  test("saves a quote from a completed direct job, reloads its link and converts it once", async ({ page }) => {
-    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+  test("books a direct job, then quotes, invoices and revises the same visit after reload", async ({ page }) => {
+    await page.goto("/?demo=populated&view=schedule");
+    await page.getByRole("button", { name: "Schedule a job", exact: true }).first().click();
+    const form = page.getByRole("dialog");
+    await form.getByRole("combobox", { name: "Client", exact: true }).selectOption("demo-client-completed");
+    await form.getByRole("combobox", { name: "Service address", exact: true }).selectOption("demo-site-completed");
+    await form.getByRole("combobox", { name: "Service", exact: true }).selectOption("Yard Services");
+    await form.getByLabel("Work details").fill("Synthetic direct browser visit");
+    await form.getByLabel("Date & time").fill("2026-11-25T10:00");
+    await form.getByRole("button", { name: "Schedule", exact: true }).click();
+    await expect(page.getByText("Job scheduled.")).toBeVisible();
+
+    await page.goto("/?demo=populated&view=jobs");
+    await page.getByRole("button", { name: /Synthetic direct browser visit/ }).click();
+    await expect(form.getByRole("button", { name: "Complete", exact: true })).toBeVisible();
+    const jobUrl = page.url();
+    expect(new URL(jobUrl).searchParams.get("record")).toBeTruthy();
+    await form.getByRole("button", { name: "Complete", exact: true }).click();
+    await expect(form.getByRole("button", { name: "Create invoice", exact: true })).toBeVisible();
+    await page.reload();
     await page.getByRole("button", { name: "Create quote", exact: true }).click();
     await page.getByLabel(/Scope summary/).fill("Trim the hedge at the completed visit");
     await page.getByRole("textbox", { name: /description/i }).first().fill("Hedge trimming");
+    await form.getByLabel("Issue date").fill("2026-11-25");
+    await form.getByLabel("Valid until").fill("2026-12-17");
     await page.getByRole("button", { name: "Save Quote", exact: true }).click();
     await expect(page.getByText("Quote saved as draft.")).toBeVisible();
 
-    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+    await page.goto(jobUrl);
     await page.getByRole("button", { name: "View quote", exact: true }).click();
     const quote = page.getByRole("dialog");
     await expect(quote.getByText("Hedge trimming", { exact: true })).toBeVisible();
+    await expect(quote.getByText("17/12/2026", { exact: true })).toBeVisible();
     await quote.getByRole("combobox").selectOption("Accepted");
     await quote.getByRole("button", { name: "Create invoice", exact: true }).click();
     await page.getByRole("button", { name: /save.*draft/i }).click();
     await expect(page.getByText("Invoice saved as draft.")).toBeVisible();
-    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+    await page.goto(jobUrl);
     await page.getByRole("button", { name: "View invoice", exact: true }).click();
     await expect(page.getByRole("dialog").getByText("Hedge trimming", { exact: true })).toBeVisible();
+    const invoiceId = new URL(page.url()).searchParams.get("record");
+    expect(invoiceId).toBeTruthy();
 
-    await page.goto("/?demo=populated&view=jobs&record=demo-job-completed");
+    await page.goto(jobUrl);
     await page.getByRole("button", { name: "View quote", exact: true }).click();
     await quote.getByRole("button", { name: "Create revision" }).click();
     await expect(page.getByText("Quote revision saved as a draft.")).toBeVisible();
@@ -108,6 +131,7 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await expect(quote.getByRole("button", { name: "Create invoice", exact: true })).toHaveCount(0);
     await quote.getByRole("button", { name: "View invoice", exact: true }).click();
     await expect(quote.getByText("Hedge trimming", { exact: true })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("record")).toBe(invoiceId);
   });
 
   test("only counts urgent alerts among 51 items and clears a resolved job", async ({ page }) => {
