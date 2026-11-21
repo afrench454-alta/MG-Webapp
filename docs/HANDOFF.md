@@ -17,7 +17,7 @@ Open the [populated synthetic preview](http://127.0.0.1:3003/?demo=populated) on
 
 ## Candidate checks
 
-The release review caught three billing issues. The candidate rounds each quote line the same way as PostgreSQL, reads beyond the first page of financial rows, and checks the reviewed quote version on a status change. Lint, type checking, 154 unit tests, all 21 Chromium demo tests and the production build passed. Runtime and full npm audits both returned zero findings after updating transitive development tooling. The independent review also tightened the proposed Supabase denial assertions. The Windows host cannot run the pinned local Supabase CLI without a container runtime.
+The release review caught three billing issues. The candidate rounds each quote line the same way as PostgreSQL, reads beyond the first page of financial rows, and checks the reviewed quote version on a status change. Lint, type checking, 154 unit tests, all 22 Chromium demo tests and the production build passed. Runtime and full npm audits both returned zero findings after updating transitive development tooling. The independent review also tightened the proposed Supabase denial assertions. The Windows host cannot run the pinned local Supabase CLI without a container runtime.
 
 The iPhone 12 mini reached the Wi-Fi demo. Its user reported a squeezed layout. The update keeps the menu, alerts and Quick Create together, wraps the full business name, and removes the closed menu's visible shadow. WebKit checks passed at 320, 375 and 390 px. The synthetic quote and payment flows also passed in WebKit on the Wi-Fi HTTP address. Physical acceptance of the revised layout and VoiceOver remain open.
 

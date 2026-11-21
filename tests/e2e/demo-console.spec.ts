@@ -214,3 +214,69 @@ test.describe("Mow & Glow Console - Demo Mode", () => {
     await expect(page.locator(".job-column--unscheduled").getByText("Reschedule Client")).toBeVisible();
   });
 });
+
+test("keeps a request visit and its original invoice linked when issuing a replacement", async ({ page }) => {
+  await page.goto("/?demo=populated&view=schedule");
+  await page.getByRole("button", { name: "Schedule a job", exact: true }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Job Request").selectOption("demo-request-1");
+  await dialog.getByLabel("Date & time").fill("2026-11-25T14:00");
+  await dialog.getByRole("button", { name: "Schedule", exact: true }).click();
+  await expect(page.getByText("Job scheduled.")).toBeVisible();
+
+  const openVisit = async () => {
+    await page.goto("/?demo=populated&view=requests");
+    const request = page.getByRole("article").filter({ hasText: "Demo unscheduled customer" });
+    await request.getByRole("button", { name: "View visits", exact: true }).click();
+    await dialog.getByRole("button", { name: "Open visit", exact: true }).click();
+  };
+
+  await openVisit();
+  await dialog.getByRole("button", { name: "Complete", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Create invoice", exact: true })).toBeVisible();
+  await page.reload();
+  await dialog.getByRole("button", { name: "Create invoice", exact: true }).click();
+  await dialog.getByLabel("Item 1 description").fill("Initial request mowing");
+  await dialog.getByLabel("Item 1 unit price").fill("125");
+  await dialog.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("Invoice saved as draft.")).toBeVisible();
+
+  await openVisit();
+  await dialog.getByRole("button", { name: "View invoice", exact: true }).click();
+  const originalUrl = page.url();
+  const originalId = new URL(originalUrl).searchParams.get("record");
+  expect(originalId).toBeTruthy();
+  await dialog.getByRole("button", { name: "Issue", exact: true }).click();
+  await expect(page.getByText("Invoice issued.")).toBeVisible();
+  await page.reload();
+  await expect(dialog.getByText("Initial request mowing", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Create replacement", exact: true }).click();
+  const reason = "Correct synthetic service details";
+  await dialog.getByLabel("Reason for replacement").fill(reason);
+  await dialog.getByLabel("Item 1 description").fill("Corrected request mowing");
+  await dialog.getByLabel("Item 1 unit price").fill("150");
+  await dialog.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("Invoice saved as draft.")).toBeVisible();
+
+  await page.goto(originalUrl);
+  await expect(dialog.getByText("Issued", { exact: true })).toBeVisible();
+  await page.goto("/?demo=populated&view=invoices");
+  const replacement = page.getByRole("article").filter({ hasText: "$150.00" });
+  await expect(replacement).toHaveCount(1);
+  await replacement.getByRole("button", { name: "Review draft", exact: true }).click();
+  const replacementId = new URL(page.url()).searchParams.get("record");
+  expect(replacementId).toBeTruthy();
+  expect(replacementId).not.toBe(originalId);
+  await dialog.getByRole("button", { name: "Issue", exact: true }).click();
+  await expect(page.getByText("Invoice issued.")).toBeVisible();
+  await page.reload();
+  await expect(dialog.getByText("Corrected request mowing", { exact: true })).toBeVisible();
+  await expect(dialog.getByText(`Replacement for invoice ${originalId}. ${reason}`)).toBeVisible();
+
+  await page.goto(originalUrl);
+  await expect(dialog.getByText("Void", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Initial request mowing", { exact: true })).toBeVisible();
+  await openVisit();
+  await dialog.getByRole("button", { name: "View invoice", exact: true }).click();
+  expect(new URL(page.url()).searchParams.get("record")).toBe(replacementId);
+});

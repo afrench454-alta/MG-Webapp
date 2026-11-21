@@ -5,7 +5,7 @@ Local review candidate on `feat/mg-workflow-review`, based on workflow commit `4
 ## Evidence
 
 - [x] Preserved the former demo worktree before retiring it. Recovery commit `cec896d` and a verified byte-for-byte archive are available. The primary repository still owns the shared Git metadata.
-- [x] Ran `npm run check`, `npm run build` and `npx playwright test --workers=2` on the candidate with Node 24.19.0 and npm 12.0.2. All 154 unit and 21 Chromium tests passed. The Chromium suite used synthetic demo mode.
+- [x] Ran `npm run check`, `npm run build` and `npx playwright test --workers=2` on the candidate with Node 24.19.0 and npm 12.0.2. All 154 unit and 22 Chromium tests passed. The Chromium suite used synthetic demo mode, including scheduling a request visit, issuing its invoice and reloading both documents after issuing a linked replacement. The replacement preserved the original line and moved the visit to the replacement invoice.
 - [x] Ran the three integrity suites after applying all 17 migrations to disposable PostgreSQL 17.11 with synthetic Auth and Storage shims. The legacy duplicate pair survived upgrade and its draft could not be issued. Separate connections verified the quote-creation race, job-versus-quote billing race, payment replay and overpayment handling.
 - [x] Fixed per-line quote rounding, complete billing reads over multiple pages, and quote status writes tied to the version reviewed. The three targeted regressions and the full local suites passed.
 - [x] Ran fresh `npm audit --omit=dev` and `npm audit` against the updated candidate lockfile. Both returned zero findings after compatible transitive development-tool updates.
