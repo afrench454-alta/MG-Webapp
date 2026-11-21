@@ -16,7 +16,7 @@ Local review candidate on `feat/mg-workflow-review`, based on workflow commit `4
 - [ ] Use a physical iPhone and VoiceOver over a trusted test connection. Cover Today/Jobs, quote entry, payments, dialogs, touch keyboard, focus order and return, zoom/reflow, and print. The iPhone 12 mini opened the Wi-Fi preview and the operator reported a squeezed layout. The updated header, quote and payment passed in local WebKit. Confirm the revised layout on the physical device and complete the acceptance steps.
 - [ ] Rehearse the full Supabase legacy upgrade and isolated restore or forward recovery. Verify retained payments, issued snapshots, audit history and source links.
 
-The prior visual pass covered a one-line invoice, a one-page quote and a three-page invoice. It checked repeated headings, totals and exclusion of internal notes. This tranche does not change print layout.
+The Chromium A4 pass at `3491a34` covered a one-line invoice, a 32-line invoice across three pages and a quote with two fractional-cent lines. Each page was visually inspected. PDF text checks confirmed repeated column headings, all line items, expected totals and exclusion of internal notes. See the project-level `phase-evidence/a4-3491a34` directory for the preserved synthetic samples. Physical Safari print remains open.
 
 ## iPhone acceptance
 
