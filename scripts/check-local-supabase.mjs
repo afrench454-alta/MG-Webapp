@@ -40,6 +40,70 @@ function storageDenied(result, allowedStatuses, label) {
   assert.ok(allowedStatuses.includes(status), `${label} failed for an unexpected reason (${status})`);
 }
 
+async function verifyVisitBilling(owner) {
+  const reference = randomUUID();
+  const jobId = value(await owner.rpc("schedule_work_job", {
+    target_business_id: tenant,
+    draft: {
+      category: "Yard Services",
+      scope: "Synthetic direct booking",
+      scheduledStart: "2026-11-25T10:00:00+10:00",
+      inlineClient: { name: "Local direct booking", siteAddress: "25 Example Street, Sample QLD" },
+    },
+  }), "Book a direct visit");
+  const job = value(await owner.from("jobs")
+    .select("client_id,service_address_id,updated_at").eq("id", jobId).single(), "Reload booked visit");
+  assert.ok(job.client_id && job.service_address_id);
+  value(await owner.rpc("update_work_job", {
+    target_business_id: tenant, target_job_id: jobId, target_status: "completed",
+    job_notes: "", recurrence_frequency: null, recurrence_interval: null,
+    change_schedule: false, new_start: null, expected_updated_at: job.updated_at,
+  }), "Complete the direct visit");
+
+  const items = [{ description: "Synthetic visit", quantity: 1.25, unitLabel: "hours", rate: 160 }];
+  const quoteDraft = { scope: "Synthetic visit quote", reference, issueDate: "2026-11-25",
+    validUntil: "2026-12-17", items };
+  const saveQuote = () => owner.rpc("save_direct_job_quote", {
+    target_business_id: tenant, target_job_id: jobId, draft: quoteDraft,
+  });
+  const quotes = await Promise.all([saveQuote(), saveQuote()]);
+  const savedQuotes = quotes.filter((attempt) => !attempt.error);
+  assert.equal(savedQuotes.length, 1, "Concurrent quote creation must produce one result");
+  assert.match(quotes.find((attempt) => attempt.error).error.message, /already has a quote/i);
+  const quoteId = value(savedQuotes[0], "Read saved quote ID");
+  const quote = value(await owner.from("quotes")
+    .select("id,client_id,service_address_id,valid_until").eq("customer_reference", reference),
+  "Reload linked quote and check there is no orphan");
+  assert.deepEqual(quote, [{
+    id: quoteId, client_id: job.client_id, service_address_id: job.service_address_id, valid_until: "2026-12-17",
+  }]);
+  const linked = value(await owner.from("jobs").select("quote_id").eq("id", jobId).single(), "Reload visit quote link");
+  assert.equal(linked.quote_id, quoteId);
+
+  const accept = (id) => owner.from("quotes").update({ status: "approved" }).eq("id", id).select("id").single();
+  value(await accept(quoteId), "Accept visit quote");
+  const bill = (link) => owner.rpc("save_invoice_draft", {
+    draft: { ...link, clientId: job.client_id, propertyId: job.service_address_id,
+      issueDate: "2026-11-25", notes: "", idempotencyKey: randomUUID(), items },
+  });
+  const invoices = await Promise.all([bill({ jobId }), bill({ quoteId })]);
+  const savedInvoices = invoices.filter((attempt) => !attempt.error);
+  assert.equal(savedInvoices.length, 1, "Competing sources must bill the visit once");
+  assert.match(invoices.find((attempt) => attempt.error).error.message, /already exists/i);
+  const invoiceId = value(savedInvoices[0], "Read saved invoice ID");
+
+  const revisionId = value(await owner.rpc("revise_work_quote", {
+    target_business_id: tenant, target_quote_id: quoteId,
+  }), "Revise accepted visit quote");
+  value(await accept(revisionId), "Accept visit quote revision");
+  const revisedBilling = await bill({ quoteId: revisionId });
+  databaseDenied(revisedBilling, ["P0001"], "Duplicate billing from a revised visit quote");
+  assert.match(revisedBilling.error.message, /already exists/i);
+  const results = value(await owner.from("invoices").select("id,total").eq("job_id", jobId), "Reload visit invoice");
+  assert.deepEqual(results, [{ id: invoiceId, total: 200 }]);
+  console.log("PASS concurrent direct-job quotes, competing invoice sources and revision guard over PostgREST");
+}
+
 async function run() {
   const status = spawnSync(process.execPath, [cli, "status", "-o", "json"], {
     cwd: root,
@@ -159,6 +223,8 @@ async function run() {
     value(await bucket(owner).remove([object]), "Remove synthetic attachment");
   }
   console.log("PASS Supabase Auth, PostgREST financial permissions and payment persistence, Storage policies, and SQL suites");
+
+  await verifyVisitBilling(owner);
 
   if (process.argv.includes("--browser")) {
     const playwright = fileURLToPath(new URL("../node_modules/@playwright/test/cli.js", import.meta.url));
