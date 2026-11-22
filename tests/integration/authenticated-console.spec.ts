@@ -122,3 +122,45 @@ test("signed-in invoice draft recovers from interruption and persists an issued 
     });
   }
 });
+
+test("Joseph rejects a stale next-stop approval after the same visit changes", async ({ page }) => {
+  const customer = `Joseph fixture ${randomUUID()}`;
+  await page.goto("/sign-in?next=%2F%3Fview%3Dschedule");
+  await page.getByLabel("Email", { exact: true }).fill("tenant-a-owner@example.test");
+  await page.getByLabel("Password", { exact: true }).fill("MowGlowLocalTest123!");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Schedule a job", exact: true }).first().click();
+  const booking = page.getByRole("dialog");
+  await booking.getByRole("button", { name: "Add new client", exact: true }).click();
+  await booking.getByLabel("Client name").fill(customer);
+  await booking.getByLabel("Service address").fill("2 Example Way, Sample QLD");
+  await booking.getByRole("combobox", { name: "Service", exact: true }).selectOption("Yard Services");
+  await booking.getByLabel("Work details").fill("Synthetic Joseph visit");
+  await booking.getByRole("button", { name: "Schedule", exact: true }).click();
+  await expect(page.getByText("Job scheduled.")).toBeVisible();
+
+  await page.goto("/?view=joseph");
+  await page.getByRole("button", { name: "On my way", exact: true }).click();
+  const confirmation = page.getByRole("button", { name: "Confirm change", exact: true });
+  await expect(confirmation).toBeVisible();
+
+  const otherTab = await page.context().newPage();
+  try {
+    await otherTab.goto("/?view=jobs");
+    const card = otherTab.getByRole("article").filter({ hasText: customer });
+    await card.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(card.getByText("In Progress", { exact: true })).toBeVisible();
+  } finally {
+    await otherTab.close();
+  }
+
+  await confirmation.click();
+  await expect(page.getByText("The job changed. Review a new proposal.", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Running late", exact: true }).click();
+  await expect(confirmation).toBeVisible();
+  await confirmation.click();
+  await expect(page.getByText(/Not sent\./)).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".joseph-brief__header").getByText("Running late", { exact: true })).toBeVisible();
+});
