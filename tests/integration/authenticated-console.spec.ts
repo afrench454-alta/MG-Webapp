@@ -64,7 +64,26 @@ test("signed-in invoice draft recovers from interruption and persists an issued 
     expect(list?.headers()["content-security-policy"]).toBeUndefined();
     const row = page.getByRole("article").filter({ hasText: customer });
     await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: "Edit", exact: true }).click();
+    await dialog.getByLabel("Scope of work").fill("Stale synthetic edit");
+    const otherTab = await page.context().newPage();
+    try {
+      await otherTab.goto("/?view=invoices");
+      await otherTab.getByRole("article").filter({ hasText: customer })
+        .getByRole("button", { name: "Edit", exact: true }).click();
+      const otherDraft = otherTab.getByRole("dialog");
+      await otherDraft.getByLabel("Scope of work").fill("Current synthetic edit");
+      await otherDraft.getByRole("button", { name: "Save changes", exact: true }).click();
+      await expect(otherTab.getByText("Draft invoice updated.")).toBeVisible();
+    } finally {
+      await otherTab.close();
+    }
+    await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText("This draft changed");
+    await expect(dialog.getByLabel("Scope of work")).toHaveValue("Stale synthetic edit");
+    await page.goto("/?view=invoices");
     await row.getByRole("button", { name: "Review draft", exact: true }).click();
+    await expect(dialog.getByText("Current synthetic edit", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Synthetic hedge trimming", { exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "Issue", exact: true }).click();
     await expect(page.getByText("Invoice issued.")).toBeVisible();
@@ -82,6 +101,20 @@ test("signed-in invoice draft recovers from interruption and persists an issued 
     await expect(dialog.getByText("Synthetic internal-only text", { exact: true })).toHaveCount(0);
     await dialog.getByRole("button", { name: "Save / Print PDF" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-print-invoked", "true");
+
+    // End the browser session between opening and submitting a new draft.
+    await page.goto("/?view=invoices");
+    await create.click();
+    await dialog.getByRole("button", { name: "Add new client", exact: true }).click();
+    await dialog.getByLabel("Client name").fill("Signed-out synthetic draft");
+    await dialog.getByLabel("Item 1 description").fill("Retain entered work");
+    const authCookies = (await page.context().cookies()).filter((cookie) => /^sb-/.test(cookie.name));
+    expect(authCookies.length).toBeGreaterThan(0);
+    await page.context().clearCookies({ name: /^sb-/ });
+    await dialog.getByRole("button", { name: "Save draft", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    await expect(dialog.getByLabel("Item 1 description")).toHaveValue("Retain entered work");
+    await expect(page.getByText("Invoice saved as draft.")).toHaveCount(0);
   } finally {
     await info.attach("report-only CSP events", {
       body: JSON.stringify([...reports].sort(), null, 2),
