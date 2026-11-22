@@ -1,0 +1,7 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "feat/mg-workflow-review": false
+    }
+  }
+}
