@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import type { Questionnaire } from "../domain";
+import { QuestionnaireForm } from "@/app/questionnaire/[token]/questionnaire-form";
 import styles from "@/app/questionnaire/[token]/questionnaire.module.css";
 
 export function PublicQuestionnairePreview({
@@ -12,26 +12,6 @@ export function PublicQuestionnairePreview({
   questionnaire: Questionnaire;
   onClose: () => void;
 }) {
-  const [submitted, setSubmitted] = useState(false);
-  const fields = questionnaire.fields || [];
-
-  if (submitted) {
-    return (
-      <div className={styles.page}>
-        <section className={styles.card}>
-          <div className={styles.success}>
-            <div className={styles.successIcon}>✓</div>
-            <h1>Preview only</h1>
-            <p>This is what a client sees after they submit.</p>
-            <button className={styles.submitBtn} onClick={onClose} type="button">
-              Close preview
-            </button>
-          </div>
-        </section>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.page}>
       <section className={styles.card}>
@@ -71,76 +51,10 @@ export function PublicQuestionnairePreview({
             <span>{questionnaire.description}</span>
           </div>
         </header>
-        <div className={styles.formWrapper}>
-          <form
-            className={styles.form}
-            onSubmit={(event) => {
-              event.preventDefault();
-              setSubmitted(true);
-            }}
-          >
-            <fieldset className={styles.fieldCard} aria-labelledby="preview-contact-title">
-              <h2 id="preview-contact-title" className={styles.cardTitle}>Contact Information</h2>
-              <div className={styles.identity}>
-                <label className={styles.inputGroup}>
-                  <span>Your name *</span>
-                  <input required />
-                </label>
-                <label className={styles.inputGroup}>
-                  <span>Phone</span>
-                  <input type="tel" inputMode="tel" placeholder="04xx xxx xxx" />
-                  <span className={styles.hint}>Phone or email — at least one</span>
-                </label>
-                <label className={styles.inputGroup}>
-                  <span>Email</span>
-                  <input type="email" />
-                  <span className={styles.hint}>Phone or email — at least one</span>
-                </label>
-                <label className={styles.inputGroup}>
-                  <span>Property address *</span>
-                  <input required placeholder="Street, suburb" />
-                </label>
-              </div>
-            </fieldset>
-            {fields.map((field, index) => (
-              <fieldset className={styles.fieldCard} key={field.id} aria-labelledby={`preview-q-${field.id}`}>
-                <h2 id={`preview-q-${field.id}`} className={styles.cardTitle}>
-                  {index + 1}. {field.label}
-                  {field.required ? " *" : ""}
-                </h2>
-                {field.type === "textarea" ? (
-                  <textarea className={styles.textInput} rows={4} />
-                ) : field.type === "text" ? (
-                  <input className={styles.textInput} />
-                ) : (
-                  <div className={styles.options}>
-                    {(field.options || []).map((option) => (
-                      <label key={option} className={styles.optionCard}>
-                        <input
-                          className="sr-only"
-                          type={field.type === "checkbox" ? "checkbox" : "radio"}
-                          name={field.id}
-                        />
-                        <span
-                          className={
-                            field.type === "checkbox"
-                              ? styles.checkboxControl
-                              : styles.radioControl
-                          }
-                          aria-hidden="true"
-                        />
-                        <span className={styles.optionLabel}>{option}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </fieldset>
-            ))}
-            <button className={styles.submitBtn} type="submit">
-              Submit responses
-            </button>
-          </form>
-        </div>
+        <QuestionnaireForm questionnaire={{
+          form_schema: { fields: questionnaire.fields },
+          completion_message: "Preview complete. Your answers were not saved.",
+        }} />
       </section>
     </div>
   );

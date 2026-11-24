@@ -178,6 +178,7 @@ export type QuestionnaireField = {
   type: "text" | "textarea" | "radio" | "checkbox";
   required?: boolean;
   options?: string[];
+  showWhen?: { fieldId: string; option: string };
 };
 
 export type Questionnaire = {

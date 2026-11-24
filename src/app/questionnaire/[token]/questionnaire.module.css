@@ -96,3 +96,13 @@
   .submitBtn { width: 100%; align-self: stretch; min-height: 48px; }
   .success { padding: 60px 20px; }
 }
+
+.estimateNotice {
+  padding: 16px 20px;
+  text-align: left;
+  color: #173f35;
+  background: #edf2e9;
+  border-radius: 12px;
+}
+.estimateNotice p { margin: 0; color: inherit; }
+.estimateNotice p + p { margin-top: 6px; }
