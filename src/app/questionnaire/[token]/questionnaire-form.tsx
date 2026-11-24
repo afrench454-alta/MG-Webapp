@@ -8,10 +8,19 @@ import type { z } from "zod";
 
 import styles from "./questionnaire.module.css";
 
-type Payload = z.infer<typeof publicQuestionnaireSchema>;
+type Questionnaire = NonNullable<z.infer<typeof publicQuestionnaireSchema>["questionnaire"]>;
+type FormProps = { questionnaire: Pick<Questionnaire, "form_schema" | "completion_message">; token?: string };
 
-export function QuestionnaireForm({ token, payload }: { token: string; payload: Payload }) {
-  const questionnaire = payload.questionnaire!;
+function EstimateNotice() {
+  return (
+    <aside className={styles.estimateNotice} aria-label="Estimate and fixed quotes">
+      <p>This job request is for an estimate only.</p>
+      <p>For a detailed, fixed quote, contact us to book a property viewing and consultation.</p>
+    </aside>
+  );
+}
+
+export function QuestionnaireForm({ token, questionnaire }: FormProps) {
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [identity, setIdentity] = useState({ name: "", email: "", phone: "", address: "" });
   const [pending, setPending] = useState(false);
@@ -20,8 +29,17 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
 
   const toggle = (fieldId: string, option: string) => setAnswers((current) => { const selected = Array.isArray(current[fieldId]) ? current[fieldId] as string[] : []; return { ...current, [fieldId]: selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option] }; });
 
-  const totalRequired = questionnaire.form_schema.fields.filter((f: z.infer<typeof formFieldSchema>) => f.required).length;
-  const answeredRequired = questionnaire.form_schema.fields.filter((f: z.infer<typeof formFieldSchema>) => f.required && answers[f.id] && answers[f.id].length > 0).length;
+  const visibleFields = questionnaire.form_schema.fields.filter((field) => {
+    if (!field.showWhen) return true;
+    const selected = answers[field.showWhen.fieldId];
+    return Array.isArray(selected) && selected.includes(field.showWhen.option);
+  });
+  const hasAnswer = (field: z.infer<typeof formFieldSchema>) => {
+    const value = answers[field.id];
+    return typeof value === "string" ? Boolean(value.trim()) : Boolean(value?.length);
+  };
+  const totalRequired = visibleFields.filter((field) => field.required).length;
+  const answeredRequired = visibleFields.filter((field) => field.required && hasAnswer(field)).length;
   const progressPercent = totalRequired === 0 ? 100 : Math.round((answeredRequired / totalRequired) * 100);
 
   if (submitted) {
@@ -30,9 +48,10 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
         <div className={styles.successIcon}>✓</div>
         <h1>Responses received</h1>
         <p>{questionnaire.completion_message || "Thanks — the team can now prepare the next step."}</p>
-        <div className={styles.successDetails}>
+        <EstimateNotice />
+        {token ? <div className={styles.successDetails}>
           <strong>Reference ID:</strong> {token.substring(0, 8).toUpperCase()}
-        </div>
+        </div> : null}
       </div>
     );
   }
@@ -59,13 +78,24 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
         if (!name) { setError("Enter your name."); return; }
         if (!address) { setError("Enter the property address."); return; }
         if (!phone && !email) { setError("Provide a phone number or email — at least one."); return; }
-        const missing = questionnaire.form_schema.fields.some((field: z.infer<typeof formFieldSchema>) => field.required && (!answers[field.id] || answers[field.id].length === 0));
-        if (missing) { setError("Complete each required question."); return; }
+        const missing = visibleFields.find((field) => field.required && !hasAnswer(field));
+        if (missing) { setError(`Complete the required question: ${missing.label}.`); return; }
+        const visibleAnswers: Record<string, string | string[]> = {};
+        for (const field of visibleFields) {
+          const value = answers[field.id];
+          if (value !== undefined) visibleAnswers[field.id] = typeof value === "string" ? value.trim() : value;
+        }
+        if (!token) { setSubmitted(true); return; }
         setPending(true);
-        const result = await submitQuestionnaireAction({ token, name, email, phone, answers: { ...answers, _site_address: address } });
-        setPending(false);
-        if (!result.ok) { setError(result.message); return; }
-        setSubmitted(true);
+        try {
+          const result = await submitQuestionnaireAction({ token, name, email, phone, answers: { ...visibleAnswers, _site_address: address } });
+          if (!result.ok) { setError(result.message); return; }
+          setSubmitted(true);
+        } catch {
+          setError("Could not submit your responses. Please try again.");
+        } finally {
+          setPending(false);
+        }
       }}>
         
         <fieldset className={styles.fieldCard} aria-labelledby="intake-contact-title">
@@ -92,16 +122,16 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
           </div>
         </fieldset>
 
-        {questionnaire.form_schema.fields.map((field: z.infer<typeof formFieldSchema>, index: number) => {
-          const isError = error && field.required && (!answers[field.id] || answers[field.id].length === 0);
+        {visibleFields.map((field: z.infer<typeof formFieldSchema>, index: number) => {
+          const isError = error && field.required && !hasAnswer(field);
           return (
             <fieldset className={`${styles.fieldCard} ${isError ? styles.fieldError : ""}`} key={field.id} aria-invalid={isError ? "true" : "false"} aria-labelledby={`intake-q-${field.id}`}>
               <h2 id={`intake-q-${field.id}`} className={styles.cardTitle}>
                 {index + 1}. {field.label}
                 {field.required ? <span className={styles.asterisk} aria-hidden="true"> *</span> : null}
               </h2>
-              {field.type === "text" ? <input className={styles.textInput} value={(answers[field.id] as string) || ""} onChange={(event) => setAnswers((current) => ({ ...current, [field.id]: event.target.value }))} aria-required={field.required} /> : null}
-              {field.type === "textarea" ? <textarea className={styles.textInput} rows={4} value={(answers[field.id] as string) || ""} onChange={(event) => setAnswers((current) => ({ ...current, [field.id]: event.target.value }))} aria-required={field.required} /> : null}
+              {field.type === "text" ? <input className={styles.textInput} aria-labelledby={`intake-q-${field.id}`} required={field.required} value={(answers[field.id] as string) || ""} onChange={(event) => setAnswers((current) => ({ ...current, [field.id]: event.target.value }))} aria-required={field.required} /> : null}
+              {field.type === "textarea" ? <textarea className={styles.textInput} rows={4} aria-labelledby={`intake-q-${field.id}`} required={field.required} value={(answers[field.id] as string) || ""} onChange={(event) => setAnswers((current) => ({ ...current, [field.id]: event.target.value }))} aria-required={field.required} /> : null}
               {field.type === "radio" ? <div className={styles.options} role="radiogroup" aria-required={field.required}>{(field.options || []).map((option: string) => {
                 const isChecked = answers[field.id] === option;
                 return (
@@ -126,6 +156,7 @@ export function QuestionnaireForm({ token, payload }: { token: string; payload: 
           );
         })}
         {error ? <div className={styles.errorAlert} role="alert"><p>{error}</p></div> : null}
+        <EstimateNotice />
         <button className={styles.submitBtn} type="submit" disabled={pending}>{pending ? "Submitting…" : "Submit responses"}</button>
       </form>
     </div>

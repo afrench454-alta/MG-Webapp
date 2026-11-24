@@ -12,7 +12,7 @@ import Image from "next/image";
 export default async function PublicQuestionnairePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const payload = await getPublicQuestionnaire(token);
-  if (!payload) notFound();
+  if (!payload || (!payload.already_submitted && !payload.questionnaire)) notFound();
   
   return (
     <main className={styles.page}>
@@ -41,7 +41,7 @@ export default async function PublicQuestionnairePage({ params }: { params: Prom
             )}
           </div>
         </header>
-        {payload.already_submitted ? null : <QuestionnaireForm token={token} payload={payload} />}
+        {!payload.already_submitted && payload.questionnaire ? <QuestionnaireForm token={token} questionnaire={payload.questionnaire} /> : null}
       </section>
     </main>
   );

@@ -341,3 +341,16 @@ test("contracts: publicQuestionnaireSubmissionSchema requires name, address, and
     false,
   );
 });
+
+test("contracts: questionnaire fields keep conditional visibility from the stored template", () => {
+  const showWhen = { fieldId: "extras", option: "Other" };
+  const field = formFieldSchema.parse({
+    id: "extras_description",
+    label: "Describe the other service needed",
+    type: "textarea",
+    required: true,
+    showWhen,
+  });
+  assert.deepEqual(field.showWhen, showWhen);
+  assert.equal(field.required, true);
+});

@@ -51,7 +51,8 @@ export const formFieldSchema = z.object({
   ),
   type: z.enum(["text", "textarea", "radio", "checkbox"]).catch("text"),
   required: z.boolean().optional(),
-  options: z.array(z.string()).optional()
+  options: z.array(z.string()).optional(),
+  showWhen: z.object({ fieldId: z.string(), option: z.string() }).optional(),
 });
 
 export const publicQuestionnaireSchema = z.object({
